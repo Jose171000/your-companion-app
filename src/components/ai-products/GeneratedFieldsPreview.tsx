@@ -61,50 +61,51 @@ export function GeneratedFieldsPreview({ visible }: GeneratedFieldsPreviewProps)
   const filledRequired = fields.filter((f) => f.required && f.value).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header Stats */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-lg">Campos generados por IA</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="font-semibold text-base md:text-lg">Campos generados por IA</h3>
+          <p className="text-xs md:text-sm text-muted-foreground">
             Revisa y edita antes de enviar
           </p>
         </div>
-        <div className="flex items-center gap-4">
-          <Badge variant="outline" className="gap-2">
-            <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+        <div className="flex items-center gap-2 md:gap-4">
+          <Badge variant="outline" className="gap-1.5 md:gap-2 text-xs">
+            <CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5 text-green-400" />
             {filledRequired}/{requiredCount} requeridos
           </Badge>
-          <Button variant="outline" size="sm" className="gap-2">
-            <RotateCcw className="w-4 h-4" />
-            Regenerar todo
+          <Button variant="outline" size="sm" className="gap-1.5 md:gap-2 text-xs md:text-sm h-8 md:h-9">
+            <RotateCcw className="w-3.5 h-3.5 md:w-4 md:h-4" />
+            <span className="hidden sm:inline">Regenerar todo</span>
+            <span className="sm:hidden">Regenerar</span>
           </Button>
         </div>
       </div>
 
       {/* Fields Grid */}
-      <div className="grid gap-4">
+      <div className="grid gap-3 md:gap-4">
         {fields.map((field) => (
           <Card
             key={field.id}
             className={cn(
-              "p-4 transition-all",
+              "p-3 md:p-4 transition-all",
               editingField === field.id && "ring-2 ring-primary"
             )}
           >
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 space-y-2">
-                <div className="flex items-center gap-2">
-                  <label className="font-medium text-sm">{field.label}</label>
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+              <div className="flex-1 space-y-2 min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                  <label className="font-medium text-xs md:text-sm">{field.label}</label>
                   {field.required && (
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                    <Badge variant="secondary" className="text-[9px] md:text-[10px] px-1 md:px-1.5 py-0">
                       Requerido
                     </Badge>
                   )}
                   {field.aiGenerated && (
                     <Badge
                       className={cn(
-                        "text-[10px] px-1.5 py-0",
+                        "text-[9px] md:text-[10px] px-1 md:px-1.5 py-0",
                         confidenceColors[field.confidence]
                       )}
                     >
