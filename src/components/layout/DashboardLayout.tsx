@@ -23,7 +23,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const pageInfo = pageTitles[activeItem] || { title: "Dashboard", subtitle: "" };
 
   return (
-    <div className="min-h-screen bg-background dark">
+    <div className="min-h-screen bg-background">
       <Sidebar activeItem={activeItem} onItemChange={setActiveItem} />
       
       <main
