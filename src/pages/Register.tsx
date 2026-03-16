@@ -10,6 +10,7 @@ import { Loader2, UserPlus } from 'lucide-react';
 
 export default function Register() {
   const [name, setName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -35,7 +36,7 @@ export default function Register() {
 
     setIsLoading(true);
 
-    const result = await register({ email, password, name });
+    const result = await register({ email, password, name, lastName });
     
     if (result.success) {
       navigate('/');
@@ -68,13 +69,25 @@ export default function Register() {
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="name">Nombre (opcional)</Label>
+              <Label htmlFor="name">Nombre</Label>
               <Input
                 id="name"
                 type="text"
                 placeholder="Tu nombre"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Apellido</Label>
+              <Input
+                id="lastName"
+                type="text"
+                placeholder="Tu apellido"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
                 disabled={isLoading}
               />
             </div>

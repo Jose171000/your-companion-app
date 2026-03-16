@@ -7,6 +7,8 @@ import { ProductInputForm } from "./ProductInputForm";
 import { GeneratedFieldsPreview } from "./GeneratedFieldsPreview";
 import { ExportActions } from "./ExportActions";
 import { Sparkles } from "lucide-react";
+import { productsApi } from "@/lib/products-api";
+import { toast } from "sonner";
 
 export function AIProductsModule() {
   const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>([]);
@@ -14,12 +16,41 @@ export function AIProductsModule() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasGeneratedContent, setHasGeneratedContent] = useState(false);
 
-  const handleSubmit = async (data: { mode: "single" | "bulk"; content: string }) => {
+
+
+  const handleSubmit = async (data: {
+    mode: "single" | "bulk";
+    content: string;
+    sku: string;
+    price?: number;
+    images: File[];
+  }) => {
     setIsProcessing(true);
-    // Simular procesamiento de IA
-    await new Promise((resolve) => setTimeout(resolve, 2500));
-    setIsProcessing(false);
-    setHasGeneratedContent(true);
+    try {
+      const dto = {
+        sku: data.sku,
+        name: data.content,
+        description: data.content,
+        category: selectedCategory,
+        targetMarketplaces: selectedMarketplaces,
+        price: data.price,
+      };
+
+      const response = await productsApi.createWithAIAndFiles(dto, data.images);
+
+      if (response.error) {
+        toast.error(response.error);
+      } else {
+        setHasGeneratedContent(true);
+        toast.success("Contenido generado exitosamente");
+        console.log("Generated Content:", response.data);
+      }
+    } catch (error) {
+      toast.error("Error al conectar con el servidor");
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -27,20 +58,20 @@ export function AIProductsModule() {
       {/* Hero Section */}
       <Card className="p-4 md:p-8 glass overflow-hidden relative">
         <div className="absolute top-0 right-0 w-64 h-64 gradient-primary opacity-10 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
-        
+
         <div className="relative flex flex-col sm:flex-row items-start gap-4 md:gap-6">
           <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl gradient-primary flex items-center justify-center glow-primary shrink-0">
             <Sparkles className="w-6 h-6 md:w-8 md:h-8 text-primary-foreground" />
           </div>
-          
+
           <div>
             <h2 className="text-xl md:text-2xl font-bold">Optimiza tus productos con IA</h2>
             <p className="text-sm md:text-base text-muted-foreground mt-2 max-w-xl">
-              Ingresa información básica de tus productos y nuestra IA generará 
-              automáticamente títulos optimizados, descripciones atractivas y 
+              Ingresa información básica de tus productos y nuestra IA generará
+              automáticamente títulos optimizados, descripciones atractivas y
               todos los campos necesarios para cada marketplace.
             </p>
-            
+
             <div className="flex flex-wrap gap-2 md:gap-3 mt-4">
               <span className="text-[10px] md:text-xs px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-primary/10 text-primary font-medium">
                 ✨ Títulos SEO optimizados
@@ -64,9 +95,9 @@ export function AIProductsModule() {
           </span>
           <span className="font-semibold text-sm md:text-base">Selecciona los canales</span>
         </div>
-        <MarketplaceSelector 
-          selected={selectedMarketplaces} 
-          onChange={setSelectedMarketplaces} 
+        <MarketplaceSelector
+          selected={selectedMarketplaces}
+          onChange={setSelectedMarketplaces}
         />
       </Card>
 
@@ -78,9 +109,9 @@ export function AIProductsModule() {
           </span>
           <span className="font-semibold text-sm md:text-base">Elige la categoría</span>
         </div>
-        <CategorySelector 
-          value={selectedCategory} 
-          onChange={setSelectedCategory} 
+        <CategorySelector
+          value={selectedCategory}
+          onChange={setSelectedCategory}
         />
       </Card>
 
@@ -92,9 +123,9 @@ export function AIProductsModule() {
           </span>
           <span className="font-semibold text-sm md:text-base">Ingresa la información</span>
         </div>
-        <ProductInputForm 
-          onSubmit={handleSubmit} 
-          isProcessing={isProcessing} 
+        <ProductInputForm
+          onSubmit={handleSubmit}
+          isProcessing={isProcessing}
         />
       </Card>
 
@@ -108,12 +139,12 @@ export function AIProductsModule() {
             <span className="font-semibold text-sm md:text-base">Revisa los resultados</span>
           </div>
           <GeneratedFieldsPreview visible={hasGeneratedContent} />
-          
+
           <Separator className="my-6 md:my-8" />
-          
-          <ExportActions 
-            visible={hasGeneratedContent} 
-            selectedMarketplaces={selectedMarketplaces} 
+
+          <ExportActions
+            visible={hasGeneratedContent}
+            selectedMarketplaces={selectedMarketplaces}
           />
         </Card>
       )}

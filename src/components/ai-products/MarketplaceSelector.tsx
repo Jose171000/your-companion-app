@@ -50,7 +50,6 @@ export function MarketplaceSelector({ selected, onChange }: MarketplaceSelectorP
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
         {marketplaces.map((mp) => {
           const isSelected = selected.includes(mp.id);
-          
           return (
             <button
               key={mp.id}
