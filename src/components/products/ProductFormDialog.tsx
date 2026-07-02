@@ -271,49 +271,6 @@ export function ProductFormDialog({
         {/* ── Scrollable body ───────────────────────────────────────────────── */}
         <ScrollArea className="flex-1 px-6">
           <div className="space-y-5 py-5">
-            {/* SKU + Price + Stock */}
-            <div className={cn("grid gap-4", isEdit ? "grid-cols-2" : "grid-cols-3")}>
-              {!isEdit && (
-                <div className="space-y-2">
-                  <Label htmlFor="pf-sku">
-                    SKU <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="pf-sku"
-                    placeholder="Ej: PROD-001"
-                    value={sku}
-                    onChange={(e) => setSku(e.target.value)}
-                    className="bg-secondary/50 border-border h-11"
-                  />
-                </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="pf-price">Precio</Label>
-                <Input
-                  id="pf-price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className="bg-secondary/50 border-border h-11"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="pf-stock">Stock</Label>
-                <Input
-                  id="pf-stock"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  value={stock}
-                  onChange={(e) => setStock(e.target.value)}
-                  className="bg-secondary/50 border-border h-11"
-                />
-              </div>
-            </div>
-
             {/* Name */}
             <div className="space-y-2">
               <Label htmlFor="pf-name">
@@ -366,6 +323,51 @@ export function ProductFormDialog({
                   placeholder="Ej: Smartphones"
                   value={subCategory}
                   onChange={(e) => setSubCategory(e.target.value)}
+                  className="bg-secondary/50 border-border h-11"
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* SKU + Price + Stock */}
+            <div className={cn("grid gap-4", isEdit ? "grid-cols-2" : "grid-cols-3")}>
+              {!isEdit && (
+                <div className="space-y-2">
+                  <Label htmlFor="pf-sku">
+                    SKU <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="pf-sku"
+                    placeholder="Ej: PROD-001"
+                    value={sku}
+                    onChange={(e) => setSku(e.target.value)}
+                    className="bg-secondary/50 border-border h-11"
+                  />
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="pf-price">Precio</Label>
+                <Input
+                  id="pf-price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="bg-secondary/50 border-border h-11"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pf-stock">Stock</Label>
+                <Input
+                  id="pf-stock"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  value={stock}
+                  onChange={(e) => setStock(e.target.value)}
                   className="bg-secondary/50 border-border h-11"
                 />
               </div>

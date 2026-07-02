@@ -114,7 +114,7 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton }: HeaderP
     : "?";
 
   return (
-    <header className="sticky top-0 z-40 glass-strong border-b border-border px-4 md:px-8 py-4">
+    <header className="sticky top-0 z-40 bg-white dark:bg-[#111111] border-b border-[#EDEDED] dark:border-white/20 px-4 md:px-8 py-4 shadow-sm transition-colors duration-200">
       <div className="flex items-center justify-between gap-4">
         {/* ── Left: Menu + Title ─────────────────────────────────────────── */}
         <div className="flex items-center gap-3 min-w-0">
@@ -124,9 +124,9 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton }: HeaderP
             </Button>
           )}
           <div className="min-w-0">
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">{title}</h1>
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate text-[#111111] dark:text-[#F8F8F5]">{title}</h1>
             {subtitle && (
-              <p className="text-xs md:text-sm text-muted-foreground mt-0.5 truncate hidden sm:block">
+              <p className="text-xs md:text-sm text-[#666666] dark:text-[#A1A1AA] mt-0.5 truncate hidden sm:block">
                 {subtitle}
               </p>
             )}
@@ -145,7 +145,7 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton }: HeaderP
                 id="header-notifications-btn"
                 variant="ghost"
                 size="icon"
-                className="relative h-9 w-9 md:h-10 md:w-10"
+                className="relative h-9 w-9 md:h-10 md:w-10 rounded-full bg-[#F8F8F5] dark:bg-[#1A1A1A] hover:bg-[#EAEAEA] dark:hover:bg-[#2A2A2A] text-[#111111] dark:text-[#F8F8F5] transition-colors"
               >
                 <Bell className="w-4 h-4 md:w-5 md:h-5" />
                 {unread > 0 && (

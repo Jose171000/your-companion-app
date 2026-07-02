@@ -1,4 +1,4 @@
-import { apiRequest, apiRequestMultipart } from './api';
+import { apiRequest, apiRequestMultipart, apiDownload } from './api';
 
 // ─────────────────────────────────────────────
 // Types
@@ -155,6 +155,18 @@ export const productsApi = {
   /** Eliminar un producto */
   remove: (id: string) =>
     apiRequest<{ message: string }>(`/products/${id}`, { method: 'DELETE' }),
+
+  /** Exportar catálogo completo */
+  exportProducts: (format: 'json' | 'csv' | 'xlsx', params: ProductsQueryParams = {}) => {
+    const { page, limit, sortBy, order, ...exportParams } = params;
+    return apiDownload(`/export/products/${format}${buildQueryString(exportParams)}`, `productos.${format}`);
+  },
+
+  /** Exportar contenido generado por IA */
+  exportAiContent: (format: 'json' | 'csv' | 'xlsx', params: ProductsQueryParams = {}) => {
+    const { page, limit, sortBy, order, ...exportParams } = params;
+    return apiDownload(`/export/ai-content/${format}${buildQueryString(exportParams)}`, `contenido-ia.${format}`);
+  }
 };
 
 // ─────────────────────────────────────────────

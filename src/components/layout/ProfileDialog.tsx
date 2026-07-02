@@ -76,8 +76,8 @@ export function ProfileDialog({ open, onClose }: ProfileDialogProps) {
   const { user, updateProfile } = useAuth();
 
   // ── Info tab state ─────────────────────────────────────────────────────────
-  const [name, setName]           = useState("");
-  const [lastName, setLastName]   = useState("");
+  const [name, setName]           = useState(user?.name ?? "");
+  const [lastName, setLastName]   = useState(user?.lastName ?? "");
   const [savingInfo, setSavingInfo] = useState(false);
 
   // ── Password tab state ─────────────────────────────────────────────────────
@@ -89,8 +89,8 @@ export function ProfileDialog({ open, onClose }: ProfileDialogProps) {
   // Sync local state when dialog opens or user changes
   useEffect(() => {
     if (open && user) {
-      setName(user.name);
-      setLastName(user.lastName);
+      setName(user.name ?? "");
+      setLastName(user.lastName ?? "");
     }
     if (!open) {
       setCurrentPassword("");
@@ -106,17 +106,17 @@ export function ProfileDialog({ open, onClose }: ProfileDialogProps) {
 
   // Dirty check for info tab
   const infoIsDirty =
-    name.trim() !== (user?.name ?? "") ||
-    lastName.trim() !== (user?.lastName ?? "");
+    (name || "").trim() !== (user?.name ?? "") ||
+    (lastName || "").trim() !== (user?.lastName ?? "");
 
   // ── Save profile info ──────────────────────────────────────────────────────
   const handleSaveInfo = async () => {
-    if (!name.trim() || !lastName.trim()) {
+    if (!(name || "").trim() || !(lastName || "").trim()) {
       toast.error("Nombre y apellido son obligatorios");
       return;
     }
     setSavingInfo(true);
-    const result = await updateProfile({ name: name.trim(), lastName: lastName.trim() });
+    const result = await updateProfile({ name: (name || "").trim(), lastName: (lastName || "").trim() });
     setSavingInfo(false);
     if (result.success) {
       toast.success("Perfil actualizado correctamente");

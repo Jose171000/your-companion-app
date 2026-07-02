@@ -77,27 +77,27 @@ export function CategorySelector({ value, onChange }: CategorySelectorProps) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-semibold text-lg">Categoría del producto</h3>
-        <p className="text-sm text-muted-foreground">
+        <h3 className="font-semibold text-lg text-[#111111] dark:text-[#F8F8F5]">Categoría del producto</h3>
+        <p className="text-sm text-[#666666] dark:text-[#A1A1AA]">
           Cada categoría tiene campos específicos que la IA completará
         </p>
       </div>
       
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-full h-12 bg-secondary/50 border-border hover:border-primary/50 transition-colors">
+        <SelectTrigger className="w-full h-12 bg-white dark:bg-[#1A1A1A] border-[#EAEAEA] dark:border-white/20 hover:border-[#FCCB34]/60 focus:border-[#FCCB34] focus:ring-[#FCCB34] transition-colors shadow-sm dark:text-[#F8F8F5]">
           <SelectValue placeholder="Selecciona una categoría" />
         </SelectTrigger>
-        <SelectContent className="glass max-h-80">
+        <SelectContent className="bg-white dark:bg-[#1A1A1A] border-[#EAEAEA] dark:border-white/20 shadow-lg max-h-80">
           {categories.map((cat) => (
             <SelectGroup key={cat.id}>
-              <SelectLabel className="text-primary font-semibold">
+              <SelectLabel className="text-[#111111] dark:text-[#F8F8F5] font-bold">
                 {cat.name}
               </SelectLabel>
               {cat.subcategories.map((sub) => (
                 <SelectItem
                   key={sub.id}
                   value={`${cat.id}/${sub.id}`}
-                  className="cursor-pointer hover:bg-primary/10"
+                  className="cursor-pointer hover:bg-[#FFF7D6] dark:hover:bg-[#FCCB34]/20 focus:bg-[#FFF7D6] dark:focus:bg-[#FCCB34]/20 dark:text-[#F8F8F5]"
                 >
                   {sub.name}
                 </SelectItem>

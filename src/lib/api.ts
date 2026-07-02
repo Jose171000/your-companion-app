@@ -101,6 +101,50 @@ async function apiRequestMultipart<T>(
 }
 
 // ─────────────────────────────────────────────
+// File Download helper
+// ─────────────────────────────────────────────
+
+async function apiDownload(
+  endpoint: string,
+  filename: string,
+  options: RequestInit = {}
+): Promise<void> {
+  const token = localStorage.getItem('auth_token');
+  const headers: HeadersInit = { ...options.headers };
+
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    let errorMsg = 'Error al descargar el archivo';
+    try {
+      const json = await response.json();
+      if (json.message) errorMsg = typeof json.message === 'string' ? json.message : json.message[0];
+      else if (json.error) errorMsg = json.error;
+    } catch (e) {
+      // Ignorar si no es JSON
+    }
+    throw new Error(errorMsg);
+  }
+
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────
 // Auth types
 // ─────────────────────────────────────────────
 
@@ -208,4 +252,4 @@ export const authApi = {
     }),
 };
 
-export { apiRequest, apiRequestMultipart, API_BASE_URL };
+export { apiRequest, apiRequestMultipart, apiDownload, API_BASE_URL };

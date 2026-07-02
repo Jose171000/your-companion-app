@@ -5,18 +5,18 @@ interface Marketplace {
   id: string;
   name: string;
   logo: string;
-  color: string;
+  imgClass?: string;
 }
 
 const marketplaces: Marketplace[] = [
-  { id: "mercadolibre", name: "MercadoLibre", logo: "🛒", color: "from-yellow-500 to-yellow-600" },
-  { id: "amazon", name: "Amazon", logo: "📦", color: "from-orange-500 to-orange-600" },
-  { id: "shopify", name: "Shopify", logo: "🛍️", color: "from-green-500 to-green-600" },
-  { id: "woocommerce", name: "WooCommerce", logo: "🔮", color: "from-purple-500 to-purple-600" },
-  { id: "falabella", name: "Falabella", logo: "🏬", color: "from-lime-500 to-lime-600" },
-  { id: "ripley", name: "Ripley", logo: "🏪", color: "from-red-500 to-red-600" },
-  { id: "juntoz", name: "Juntoz", logo: "🎯", color: "from-blue-500 to-blue-600" },
-  { id: "yape", name: "Yape", logo: "💜", color: "from-fuchsia-500 to-fuchsia-600" },
+  { id: "mercadolibre", name: "MercadoLibre", logo: "/mercadolibre.png" },
+  { id: "amazon", name: "Amazon", logo: "/amazon.png", imgClass: "scale-[1.7]" },
+  { id: "shopify", name: "Shopify", logo: "/shopify.png" },
+  { id: "woocommerce", name: "WooCommerce", logo: "/woocomerce.png" },
+  { id: "falabella", name: "Falabella", logo: "/Falabella.png" },
+  { id: "ripley", name: "Ripley", logo: "/Logo_Ripley_com.png" },
+  { id: "juntoz", name: "Juntoz", logo: "/juntoz.png", imgClass: "scale-[1.8]" },
+  { id: "yape", name: "Yape", logo: "/yape-logo-fondo-transparente.png" },
 ];
 
 interface MarketplaceSelectorProps {
@@ -37,12 +37,12 @@ export function MarketplaceSelector({ selected, onChange }: MarketplaceSelectorP
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-          <h3 className="font-semibold text-base md:text-lg">Marketplaces destino</h3>
-          <p className="text-xs md:text-sm text-muted-foreground">
+          <h3 className="font-semibold text-base md:text-lg text-[#111111] dark:text-[#F8F8F5]">Marketplaces destino</h3>
+          <p className="text-xs md:text-sm text-[#666666] dark:text-[#A1A1AA]">
             Selecciona dónde quieres enviar los productos
           </p>
         </div>
-        <span className="text-xs md:text-sm text-muted-foreground">
+        <span className="text-xs md:text-sm text-[#666666] dark:text-[#A1A1AA] font-medium bg-[#F8F8F5] dark:bg-[#1A1A1A] px-3 py-1 rounded-full border border-[#EAEAEA] dark:border-white/20">
           {selected.length} seleccionados
         </span>
       </div>
@@ -55,26 +55,21 @@ export function MarketplaceSelector({ selected, onChange }: MarketplaceSelectorP
               key={mp.id}
               onClick={() => toggleMarketplace(mp.id)}
               className={cn(
-                "relative flex flex-col items-center gap-1.5 md:gap-2 p-3 md:p-4 rounded-xl border-2 transition-all duration-200",
-                isSelected
-                  ? "border-primary bg-primary/10"
-                  : "border-border bg-card hover:border-primary/50 hover:bg-secondary"
+                "relative flex flex-col items-center justify-center p-3 md:p-4 rounded-[16px] border transition-all duration-200",
+                  isSelected
+                  ? "border-[#FCCB34] bg-[#FFF7D6] dark:bg-[#FCCB34]/20 shadow-[0_4px_12px_rgba(252,203,52,0.15)]"
+                  : "border-[#EAEAEA] dark:border-white/20 bg-white dark:bg-[#222222] hover:border-[#FCCB34]/40 dark:hover:border-white/40 hover:shadow-[0_8px_20px_rgba(0,0,0,0.06)] hover:-translate-y-0.5"
               )}
             >
               {isSelected && (
-                <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 w-4 h-4 md:w-5 md:h-5 rounded-full bg-primary flex items-center justify-center">
-                  <Check className="w-2.5 h-2.5 md:w-3 md:h-3 text-primary-foreground" />
+                <div className="absolute top-1.5 right-1.5 md:top-2 md:right-2 w-5 h-5 rounded-full bg-[#FCCB34] flex items-center justify-center shadow-sm z-10">
+                  <Check className="w-3 h-3 text-[#111111] stroke-[3]" />
                 </div>
               )}
-              <div
-                className={cn(
-                  "w-10 h-10 md:w-12 md:h-12 rounded-lg md:rounded-xl flex items-center justify-center text-xl md:text-2xl bg-gradient-to-br",
-                  mp.color
-                )}
-              >
-                {mp.logo}
+              <div className="w-full h-12 md:h-16 px-2 py-1 flex items-center justify-center mb-1.5 md:mb-2 bg-transparent dark:bg-[#EAEAEA] rounded-[8px]">
+                <img src={mp.logo} alt={mp.name} className={cn("w-full h-full object-contain", mp.imgClass)} />
               </div>
-              <span className="text-xs md:text-sm font-medium text-center">{mp.name}</span>
+              <span className="text-xs md:text-sm font-semibold text-[#111111] dark:text-[#F8F8F5] text-center leading-tight">{mp.name}</span>
             </button>
           );
         })}

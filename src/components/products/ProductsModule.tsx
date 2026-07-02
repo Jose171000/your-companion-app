@@ -74,6 +74,16 @@ export function ProductsModule() {
   const handleRegenSuccess = () =>
     queryClient.invalidateQueries({ queryKey: ["products"] });
 
+  const handleExport = async (format: "csv" | "xlsx" | "json") => {
+    try {
+      toast.loading("Exportando productos...", { id: "export-toast" });
+      await productsApi.exportProducts(format, filters);
+      toast.success("Exportación completada", { id: "export-toast" });
+    } catch (error: any) {
+      toast.error(error.message || "Error al exportar productos", { id: "export-toast" });
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -86,6 +96,7 @@ export function ProductsModule() {
         inStock={inStock}
         onInStockChange={handleInStockChange}
         onNewProduct={openCreate}
+        onExport={handleExport}
       />
 
       {/* Table */}

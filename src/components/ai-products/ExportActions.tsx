@@ -56,9 +56,11 @@ const exportOptions: ExportOption[] = [
 interface ExportActionsProps {
   visible: boolean;
   selectedMarketplaces: string[];
+  onExport: (format: string) => void;
+  onPublish: () => void;
 }
 
-export function ExportActions({ visible, selectedMarketplaces }: ExportActionsProps) {
+export function ExportActions({ visible, selectedMarketplaces, onExport, onPublish }: ExportActionsProps) {
   if (!visible) return null;
 
   return (
@@ -123,6 +125,7 @@ export function ExportActions({ visible, selectedMarketplaces }: ExportActionsPr
                 <Button
                   variant={isSend ? "default" : "outline"}
                   size="sm"
+                  onClick={() => isSend ? onPublish() : onExport(option.format!)}
                   className={cn(
                     "gap-1.5 md:gap-2 shrink-0 text-xs md:text-sm h-8 md:h-9 w-full sm:w-auto mt-2 sm:mt-0",
                     isSend && "gradient-primary text-primary-foreground"

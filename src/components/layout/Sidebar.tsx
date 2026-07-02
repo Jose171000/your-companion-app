@@ -56,21 +56,13 @@ export function Sidebar({ activeItem, onItemChange, mobileOpen, onMobileClose }:
         {/* Sidebar */}
         <aside
           className={cn(
-            "fixed left-0 top-0 h-screen glass-strong z-50 flex flex-col w-72 transition-transform duration-300",
+            "fixed left-0 top-0 h-screen bg-white dark:bg-[#111111] border-r border-border dark:border-white/20 z-50 flex flex-col w-72 transition-transform duration-300",
             mobileOpen ? "translate-x-0" : "-translate-x-full"
           )}
         >
           {/* Logo with close button */}
-          <div className="flex items-center justify-between p-6 border-b border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
-                <Store className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="font-bold text-lg tracking-tight">SyncHub</h1>
-                <p className="text-xs text-muted-foreground">Marketplace Manager</p>
-              </div>
-            </div>
+          <div className="flex items-center justify-between p-6 border-b border-border dark:border-white/20 h-24">
+              <img src="/logo_synkro.png" alt="Synkro AI Logo" className="h-12 w-auto object-contain" />
             <Button variant="ghost" size="icon" onClick={onMobileClose}>
               <X className="w-5 h-5" />
             </Button>
@@ -89,8 +81,8 @@ export function Sidebar({ activeItem, onItemChange, mobileOpen, onMobileClose }:
                   className={cn(
                     "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative",
                     isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                      ? "bg-[#FFF1B8] dark:bg-[#FCCB34]/20 text-[#111111] dark:text-[#FCCB34] font-semibold"
+                      : "text-[#666666] dark:text-[#A1A1AA] hover:bg-[#F8F8F5] dark:hover:bg-[#1A1A1A] hover:text-[#111111] dark:hover:text-[#F8F8F5]"
                   )}
                 >
                   <Icon
@@ -106,7 +98,7 @@ export function Sidebar({ activeItem, onItemChange, mobileOpen, onMobileClose }:
                     </span>
                   )}
                   {isActive && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full bg-primary" />
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full bg-[#FCCB34]" />
                   )}
                 </button>
               );
@@ -121,19 +113,17 @@ export function Sidebar({ activeItem, onItemChange, mobileOpen, onMobileClose }:
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 h-screen glass-strong z-50 flex flex-col transition-all duration-300",
+        "fixed left-0 top-0 h-screen bg-white dark:bg-[#111111] border-r border-border dark:border-white/20 z-50 flex flex-col transition-all duration-300",
         collapsed ? "w-20" : "w-64"
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 p-6 border-b border-border">
-        <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center glow-primary">
-          <Store className="w-5 h-5 text-primary-foreground" />
-        </div>
-        {!collapsed && (
-          <div>
-            <h1 className="font-bold text-lg tracking-tight">SyncHub</h1>
-            <p className="text-xs text-muted-foreground">Marketplace Manager</p>
+      <div className="flex items-center gap-3 p-6 border-b border-border dark:border-white/20 h-24">
+        {!collapsed ? (
+            <img src="/logo_synkro.png" alt="Synkro AI Logo" className="h-12 md:h-14 w-auto object-contain" />
+        ) : (
+          <div className="flex items-center justify-center w-full">
+            <img src="/logo_synkro.png" alt="Synkro AI Icon" className="h-8 w-8 object-cover object-left" />
           </div>
         )}
       </div>
@@ -151,8 +141,8 @@ export function Sidebar({ activeItem, onItemChange, mobileOpen, onMobileClose }:
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative",
                 isActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  ? "bg-[#FFF1B8] dark:bg-[#FCCB34]/20 text-[#111111] dark:text-[#FCCB34] font-semibold"
+                  : "text-[#666666] dark:text-[#A1A1AA] hover:bg-[#F8F8F5] dark:hover:bg-[#1A1A1A] hover:text-[#111111] dark:hover:text-[#F8F8F5]"
               )}
             >
               <Icon
@@ -172,7 +162,7 @@ export function Sidebar({ activeItem, onItemChange, mobileOpen, onMobileClose }:
                 </>
               )}
               {isActive && (
-                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full bg-primary" />
+                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r-full bg-[#FCCB34]" />
               )}
             </button>
           );
@@ -180,7 +170,7 @@ export function Sidebar({ activeItem, onItemChange, mobileOpen, onMobileClose }:
       </nav>
 
       {/* Collapse Button */}
-      <div className="p-4 border-t border-border">
+      <div className="p-4 border-t border-border dark:border-white/20">
         <Button
           variant="ghost"
           size="sm"
