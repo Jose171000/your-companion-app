@@ -2,7 +2,7 @@ import { Product } from "@/lib/products-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Edit, ImageOff, Package, Sparkles, Trash2 } from "lucide-react";
+import { Edit, ImageOff, Package, Rocket, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProductCard } from "./ProductCard";
 
@@ -13,6 +13,7 @@ interface ProductsTableProps {
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
   onRegenerate: (product: Product) => void;
+  onPublish: (product: Product) => void;
 }
 
 export function ProductsTable({
@@ -22,6 +23,7 @@ export function ProductsTable({
   onEdit,
   onDelete,
   onRegenerate,
+  onPublish,
 }: ProductsTableProps) {
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (isLoading) {
@@ -207,6 +209,15 @@ export function ProductsTable({
                       <Button
                         variant="ghost"
                         size="icon"
+                        className="h-8 w-8 hover:text-primary hover:bg-primary/10"
+                        onClick={() => onPublish(product)}
+                        title="Publicar en marketplaces"
+                      >
+                        <Rocket className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 hover:text-accent hover:bg-accent/10"
                         onClick={() => onRegenerate(product)}
                         title="Regenerar con IA"
@@ -249,6 +260,7 @@ export function ProductsTable({
             onEdit={onEdit}
             onDelete={onDelete}
             onRegenerate={onRegenerate}
+            onPublish={onPublish}
           />
         ))}
       </div>
