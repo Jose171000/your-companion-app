@@ -1,0 +1,46 @@
+# Despliegue automático a SiteGround (app.synkroai.com)
+#
+# En cada push a esta rama: compila la app y sube dist/ por FTPS al hosting.
+# Requiere estos SECRETS en el repo (Settings → Secrets and variables → Actions):
+#   SITEGROUND_FTP_HOST      → ej. ftp.synkroai.com (Site Tools → FTP Accounts)
+#   SITEGROUND_FTP_USER      → usuario FTP
+#   SITEGROUND_FTP_PASSWORD  → contraseña FTP
+#   VITE_API_URL             → URL pública del backend en Railway (ej. https://synkro-api.up.railway.app)
+# Y esta VARIABLE opcional:
+#   SITEGROUND_REMOTE_DIR    → carpeta destino (default: app.synkroai.com/public_html/)
+
+name: Deploy a SiteGround
+
+on:
+  push:
+    branches: [deploy/app-synkroai]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar (Vite)
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Subir dist/ a SiteGround por FTPS
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.SITEGROUND_FTP_HOST }}
+          username: ${{ secrets.SITEGROUND_FTP_USER }}
+          password: ${{ secrets.SITEGROUND_FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: dist/
+          server-dir: ${{ vars.SITEGROUND_REMOTE_DIR || 'app.synkroai.com/public_html/' }}

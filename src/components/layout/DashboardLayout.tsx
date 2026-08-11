@@ -5,7 +5,11 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { AIProductsModule } from "@/components/ai-products/AIProductsModule";
 import { ProductsModule } from "@/components/products/ProductsModule";
+import { MarketplacesModule } from "@/components/marketplaces/MarketplacesModule";
+import { AnalyticsModule } from "@/components/analytics/AnalyticsModule";
+import { AdminModule } from "@/components/admin/AdminModule";
 import { FormDraftProvider, useFormDraft } from "@/contexts/FormDraftContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { NavigationGuardDialog } from "./NavigationGuardDialog";
 import { Construction } from "lucide-react";
 
@@ -16,11 +20,12 @@ const pageTitles: Record<string, { title: string; subtitle: string }> = {
   products:      { title: "Productos",         subtitle: "Gestiona tu catálogo de productos" },
   "ai-products": { title: "IA para Productos", subtitle: "Optimiza tus productos con inteligencia artificial" },
   marketplaces:  { title: "Marketplaces",      subtitle: "Conecta y sincroniza tus canales de venta" },
-  analytics:     { title: "Analíticas",        subtitle: "Métricas y reportes de rendimiento" },
+  analytics:     { title: "Analíticas",        subtitle: "Tus ventas y el rendimiento de tus canales" },
+  admin:         { title: "Superadmin",        subtitle: "Clientes, pagos y control financiero" },
   settings:      { title: "Configuración",     subtitle: "Ajustes de tu cuenta y preferencias" },
 };
 
-const IMPLEMENTED = ["ai-products", "products"];
+const IMPLEMENTED = ["ai-products", "products", "marketplaces", "analytics", "admin"];
 
 // ─── Coming soon placeholder ──────────────────────────────────────────────────
 
@@ -41,17 +46,25 @@ function ComingSoonSection({ section }: { section: string }) {
 
 // ─── Inner layout (needs access to FormDraftContext) ──────────────────────────
 
+// If the OAuth callback redirected here (?meli=...), land on Marketplaces
+// so the module can show the connection result.
+const INITIAL_SECTION = new URLSearchParams(window.location.search).has("meli")
+  ? "marketplaces"
+  : "ai-products";
+
 function DashboardContent() {
-  const [activeItem, setActiveItem]         = useState("ai-products");
+  const [activeItem, setActiveItem]         = useState(INITIAL_SECTION);
   const [sidebarCollapsed]                  = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [guardOpen, setGuardOpen]           = useState(false);
   const [pendingSection, setPendingSection] = useState<string | null>(null);
   // Sections are lazy-mounted: added to this Set the first time they're visited
-  const [mounted, setMounted]               = useState<Set<string>>(new Set(["ai-products"]));
+  const [mounted, setMounted]               = useState<Set<string>>(new Set([INITIAL_SECTION]));
 
   const isMobile       = useIsMobile();
   const { checkDirty } = useFormDraft();
+  const { user }       = useAuth();
+  const isAdmin        = user?.role === "admin";
 
   const pageInfo = pageTitles[activeItem] ?? { title: "Dashboard", subtitle: "" };
 
@@ -98,6 +111,7 @@ function DashboardContent() {
         onItemChange={handleSectionChange}
         mobileOpen={mobileMenuOpen}
         onMobileClose={() => setMobileMenuOpen(false)}
+        isAdmin={isAdmin}
       />
 
       <main
@@ -127,8 +141,22 @@ function DashboardContent() {
             {mounted.has("products") && <ProductsModule />}
           </div>
 
+          <div style={{ display: activeItem === "marketplaces" ? "block" : "none" }}>
+            {mounted.has("marketplaces") && <MarketplacesModule />}
+          </div>
+
+          <div style={{ display: activeItem === "analytics" ? "block" : "none" }}>
+            {mounted.has("analytics") && <AnalyticsModule />}
+          </div>
+
+          {isAdmin && (
+            <div style={{ display: activeItem === "admin" ? "block" : "none" }}>
+              {mounted.has("admin") && <AdminModule />}
+            </div>
+          )}
+
           {/* Placeholder for sections not yet implemented */}
-          {!IMPLEMENTED.includes(activeItem) && (
+          {(!IMPLEMENTED.includes(activeItem) || (activeItem === "admin" && !isAdmin)) && (
             <ComingSoonSection section={activeItem} />
           )}
         </div>

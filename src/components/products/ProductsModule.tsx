@@ -7,6 +7,7 @@ import { ProductsPagination } from "./ProductsPagination";
 import { ProductFormDialog } from "./ProductFormDialog";
 import { DeleteProductDialog } from "./DeleteProductDialog";
 import { RegenerateAIDialog } from "./RegenerateAIDialog";
+import { PublishProductDialog } from "./PublishProductDialog";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 10;
@@ -25,6 +26,7 @@ export function ProductsModule() {
   const [formProduct, setFormProduct] = useState<Product | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [regenTarget, setRegenTarget]   = useState<Product | null>(null);
+  const [publishTarget, setPublishTarget] = useState<Product | null>(null);
 
   // ── Query ─────────────────────────────────────────────────────────────────
   const filters: ProductsQueryParams = {
@@ -107,6 +109,7 @@ export function ProductsModule() {
         onEdit={openEdit}
         onDelete={(p) => setDeleteTarget(p)}
         onRegenerate={(p) => setRegenTarget(p)}
+        onPublish={(p) => setPublishTarget(p)}
       />
 
       {/* Pagination */}
@@ -140,6 +143,12 @@ export function ProductsModule() {
         product={regenTarget}
         onClose={() => setRegenTarget(null)}
         onSuccess={handleRegenSuccess}
+      />
+
+      {/* Publish dialog */}
+      <PublishProductDialog
+        product={publishTarget}
+        onClose={() => setPublishTarget(null)}
       />
     </div>
   );

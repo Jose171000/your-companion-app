@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { 
-  LayoutDashboard, 
-  Package, 
-  Sparkles, 
-  Settings, 
-  Store, 
+import {
+  LayoutDashboard,
+  Package,
+  Sparkles,
+  Settings,
+  Store,
   BarChart3,
+  ShieldCheck,
   ChevronLeft,
   ChevronRight,
   X
@@ -19,6 +20,7 @@ interface NavItem {
   label: string;
   id: string;
   badge?: string;
+  adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -27,6 +29,7 @@ const navItems: NavItem[] = [
   { icon: Sparkles, label: "IA Productos", id: "ai-products", badge: "Nuevo" },
   { icon: Store, label: "Marketplaces", id: "marketplaces" },
   { icon: BarChart3, label: "Analíticas", id: "analytics" },
+  { icon: ShieldCheck, label: "Superadmin", id: "admin", adminOnly: true },
   { icon: Settings, label: "Configuración", id: "settings" },
 ];
 
@@ -35,11 +38,13 @@ interface SidebarProps {
   onItemChange: (id: string) => void;
   mobileOpen?: boolean;
   onMobileClose?: () => void;
+  isAdmin?: boolean;
 }
 
-export function Sidebar({ activeItem, onItemChange, mobileOpen, onMobileClose }: SidebarProps) {
+export function Sidebar({ activeItem, onItemChange, mobileOpen, onMobileClose, isAdmin }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const isMobile = useIsMobile();
+  const items = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   // Mobile overlay sidebar
   if (isMobile) {
@@ -70,7 +75,7 @@ export function Sidebar({ activeItem, onItemChange, mobileOpen, onMobileClose }:
 
           {/* Navigation */}
           <nav className="flex-1 p-4 space-y-2 overflow-y-auto scrollbar-thin">
-            {navItems.map((item) => {
+            {items.map((item) => {
               const Icon = item.icon;
               const isActive = activeItem === item.id;
 
@@ -130,7 +135,7 @@ export function Sidebar({ activeItem, onItemChange, mobileOpen, onMobileClose }:
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto scrollbar-thin">
-        {navItems.map((item) => {
+        {items.map((item) => {
           const Icon = item.icon;
           const isActive = activeItem === item.id;
 

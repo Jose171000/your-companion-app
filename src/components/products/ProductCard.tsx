@@ -1,7 +1,7 @@
 import { Product } from "@/lib/products-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Sparkles, ImageOff } from "lucide-react";
+import { Edit, Trash2, Sparkles, ImageOff, Rocket } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ProductCardProps {
@@ -9,9 +9,10 @@ interface ProductCardProps {
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
   onRegenerate: (product: Product) => void;
+  onPublish: (product: Product) => void;
 }
 
-export function ProductCard({ product, onEdit, onDelete, onRegenerate }: ProductCardProps) {
+export function ProductCard({ product, onEdit, onDelete, onRegenerate, onPublish }: ProductCardProps) {
   const marketplaces = product.targetMarketplaces ?? [];
 
   return (
@@ -41,6 +42,15 @@ export function ProductCard({ product, onEdit, onDelete, onRegenerate }: Product
 
           {/* Actions */}
           <div className="flex gap-0.5 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground hover:text-primary"
+              onClick={() => onPublish(product)}
+              title="Publicar en marketplaces"
+            >
+              <Rocket className="w-3.5 h-3.5" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
