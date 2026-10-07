@@ -5,6 +5,9 @@ import { ConnectionCard } from "./ConnectionCard";
 import { ConnectYavendioDialog } from "./ConnectYavendioDialog";
 import { ConnectFalabellaDialog } from "./ConnectFalabellaDialog";
 import { ListingsTable } from "./ListingsTable";
+import { InventoryBoard } from "./InventoryBoard";
+import { ReviewQueue } from "./ReviewQueue";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -81,8 +84,26 @@ export function MarketplacesModule() {
     refetchInterval: 20_000, // las publicaciones encoladas cambian de estado solas
   });
 
+  // Modo revisión: ajuste del usuario y cambios de precio/stock por aprobar
+  const { data: settingsResult } = useQuery({
+    queryKey: ["sync-settings"],
+    queryFn:  () => syncApi.getSyncSettings(),
+    staleTime: 30_000,
+  });
+
+  const { data: changesResult, isLoading: loadingChanges } = useQuery({
+    queryKey: ["sync-change-requests"],
+    queryFn:  () => syncApi.getChangeRequests(),
+    staleTime: 10_000,
+    refetchInterval: 20_000, // los envíos aprobados pasan a "enviado" solos
+  });
+
   const connections = connectionsResult?.data ?? [];
   const listings    = listingsResult?.data ?? [];
+  const changes     = changesResult?.data ?? [];
+  const pendingChanges = changes.filter((c) => c.status === "pending");
+  // Hasta que el servidor responda se asume revisión: es el valor por defecto.
+  const reviewMode  = settingsResult?.data?.reviewMode ?? true;
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const connectMutation = useMutation({
@@ -132,6 +153,30 @@ export function MarketplacesModule() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-8">
+      <Tabs defaultValue="canales">
+        <TabsList>
+          <TabsTrigger value="canales">Canales</TabsTrigger>
+          <TabsTrigger value="tablero">Tablero</TabsTrigger>
+          <TabsTrigger value="revision">
+            Revisión{pendingChanges.length > 0 ? ` (${pendingChanges.length})` : ""}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tablero" className="pt-6">
+          <InventoryBoard
+            listings={listings}
+            pending={pendingChanges}
+            reviewMode={reviewMode}
+            isLoading={loadingListings}
+            isError={listingsError}
+          />
+        </TabsContent>
+
+        <TabsContent value="revision" className="pt-6">
+          <ReviewQueue requests={changes} reviewMode={reviewMode} isLoading={loadingChanges} />
+        </TabsContent>
+
+        <TabsContent value="canales" className="pt-6 space-y-8">
       {/* Conexiones */}
       <section className="space-y-4">
         <div>
@@ -171,6 +216,8 @@ export function MarketplacesModule() {
           isError={listingsError}
         />
       </section>
+        </TabsContent>
+      </Tabs>
 
       {/* Confirmación de desconexión */}
       <AlertDialog

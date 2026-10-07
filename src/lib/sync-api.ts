@@ -36,11 +36,28 @@ export interface ProductSyncStatus {
 
 export interface UserListing extends ListingInfo {
   id: string;
+  /** Moneda del canal (PEN, USD...) */
+  currency?: string;
   productId: string;
   productName: string;
   sku: string;
   stock: number;
   price: number | string;
+}
+
+export type ChangeRequestStatus = 'pending' | 'approved' | 'rejected' | 'sent' | 'error';
+
+export interface ChangeRequest {
+  id: string;
+  marketplace: string;
+  field: 'price' | 'stock';
+  previousValue: string | null;
+  newValue: string;
+  status: ChangeRequestStatus;
+  resultMessage: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  product: { id: string; name: string; sku: string };
 }
 
 export interface UpdateInventoryDto {
@@ -125,7 +142,7 @@ export const syncApi = {
 
   /** Actualiza stock/precio local y lo sincroniza con los canales publicados */
   updateInventory: (productId: string, dto: UpdateInventoryDto) =>
-    apiRequest<{ message: string }>(`/sync/products/${productId}/inventory`, {
+    apiRequest<{ message: string; pending?: number }>(`/sync/products/${productId}/inventory`, {
       method: 'PATCH',
       body: JSON.stringify(dto),
     }),
@@ -134,6 +151,28 @@ export const syncApi = {
   getProductStatus: (productId: string) =>
     apiRequest<ProductSyncStatus>(`/sync/products/${productId}/status`, {
       method: 'GET',
+    }),
+
+  /** Solicitudes de cambio de precio/stock (modo revisión) */
+  getChangeRequests: (status?: ChangeRequestStatus) =>
+    apiRequest<ChangeRequest[]>(`/sync/change-requests${status ? `?status=${status}` : ''}`, { method: 'GET' }),
+
+  approveChange: (id: string) =>
+    apiRequest<{ message: string }>(`/sync/change-requests/${id}/approve`, { method: 'POST' }),
+
+  rejectChange: (id: string, reason?: string) =>
+    apiRequest<{ id: string }>(`/sync/change-requests/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  getSyncSettings: () =>
+    apiRequest<{ reviewMode: boolean }>('/sync/settings', { method: 'GET' }),
+
+  setReviewMode: (enabled: boolean) =>
+    apiRequest<{ reviewMode: boolean }>('/sync/settings/review-mode', {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
     }),
 
   /** Todas las publicaciones del usuario en los marketplaces */
