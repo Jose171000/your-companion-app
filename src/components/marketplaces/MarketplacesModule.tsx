@@ -6,6 +6,9 @@ import { ConnectYavendioDialog } from "./ConnectYavendioDialog";
 import { ConnectFalabellaDialog } from "./ConnectFalabellaDialog";
 import { ListingsTable } from "./ListingsTable";
 import { InventoryBoard } from "./InventoryBoard";
+import { ImportFalabellaDialog } from "./ImportFalabellaDialog";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 import { ReviewQueue } from "./ReviewQueue";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -48,6 +51,7 @@ export function MarketplacesModule() {
   const [disconnectTarget, setDisconnectTarget] = useState<MarketplaceConnection | null>(null);
   const [yavendioOpen, setYavendioOpen] = useState(false);
   const [falabellaOpen, setFalabellaOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   // ── Resultado del flujo OAuth (query params que deja el callback) ──────────
   useEffect(() => {
@@ -203,11 +207,18 @@ export function MarketplacesModule() {
 
       {/* Publicaciones */}
       <section className="space-y-4">
-        <div>
-          <h3 className="font-semibold text-base md:text-lg">Publicaciones sincronizadas</h3>
-          <p className="text-xs md:text-sm text-muted-foreground">
-            Productos publicados en tus canales y su estado de sincronización
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-base md:text-lg">Publicaciones sincronizadas</h3>
+            <p className="text-xs md:text-sm text-muted-foreground">
+              Productos publicados en tus canales y su estado de sincronización
+            </p>
+          </div>
+          {connections.some((c) => c.marketplace === "falabella" && c.status === "active") && (
+            <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => setImportOpen(true)}>
+              <Download className="w-3.5 h-3.5" /> Importar desde Falabella
+            </Button>
+          )}
         </div>
 
         <ListingsTable
@@ -252,6 +263,7 @@ export function MarketplacesModule() {
 
       <ConnectYavendioDialog open={yavendioOpen} onOpenChange={setYavendioOpen} />
       <ConnectFalabellaDialog open={falabellaOpen} onOpenChange={setFalabellaOpen} />
+      <ImportFalabellaDialog open={importOpen} onOpenChange={setImportOpen} />
     </div>
   );
 }

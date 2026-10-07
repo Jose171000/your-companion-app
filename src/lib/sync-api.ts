@@ -85,6 +85,17 @@ export interface FalabellaPreparation {
   attributes?: Record<string, string>;
 }
 
+export interface FalabellaImportSummary {
+  total: number;
+  yaEnCatalogo: number;
+  nuevas: number;
+  enlazadas: number;
+  incompleto: boolean;
+  porEstado: Record<string, number>;
+  notaMedia: number | null;
+  ejemplos: { sku: string; nombre: string; estado: string; nota: number | null; enCatalogo: boolean }[];
+}
+
 export const syncApi = {
   /** Cuentas de marketplaces conectadas del usuario */
   getConnections: () =>
@@ -104,6 +115,10 @@ export const syncApi = {
       method: 'POST',
       body: JSON.stringify({ userId, apiKey }),
     }),
+
+  /** Trae las publicaciones que ya existen en Falabella. Con dryRun solo informa qué pasaría. */
+  importFalabellaListings: (dryRun: boolean) =>
+    apiRequest<FalabellaImportSummary>(`/sync/falabella/listings/import?dryRun=${dryRun}`, { method: 'POST' }),
 
   /** Categorías de Falabella donde se puede publicar, filtradas por texto. */
   searchFalabellaCategories: (search: string) =>
