@@ -20,6 +20,8 @@ export interface EditableProduct {
   sku: string;
   price: number;
   stock: number;
+  /** Precio con descuento de la tienda web (no va a ningún marketplace) */
+  webPrice?: number | null;
 }
 
 interface Props {
@@ -33,11 +35,13 @@ export function EditInventoryDialog({ product, reviewMode, onClose }: Props) {
   const queryClient = useQueryClient();
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
+  const [webPrice, setWebPrice] = useState("");
 
   useEffect(() => {
     if (product) {
       setPrice(String(product.price));
       setStock(String(product.stock));
+      setWebPrice(product.webPrice != null ? String(product.webPrice) : "");
     }
   }, [product]);
 
@@ -45,16 +49,27 @@ export function EditInventoryDialog({ product, reviewMode, onClose }: Props) {
   const stockNum = Number(stock);
   const priceChanged = !!product && price !== "" && priceNum !== product.price;
   const stockChanged = !!product && stock !== "" && stockNum !== product.stock;
+  // El precio web puede quedar vacío: eso lo quita.
+  const webNum = webPrice === "" ? null : Number(webPrice);
+  const webChanged = !!product && webNum !== (product.webPrice != null ? Number(product.webPrice) : null);
   const invalid =
     (priceChanged && (Number.isNaN(priceNum) || priceNum < 0)) ||
-    (stockChanged && (!Number.isInteger(stockNum) || stockNum < 0));
+    (stockChanged && (!Number.isInteger(stockNum) || stockNum < 0)) ||
+    (webChanged && webNum !== null && (Number.isNaN(webNum) || webNum < 0));
 
   const mutation = useMutation({
-    mutationFn: () =>
-      syncApi.updateInventory(product!.productId, {
+    mutationFn: async () => {
+      // El precio web se guarda aparte: no se envía a marketplaces ni pasa por revisión.
+      if (webChanged) {
+        const web = await syncApi.setWebPrice(product!.productId, webNum);
+        if (web.error) return web;
+        if (!priceChanged && !stockChanged) return web;
+      }
+      return syncApi.updateInventory(product!.productId, {
         ...(priceChanged ? { price: priceNum } : {}),
         ...(stockChanged ? { stock: stockNum } : {}),
-      }),
+      });
+    },
     onSuccess: (res) => {
       if (res.error) {
         toast.error(res.error);
@@ -103,9 +118,25 @@ export function EditInventoryDialog({ product, reviewMode, onClose }: Props) {
           </div>
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="inv-web">Precio web (con descuento)</Label>
+          <Input
+            id="inv-web"
+            type="number"
+            min={0}
+            step="0.01"
+            placeholder="Sin precio web"
+            value={webPrice}
+            onChange={(e) => setWebPrice(e.target.value)}
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Es el precio de tu tienda web. Se enviará a WooCommerce cuando esa conexión esté lista; no afecta a los marketplaces.
+          </p>
+        </div>
+
         <p className="text-xs text-muted-foreground">
           {reviewMode
-            ? "El modo revisión está activo: el cambio quedará pendiente hasta que lo apruebes en la pestaña Revisión."
+            ? "El modo revisión está activo: los cambios de precio y stock quedarán pendientes hasta que los apruebes en la pestaña Revisión. El precio web se guarda al instante."
             : "El modo revisión está apagado: el cambio se enviará de inmediato a los canales publicados."}
         </p>
 
@@ -115,7 +146,7 @@ export function EditInventoryDialog({ product, reviewMode, onClose }: Props) {
           </Button>
           <Button
             className="gradient-primary"
-            disabled={mutation.isPending || invalid || (!priceChanged && !stockChanged)}
+            disabled={mutation.isPending || invalid || (!priceChanged && !stockChanged && !webChanged)}
             onClick={() => mutation.mutate()}
           >
             {reviewMode ? "Enviar a revisión" : "Guardar y sincronizar"}

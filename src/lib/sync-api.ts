@@ -38,6 +38,15 @@ export interface UserListing extends ListingInfo {
   id: string;
   /** Moneda del canal (PEN, USD...) */
   currency?: string;
+  /** Precio regular y, si hay promoción vigente, el precio con descuento del canal */
+  regularPrice?: number | string | null;
+  salePrice?: number | string | null;
+  /** Imagen de esta publicación (cada variante tiene la suya) */
+  imageUrl?: string | null;
+  variation?: string | null;
+  parentSku?: string | null;
+  /** Precio con descuento de la tienda web (futura conexión WooCommerce) */
+  webPrice?: number | string | null;
   productId: string;
   productName: string;
   sku: string;
@@ -166,6 +175,13 @@ export const syncApi = {
   getProductStatus: (productId: string) =>
     apiRequest<ProductSyncStatus>(`/sync/products/${productId}/status`, {
       method: 'GET',
+    }),
+
+  /** Precio con descuento de la tienda web; null lo quita. No pasa por revisión. */
+  setWebPrice: (productId: string, webPrice: number | null) =>
+    apiRequest<{ message: string }>(`/sync/products/${productId}/web-price`, {
+      method: 'PATCH',
+      body: JSON.stringify({ webPrice }),
     }),
 
   /** Solicitudes de cambio de precio/stock (modo revisión) */

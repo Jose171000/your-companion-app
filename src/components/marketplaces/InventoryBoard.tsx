@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import { channelName, money } from "./format";
 import { EditInventoryDialog, EditableProduct } from "./EditInventoryDialog";
+import { ProductThumb } from "./ProductThumb";
 
 interface Props {
   listings: UserListing[];
@@ -26,6 +27,8 @@ interface ChannelCell {
 }
 
 interface Row extends EditableProduct {
+  imageUrl: string | null;
+  variation: string | null;
   channels: ChannelCell[];
   pendingCount: number;
 }
@@ -55,11 +58,17 @@ function buildRows(listings: UserListing[], pending: ChangeRequest[]): Row[] {
         sku: l.sku,
         price: Number(l.price),
         stock: l.stock,
+        webPrice: l.webPrice != null ? Number(l.webPrice) : null,
+        imageUrl: null,
+        variation: null,
         channels: [],
         pendingCount: pending.filter((p) => p.product.id === l.productId).length,
       };
       byProduct.set(l.productId, row);
     }
+    // La imagen y la variante salen de la primera publicación que las tenga.
+    row.imageUrl = row.imageUrl ?? l.imageUrl ?? null;
+    row.variation = row.variation ?? l.variation ?? null;
     row.channels.push({
       listing: l,
       // Desfasado = el canal quedó con un valor distinto al de Synkro.
@@ -68,6 +77,32 @@ function buildRows(listings: UserListing[], pending: ChangeRequest[]): Row[] {
     });
   }
   return [...byProduct.values()];
+}
+
+/** Precio regular y, si hay promoción vigente, el precio con descuento del canal. */
+function ChannelPrice({ listing: l }: { listing: UserListing }) {
+  const regular = l.regularPrice ?? l.lastPriceSynced;
+  if (regular == null) return <span>—</span>;
+  if (l.salePrice == null) return <span>{money(regular, l.currency)}</span>;
+  return (
+    <span className="flex flex-col leading-tight">
+      <span className="line-through text-[10px] opacity-70">{money(regular, l.currency)}</span>
+      <span className="font-semibold text-foreground">{money(l.salePrice, l.currency)}</span>
+    </span>
+  );
+}
+
+function WebPrice({ value }: { value?: number | null }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Precio web</p>
+      {value != null ? (
+        <p className="font-semibold">{money(value)}</p>
+      ) : (
+        <p className="text-muted-foreground">—</p>
+      )}
+    </div>
+  );
 }
 
 function ChannelChip({ cell }: { cell: ChannelCell }) {
@@ -87,8 +122,8 @@ function ChannelChip({ cell }: { cell: ChannelCell }) {
           {STATUS_LABELS[l.syncStatus] ?? l.syncStatus}
         </Badge>
       </div>
-      <div className="flex items-center justify-between text-muted-foreground tabular-nums">
-        <span>{l.lastPriceSynced != null ? money(l.lastPriceSynced, l.currency) : "—"}</span>
+      <div className="flex items-end justify-between gap-2 text-muted-foreground tabular-nums">
+        <ChannelPrice listing={l} />
         <span>{l.lastStockSynced ?? "—"} u.</span>
       </div>
     </div>
@@ -199,11 +234,15 @@ export function InventoryBoard({ listings, pending, reviewMode, isLoading, isErr
               key={r.productId}
               className="p-4 flex flex-col lg:flex-row lg:items-center gap-4 hover:bg-secondary/20 transition-colors"
             >
-              <div className="lg:w-64 shrink-0 min-w-0">
-                <p className="font-medium text-sm truncate">{r.name}</p>
-                <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
+              <div className="lg:w-72 shrink-0 min-w-0 flex items-center gap-3">
+                <ProductThumb src={r.imageUrl} alt={r.name} />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{r.name}</p>
+                  {r.variation && <p className="text-[11px] text-muted-foreground truncate">{r.variation}</p>}
+                  <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
+                </div>
               </div>
-              <div className="flex items-center gap-6 text-sm tabular-nums lg:w-64 shrink-0">
+              <div className="flex items-center gap-6 text-sm tabular-nums lg:w-80 shrink-0">
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Precio</p>
                   <p className="font-semibold">{money(r.price, r.channels[0]?.listing.currency)}</p>
@@ -212,6 +251,7 @@ export function InventoryBoard({ listings, pending, reviewMode, isLoading, isErr
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stock</p>
                   <p className="font-semibold">{r.stock} u.</p>
                 </div>
+                <WebPrice value={r.webPrice} />
                 <PendingBadge count={r.pendingCount} long />
               </div>
               <div className="flex flex-wrap gap-2 flex-1">
@@ -230,9 +270,13 @@ export function InventoryBoard({ listings, pending, reviewMode, isLoading, isErr
           {visible.map((r) => (
             <div key={r.productId} className="glass rounded-2xl p-4 space-y-3 border border-border">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{r.name}</p>
-                  <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
+                <div className="min-w-0 flex items-center gap-3">
+                  <ProductThumb src={r.imageUrl} alt={r.name} />
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{r.name}</p>
+                    {r.variation && <p className="text-[11px] text-muted-foreground truncate">{r.variation}</p>}
+                    <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
+                  </div>
                 </div>
                 <Button
                   variant="outline"
@@ -247,6 +291,7 @@ export function InventoryBoard({ listings, pending, reviewMode, isLoading, isErr
               <div className="flex items-center gap-6 text-sm tabular-nums">
                 <span className="font-semibold">{money(r.price, r.channels[0]?.listing.currency)}</span>
                 <span className="text-muted-foreground">{r.stock} u.</span>
+                <WebPrice value={r.webPrice} />
                 <PendingBadge count={r.pendingCount} />
               </div>
               <div className="flex flex-wrap gap-2">

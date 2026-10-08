@@ -2,6 +2,8 @@ import { UserListing } from "@/lib/sync-api";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { ProductThumb } from "./ProductThumb";
+import { money } from "./format";
 import { AlertCircle, ExternalLink, Store } from "lucide-react";
 import {
   Tooltip,
@@ -99,7 +101,7 @@ export function ListingsTable({ listings, isLoading, isError }: ListingsTablePro
         <table className="w-full">
           <thead>
             <tr className="border-b border-border bg-secondary/20">
-              {["Producto", "Canal", "Estado", "Stock sync", "Precio sync", "Última sync", ""].map((h) => (
+              {["Producto", "Canal", "Estado", "Stock sync", "Precio (regular / descuento)", "Última sync", ""].map((h) => (
                 <th
                   key={h}
                   className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
@@ -113,8 +115,14 @@ export function ListingsTable({ listings, isLoading, isError }: ListingsTablePro
             {listings.map((l) => (
               <tr key={l.id} className="hover:bg-secondary/20 transition-colors">
                 <td className="px-4 py-3">
-                  <p className="font-medium text-sm truncate max-w-[240px]">{l.productName}</p>
-                  <code className="text-[10px] font-mono text-muted-foreground">{l.sku}</code>
+                  <div className="flex items-center gap-3">
+                    <ProductThumb src={l.imageUrl} alt={l.productName} />
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate max-w-[240px]">{l.productName}</p>
+                      {l.variation && <p className="text-[11px] text-muted-foreground truncate max-w-[240px]">{l.variation}</p>}
+                      <code className="text-[10px] font-mono text-muted-foreground">{l.sku}</code>
+                    </div>
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <Badge variant="secondary" className="text-[10px] capitalize">
@@ -128,8 +136,17 @@ export function ListingsTable({ listings, isLoading, isError }: ListingsTablePro
                   {l.lastStockSynced ?? <span className="text-muted-foreground">—</span>}
                 </td>
                 <td className="px-4 py-3 text-sm">
-                  {l.lastPriceSynced != null ? (
-                    `$${Number(l.lastPriceSynced).toFixed(2)}`
+                  {l.regularPrice != null || l.lastPriceSynced != null ? (
+                    l.salePrice != null ? (
+                      <span className="flex flex-col leading-tight">
+                        <span className="line-through text-[11px] text-muted-foreground">
+                          {money(l.regularPrice ?? l.lastPriceSynced, l.currency)}
+                        </span>
+                        <span className="font-semibold">{money(l.salePrice, l.currency)}</span>
+                      </span>
+                    ) : (
+                      money(l.regularPrice ?? l.lastPriceSynced, l.currency)
+                    )
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}
@@ -160,9 +177,13 @@ export function ListingsTable({ listings, isLoading, isError }: ListingsTablePro
         {listings.map((l) => (
           <div key={l.id} className="p-4 space-y-2">
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <p className="font-medium text-sm">{l.productName}</p>
-                <code className="text-[10px] font-mono text-muted-foreground">{l.sku}</code>
+              <div className="flex items-center gap-3 min-w-0">
+                <ProductThumb src={l.imageUrl} alt={l.productName} />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm">{l.productName}</p>
+                  {l.variation && <p className="text-[11px] text-muted-foreground">{l.variation}</p>}
+                  <code className="text-[10px] font-mono text-muted-foreground">{l.sku}</code>
+                </div>
               </div>
               <StatusBadge listing={l} />
             </div>
