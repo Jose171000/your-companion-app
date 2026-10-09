@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/popover";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { StoreSwitcher } from "@/components/stores/StoreSwitcher";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -145,6 +146,7 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton }: HeaderP
 
         {/* ── Right: Actions ─────────────────────────────────────────────── */}
         <div className="flex items-center gap-1 md:gap-2 shrink-0">
+          <StoreSwitcher />
           {/* Theme toggle */}
           <ThemeToggle />
 
