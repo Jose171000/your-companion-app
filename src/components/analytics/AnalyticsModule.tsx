@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { useStores } from "@/contexts/StoreContext";
+import { syncApi } from "@/lib/sync-api";
 import { reportsApi } from "@/lib/admin-api";
 import { EmbeddedReport } from "./EmbeddedReport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -7,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Package, Receipt, TrendingUp } from "lucide-react";
+import { AlertCircle, Loader2, Package, Receipt, RefreshCw, TrendingUp } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -76,13 +79,48 @@ function KpiCard({
   );
 }
 
+/** "hace 5 min", "hace 3 h", o la fecha si fue hace más de dos días */
+function haceCuanto(iso: string | null | undefined): string {
+  if (!iso) return "todavía no ha entrado ninguna";
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (min < 1) return "hace un momento";
+  if (min < 60) return `hace ${min} min`;
+  if (min < 48 * 60) return `hace ${Math.round(min / 60)} h`;
+  return new Date(iso).toLocaleDateString("es-PE");
+}
+
 export function AnalyticsModule() {
   const [days, setDays] = useState(30);
+  const queryClient = useQueryClient();
+  // Las analíticas son de la tienda activa: cada tienda tiene sus propias métricas.
+  const { activeStore } = useStores();
+  const storeId = activeStore?.id;
+  const isOwner = activeStore?.role === "owner";
+
+  const syncOrders = useMutation({
+    mutationFn: () => syncApi.syncOrders(),
+    onSuccess: (res) => {
+      if (res.error || !res.data) {
+        toast.error(res.error ?? "No se pudieron actualizar las ventas");
+        return;
+      }
+      const { cuentas, totalNuevos } = res.data;
+      const fallidas = cuentas.filter((c) => c.error);
+      if (!cuentas.length) toast.info("Esta tienda no tiene cuentas de ventas conectadas todavía.");
+      else if (fallidas.length)
+        toast.error(`${fallidas[0].nombre}: ${fallidas[0].error}`);
+      else toast.success(totalNuevos ? `${totalNuevos} venta(s) nueva(s) registradas` : "Las ventas ya estaban al día");
+      queryClient.invalidateQueries({ queryKey: ["sales-report"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
 
   // Reporte externo (AppScript/Looker) que el admin haya configurado
   const { data: configRes } = useQuery({
-    queryKey: ["report-config"],
+    queryKey: ["report-config", storeId],
     queryFn: () => reportsApi.getConfig(),
+    enabled: !!storeId,
     staleTime: 5 * 60_000,
   });
   const embedUrl = configRes?.data?.embedUrl ?? null;
@@ -92,9 +130,12 @@ export function AnalyticsModule() {
   const to = new Date().toISOString().slice(0, 10);
 
   const { data: result, isLoading, isError } = useQuery({
-    queryKey: ["sales-report", from, to],
+    queryKey: ["sales-report", storeId, from, to],
     queryFn: () => reportsApi.getSales(from, to),
+    enabled: !!storeId,
     staleTime: 60_000,
+    // Las ventas entran solas cada pocos minutos: se refresca sin recargar la página.
+    refetchInterval: 2 * 60_000,
   });
 
   const report = result?.data;
@@ -127,6 +168,28 @@ export function AnalyticsModule() {
 
   const nativeReport = (
     <div className="space-y-6">
+      {/* Tienda activa y estado de la sincronización de ventas */}
+      <div className="glass rounded-2xl border border-border dark:border-white/10 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <p className="font-semibold text-sm">{activeStore?.name ?? "Tu tienda"}</p>
+          <p className="text-xs text-muted-foreground">
+            Última venta registrada: {haceCuanto(report.lastOrderAt)}. Las ventas se traen solas cada pocos minutos.
+          </p>
+        </div>
+        {isOwner && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-1.5 shrink-0"
+            disabled={syncOrders.isPending}
+            onClick={() => syncOrders.mutate()}
+          >
+            {syncOrders.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            Actualizar ventas ahora
+          </Button>
+        )}
+      </div>
+
       {/* Selector de rango */}
       <div className="flex items-center gap-2">
         {RANGES.map((r) => (
@@ -280,6 +343,28 @@ export function AnalyticsModule() {
           </>
         )}
       </div>
+
+      {/* Por cuenta: solo cuando hay más de una */}
+      {(report.byAccount?.length ?? 0) > 1 && (
+        <div className="glass rounded-2xl border border-border dark:border-white/10 p-5 md:p-6">
+          <h3 className="font-semibold mb-1">Ventas por cuenta</h3>
+          <p className="text-xs text-muted-foreground mb-4">Cada cuenta de marketplace conectada a la tienda</p>
+          <div className="space-y-2">
+            {report.byAccount!.map((a) => (
+              <div key={`${a.connectionId}-${a.channel}`} className="flex items-center justify-between gap-3 py-2 border-b border-border/50 last:border-0">
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{a.label || "Cuenta sin nombre"}</p>
+                  <p className="text-[11px] text-muted-foreground">{channelLabel(a.channel)}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-semibold text-sm tabular-nums">{money(a.sales)}</p>
+                  <p className="text-[11px] text-muted-foreground">{a.orders} pedidos</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Origen de los datos */}
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

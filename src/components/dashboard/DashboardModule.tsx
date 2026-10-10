@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useStores } from "@/contexts/StoreContext";
 import {
   dashboardApi,
   DashboardAccount,
@@ -98,8 +99,12 @@ function LoadingGrid() {
 // ─── Resumen del negocio propio ───────────────────────────────────────────────
 
 function MiNegocio() {
+  // El resumen es de la tienda activa: cada tienda tiene sus propios canales y ventas.
+  const { activeStore } = useStores();
+  const storeId = activeStore?.id;
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["dashboard-summary"],
+    queryKey: ["dashboard-summary", storeId],
+    enabled: !!storeId,
     queryFn: () => dashboardApi.getSummary(),
     staleTime: 60_000,
     refetchInterval: 120_000,

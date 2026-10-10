@@ -217,6 +217,13 @@ export const syncApi = {
       body: JSON.stringify({ enabled }),
     }),
 
+  /** Trae ahora las ventas recientes de todas las cuentas de la tienda activa */
+  syncOrders: () =>
+    apiRequest<{
+      cuentas: { id: string; marketplace: string; nombre: string; nuevos: number; revisados: number; error?: string }[];
+      totalNuevos: number;
+    }>('/sync/orders/sync', { method: 'POST' }),
+
   /** Todas las publicaciones del usuario en los marketplaces */
   getListings: () =>
     apiRequest<UserListing[]>('/sync/listings', { method: 'GET' }),

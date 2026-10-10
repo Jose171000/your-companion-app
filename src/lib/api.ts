@@ -26,7 +26,7 @@ async function apiRequest<T>(
 
     // Todo lo de canales ocurre dentro de la tienda activa. El servidor la
     // comprueba en cada petición: este encabezado solo dice cuál se está viendo.
-    if (endpoint.startsWith('/sync/')) {
+    if (endpoint.startsWith('/sync/') || endpoint.startsWith('/reports/') || endpoint.startsWith('/dashboard/summary')) {
       try {
         const storeId = localStorage.getItem('active_store_id');
         if (storeId) (headers as Record<string, string>)['X-Store-Id'] = storeId;

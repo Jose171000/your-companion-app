@@ -195,6 +195,10 @@ export interface SalesReport {
   totals: { sales: number; orders: number; avgTicket: number };
   byDay: { date: string; sales: number; orders: number }[];
   byChannel: { channel: string; sales: number; orders: number; source: string }[];
+  /** Desglose por cuenta del canal: una tienda puede tener varias del mismo marketplace */
+  byAccount?: { connectionId: string | null; channel: string; label: string | null; sales: number; orders: number }[];
+  /** Cuándo entró la última venta de la tienda */
+  lastOrderAt?: string | null;
   sources: { marketplaces: boolean; sheets: boolean; sheetError: string | null };
 }
 
