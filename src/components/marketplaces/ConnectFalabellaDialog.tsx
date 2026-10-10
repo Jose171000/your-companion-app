@@ -28,10 +28,11 @@ interface Props {
 export function ConnectFalabellaDialog({ open, onOpenChange }: Props) {
   const [userId, setUserId] = useState("");
   const [apiKey, setApiKey] = useState("");
+  const [label, setLabel] = useState("");
   const queryClient = useQueryClient();
 
   const connect = useMutation({
-    mutationFn: () => syncApi.connectFalabella(userId.trim(), apiKey.trim()),
+    mutationFn: () => syncApi.connectFalabella(userId.trim(), apiKey.trim(), label),
     onSuccess: (res) => {
       if (res.error) {
         toast.error(res.error);
@@ -41,6 +42,7 @@ export function ConnectFalabellaDialog({ open, onOpenChange }: Props) {
       queryClient.invalidateQueries({ queryKey: ["sync-connections"] });
       setUserId("");
       setApiKey("");
+      setLabel("");
       onOpenChange(false);
     },
     onError: () => toast.error("Error al conectar con el servidor"),
@@ -50,6 +52,7 @@ export function ConnectFalabellaDialog({ open, onOpenChange }: Props) {
     if (!next) {
       setUserId("");
       setApiKey("");
+      setLabel("");
     }
     onOpenChange(next);
   };
@@ -104,6 +107,18 @@ export function ConnectFalabellaDialog({ open, onOpenChange }: Props) {
                 if (e.key === "Enter" && listo && !connect.isPending) connect.mutate();
               }}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="falabella-label">Nombre de la cuenta (opcional)</Label>
+            <Input
+              id="falabella-label"
+              autoComplete="off"
+              maxLength={60}
+              placeholder="Ej. Cuenta principal"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            />
+            <p className="text-[11px] text-muted-foreground">Sirve para distinguirla de otras cuentas del mismo canal.</p>
           </div>
         </div>
 

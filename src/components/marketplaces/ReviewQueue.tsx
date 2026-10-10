@@ -13,6 +13,8 @@ import { channelName, money } from "./format";
 interface Props {
   requests: ChangeRequest[];
   reviewMode: boolean;
+  /** Solo el dueño aprueba, rechaza y cambia el modo revisión */
+  canManage: boolean;
   isLoading: boolean;
 }
 
@@ -34,6 +36,7 @@ function ChangeLine({ r }: { r: ChangeRequest }) {
         <code className="font-mono text-[10px]">{r.product.sku}</code>
         <Badge variant="secondary" className="text-[10px]">
           {channelName(r.marketplace)}
+          {(r.connection?.label || r.connection?.externalNickname) && ` · ${r.connection?.label || r.connection?.externalNickname}`}
         </Badge>
         <span>{r.field === "price" ? "Precio" : "Stock"}:</span>
         <span className="tabular-nums">{fmtValue(r, r.previousValue)}</span>
@@ -45,7 +48,7 @@ function ChangeLine({ r }: { r: ChangeRequest }) {
 }
 
 /** Cola de aprobación: cambios de precio y stock que esperan luz verde. */
-export function ReviewQueue({ requests, reviewMode, isLoading }: Props) {
+export function ReviewQueue({ requests, reviewMode, canManage, isLoading }: Props) {
   const queryClient = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -105,11 +108,12 @@ export function ReviewQueue({ requests, reviewMode, isLoading }: Props) {
             {reviewMode
               ? "Los cambios de precio y stock esperan tu aprobación antes de llegar a los canales."
               : "Los cambios de precio y stock se envían de inmediato a los canales."}
+            {!canManage && " Solo el dueño de la tienda puede cambiarlo."}
           </p>
         </div>
         <Switch
           checked={reviewMode}
-          disabled={toggle.isPending}
+          disabled={toggle.isPending || !canManage}
           onCheckedChange={(v) => toggle.mutate(v)}
           aria-label="Modo revisión"
         />
@@ -132,6 +136,7 @@ export function ReviewQueue({ requests, reviewMode, isLoading }: Props) {
             {pending.map((r) => (
               <div key={r.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
                 <ChangeLine r={r} />
+                {canManage ? (
                 <div className="flex gap-2 shrink-0">
                   <Button
                     variant="outline"
@@ -151,6 +156,9 @@ export function ReviewQueue({ requests, reviewMode, isLoading }: Props) {
                     <Check className="w-3.5 h-3.5" /> Aprobar
                   </Button>
                 </div>
+                ) : (
+                  <span className="text-xs text-muted-foreground shrink-0">Espera la aprobación del dueño</span>
+                )}
               </div>
             ))}
           </div>

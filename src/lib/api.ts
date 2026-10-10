@@ -24,6 +24,15 @@ async function apiRequest<T>(
       (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
     }
 
+    // Todo lo de canales ocurre dentro de la tienda activa. El servidor la
+    // comprueba en cada petición: este encabezado solo dice cuál se está viendo.
+    if (endpoint.startsWith('/sync/')) {
+      try {
+        const storeId = localStorage.getItem('active_store_id');
+        if (storeId) (headers as Record<string, string>)['X-Store-Id'] = storeId;
+      } catch { /* sin almacenamiento: el servidor usa la tienda por defecto */ }
+    }
+
     const response = await fetch(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
       ...options,
       headers,

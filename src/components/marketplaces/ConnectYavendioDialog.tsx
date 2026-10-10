@@ -28,10 +28,11 @@ interface Props {
  */
 export function ConnectYavendioDialog({ open, onOpenChange }: Props) {
   const [apiKey, setApiKey] = useState("");
+  const [label, setLabel] = useState("");
   const queryClient = useQueryClient();
 
   const connect = useMutation({
-    mutationFn: () => syncApi.connectYavendio(apiKey.trim()),
+    mutationFn: () => syncApi.connectYavendio(apiKey.trim(), label),
     onSuccess: (res) => {
       if (res.error) {
         toast.error(res.error);
@@ -40,13 +41,17 @@ export function ConnectYavendioDialog({ open, onOpenChange }: Props) {
       toast.success(`Cuenta de Yavendió conectada: ${res.data?.nickname ?? ""}`);
       queryClient.invalidateQueries({ queryKey: ["sync-connections"] });
       setApiKey("");
+      setLabel("");
       onOpenChange(false);
     },
     onError: () => toast.error("Error al conectar con el servidor"),
   });
 
   const close = (next: boolean) => {
-    if (!next) setApiKey("");
+    if (!next) {
+      setApiKey("");
+      setLabel("");
+    }
     onOpenChange(next);
   };
 
@@ -74,6 +79,7 @@ export function ConnectYavendioDialog({ open, onOpenChange }: Props) {
           </DialogDescription>
         </DialogHeader>
 
+        <div className="space-y-3">
         <div className="space-y-2">
           <Label htmlFor="yavendio-api-key">API Key</Label>
           <Input
@@ -87,6 +93,19 @@ export function ConnectYavendioDialog({ open, onOpenChange }: Props) {
               if (e.key === "Enter" && apiKey.trim() && !connect.isPending) connect.mutate();
             }}
           />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="yavendio-label">Nombre de la cuenta (opcional)</Label>
+          <Input
+            id="yavendio-label"
+            autoComplete="off"
+            maxLength={60}
+            placeholder="Ej. Cuenta principal"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <p className="text-[11px] text-muted-foreground">Sirve para distinguirla de otras cuentas del mismo canal.</p>
+        </div>
         </div>
 
         <DialogFooter>

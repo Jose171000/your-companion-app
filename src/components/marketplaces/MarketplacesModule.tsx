@@ -10,6 +10,7 @@ import { ImportFalabellaDialog } from "./ImportFalabellaDialog";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { ReviewQueue } from "./ReviewQueue";
+import { useStores } from "@/contexts/StoreContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
@@ -44,10 +45,18 @@ const MARKETPLACES: MarketplaceDef[] = [
   { id: "amazon",       name: "Amazon",       logo: "/amazon.png",       imgClass: "scale-[1.7]", available: false },
 ];
 
+/** Cuántas cuentas del mismo canal admite una tienda (el servidor lo hace cumplir). */
+const MAX_ACCOUNTS = 3;
+
 // ─── Módulo principal ─────────────────────────────────────────────────────────
 
 export function MarketplacesModule() {
   const queryClient = useQueryClient();
+  const { activeStore, setActiveStore } = useStores();
+  const storeId = activeStore?.id;
+  // Roles: el lector mira; el editor propone cambios; el dueño conecta, importa y aprueba.
+  const isOwner = activeStore?.role === "owner";
+  const canEdit = activeStore?.role === "owner" || activeStore?.role === "editor";
   const [disconnectTarget, setDisconnectTarget] = useState<MarketplaceConnection | null>(null);
   const [yavendioOpen, setYavendioOpen] = useState(false);
   const [falabellaOpen, setFalabellaOpen] = useState(false);
@@ -61,6 +70,9 @@ export function MarketplacesModule() {
 
     if (meli === "connected") {
       const nickname = params.get("nickname");
+      // La cuenta se conectó a una tienda concreta: se muestra esa.
+      const store = params.get("store");
+      if (store) setActiveStore(store);
       toast.success(
         nickname
           ? `Cuenta de Mercado Libre conectada: ${nickname}`
@@ -72,32 +84,36 @@ export function MarketplacesModule() {
     }
     // Limpia los query params sin recargar la página
     window.history.replaceState({}, "", window.location.pathname);
-  }, [queryClient]);
+  }, [queryClient, setActiveStore]);
 
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: connectionsResult, isLoading: loadingConnections } = useQuery({
-    queryKey: ["sync-connections"],
+    queryKey: ["sync-connections", storeId],
     queryFn:  () => syncApi.getConnections(),
+    enabled:  !!storeId,
     staleTime: 30_000,
   });
 
   const { data: listingsResult, isLoading: loadingListings, isError: listingsError } = useQuery({
-    queryKey: ["sync-listings"],
+    queryKey: ["sync-listings", storeId],
     queryFn:  () => syncApi.getListings(),
+    enabled:  !!storeId,
     staleTime: 15_000,
     refetchInterval: 20_000, // las publicaciones encoladas cambian de estado solas
   });
 
   // Modo revisión: ajuste del usuario y cambios de precio/stock por aprobar
   const { data: settingsResult } = useQuery({
-    queryKey: ["sync-settings"],
+    queryKey: ["sync-settings", storeId],
     queryFn:  () => syncApi.getSyncSettings(),
+    enabled:  !!storeId,
     staleTime: 30_000,
   });
 
   const { data: changesResult, isLoading: loadingChanges } = useQuery({
-    queryKey: ["sync-change-requests"],
+    queryKey: ["sync-change-requests", storeId],
     queryFn:  () => syncApi.getChangeRequests(),
+    enabled:  !!storeId,
     staleTime: 10_000,
     refetchInterval: 20_000, // los envíos aprobados pasan a "enviado" solos
   });
@@ -106,6 +122,7 @@ export function MarketplacesModule() {
   const listings    = listingsResult?.data ?? [];
   const changes     = changesResult?.data ?? [];
   const pendingChanges = changes.filter((c) => c.status === "pending");
+  const falabellaAccounts = connections.filter((c) => c.marketplace === "falabella" && c.status === "active");
   // Hasta que el servidor responda se asume revisión: es el valor por defecto.
   const reviewMode  = settingsResult?.data?.reviewMode ?? true;
 
@@ -124,7 +141,7 @@ export function MarketplacesModule() {
   });
 
   const disconnectMutation = useMutation({
-    mutationFn: (marketplace: string) => syncApi.disconnect(marketplace),
+    mutationFn: (connectionId: string) => syncApi.disconnect(connectionId),
     onSuccess: (res) => {
       if (res.error) {
         toast.error(res.error);
@@ -171,22 +188,23 @@ export function MarketplacesModule() {
             listings={listings}
             pending={pendingChanges}
             reviewMode={reviewMode}
+            canEdit={canEdit}
             isLoading={loadingListings}
             isError={listingsError}
           />
         </TabsContent>
 
         <TabsContent value="revision" className="pt-6">
-          <ReviewQueue requests={changes} reviewMode={reviewMode} isLoading={loadingChanges} />
+          <ReviewQueue requests={changes} reviewMode={reviewMode} canManage={isOwner} isLoading={loadingChanges} />
         </TabsContent>
 
         <TabsContent value="canales" className="pt-6 space-y-8">
       {/* Conexiones */}
       <section className="space-y-4">
         <div>
-          <h3 className="font-semibold text-base md:text-lg">Canales de venta</h3>
+          <h3 className="font-semibold text-base md:text-lg">Canales de venta{activeStore ? ` de ${activeStore.name}` : ""}</h3>
           <p className="text-xs md:text-sm text-muted-foreground">
-            Conecta tus cuentas para publicar y sincronizar inventario automáticamente
+            Cada tienda tiene sus propias cuentas: hasta {MAX_ACCOUNTS} por canal. Cambia de tienda en la cabecera para ver las de otra.
           </p>
         </div>
 
@@ -195,7 +213,9 @@ export function MarketplacesModule() {
             <ConnectionCard
               key={mp.id}
               marketplace={mp}
-              connection={connections.find((c) => c.marketplace === mp.id)}
+              connections={connections.filter((c) => c.marketplace === mp.id)}
+              maxAccounts={MAX_ACCOUNTS}
+              canManage={isOwner}
               isLoading={loadingConnections}
               isConnecting={connectMutation.isPending && mp.id === "mercadolibre"}
               onConnect={() => handleConnect(mp.id)}
@@ -214,7 +234,7 @@ export function MarketplacesModule() {
               Productos publicados en tus canales y su estado de sincronización
             </p>
           </div>
-          {connections.some((c) => c.marketplace === "falabella" && c.status === "active") && (
+          {isOwner && falabellaAccounts.length > 0 && (
             <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => setImportOpen(true)}>
               <Download className="w-3.5 h-3.5" /> Importar desde Falabella
             </Button>
@@ -241,10 +261,10 @@ export function MarketplacesModule() {
             <AlertDialogDescription>
               La cuenta{" "}
               <span className="font-semibold">
-                {disconnectTarget?.externalNickname || disconnectTarget?.externalUserId}
+                {disconnectTarget?.label || disconnectTarget?.externalNickname || disconnectTarget?.externalUserId}
               </span>{" "}
-              dejará de sincronizarse. Lo que ya exista en {disconnectName} no se elimina,
-              pero Synkro ya no podrá actualizarlo ni recibir sus datos.
+              dejará de sincronizarse en esta tienda. Lo que ya exista en {disconnectName} no se elimina,
+              pero Synkro ya no podrá actualizarlo ni recibir sus datos. Si vuelves a conectarla, recupera sus publicaciones.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -252,7 +272,7 @@ export function MarketplacesModule() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() =>
-                disconnectTarget && disconnectMutation.mutate(disconnectTarget.marketplace)
+                disconnectTarget && disconnectMutation.mutate(disconnectTarget.id)
               }
             >
               Desconectar
@@ -263,7 +283,7 @@ export function MarketplacesModule() {
 
       <ConnectYavendioDialog open={yavendioOpen} onOpenChange={setYavendioOpen} />
       <ConnectFalabellaDialog open={falabellaOpen} onOpenChange={setFalabellaOpen} />
-      <ImportFalabellaDialog open={importOpen} onOpenChange={setImportOpen} />
+      <ImportFalabellaDialog open={importOpen} onOpenChange={setImportOpen} accounts={falabellaAccounts} />
     </div>
   );
 }

@@ -16,6 +16,8 @@ interface Props {
   listings: UserListing[];
   pending: ChangeRequest[];
   reviewMode: boolean;
+  /** Los lectores miran; editor y dueño pueden editar */
+  canEdit: boolean;
   isLoading: boolean;
   isError: boolean;
 }
@@ -111,12 +113,15 @@ function ChannelChip({ cell }: { cell: ChannelCell }) {
   const chip = (
     <div
       className={cn(
-        "rounded-xl border px-3 py-2 text-xs space-y-1 min-w-[132px]",
+        "rounded-xl border px-3 py-2 text-xs space-y-1 min-w-[132px] max-w-[220px]",
         drift ? "border-yellow-500/40 bg-yellow-500/5" : "border-border bg-secondary/20",
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-semibold">{channelName(l.marketplace)}</span>
+        <span className="font-semibold truncate">
+          {channelName(l.marketplace)}
+          {l.accountLabel && <span className="font-normal text-muted-foreground"> · {l.accountLabel}</span>}
+        </span>
         <Badge className={cn("text-[10px] gap-1", STATUS_STYLES[l.syncStatus] ?? STATUS_STYLES.pending)}>
           {l.syncStatus === "error" && <AlertCircle className="w-3 h-3" />}
           {STATUS_LABELS[l.syncStatus] ?? l.syncStatus}
@@ -152,7 +157,7 @@ function PendingBadge({ count, long }: { count: number; long?: boolean }) {
 }
 
 /** Tablero maestro: precio y stock de cada producto, canal por canal. */
-export function InventoryBoard({ listings, pending, reviewMode, isLoading, isError }: Props) {
+export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoading, isError }: Props) {
   const [view, setView] = useState<"rows" | "grid">("rows");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<EditableProduct | null>(null);
@@ -259,9 +264,11 @@ export function InventoryBoard({ listings, pending, reviewMode, isLoading, isErr
                   <ChannelChip key={c.listing.id} cell={c} />
                 ))}
               </div>
-              <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => setEditing(r)}>
-                <Pencil className="w-3.5 h-3.5" /> Editar
-              </Button>
+              {canEdit && (
+                <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => setEditing(r)}>
+                  <Pencil className="w-3.5 h-3.5" /> Editar
+                </Button>
+              )}
             </div>
           ))}
         </div>
@@ -278,15 +285,17 @@ export function InventoryBoard({ listings, pending, reviewMode, isLoading, isErr
                     <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => setEditing(r)}
-                  aria-label="Editar"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </Button>
+                {canEdit && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => setEditing(r)}
+                    aria-label="Editar"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                )}
               </div>
               <div className="flex items-center gap-6 text-sm tabular-nums">
                 <span className="font-semibold">{money(r.price, r.channels[0]?.listing.currency)}</span>

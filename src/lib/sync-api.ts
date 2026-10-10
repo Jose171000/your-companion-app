@@ -7,6 +7,8 @@ import { apiRequest } from './api';
 export interface MarketplaceConnection {
   id: string;
   marketplace: string;
+  /** Nombre con el que la tienda distingue esta cuenta de otras del mismo canal */
+  label?: string | null;
   externalUserId: string;
   externalNickname?: string;
   expiresAt: string;
@@ -41,6 +43,9 @@ export interface UserListing extends ListingInfo {
   /** Precio regular y, si hay promoción vigente, el precio con descuento del canal */
   regularPrice?: number | string | null;
   salePrice?: number | string | null;
+  /** Cuenta del canal en la que está publicada y su nombre */
+  connectionId?: string | null;
+  accountLabel?: string | null;
   /** Imagen de esta publicación (cada variante tiene la suya) */
   imageUrl?: string | null;
   variation?: string | null;
@@ -59,6 +64,7 @@ export type ChangeRequestStatus = 'pending' | 'approved' | 'rejected' | 'sent' |
 export interface ChangeRequest {
   id: string;
   marketplace: string;
+  connection?: { id: string; label?: string | null; externalNickname?: string | null } | null;
   field: 'price' | 'stock';
   previousValue: string | null;
   newValue: string;
@@ -99,6 +105,8 @@ export interface FalabellaImportSummary {
   yaEnCatalogo: number;
   nuevas: number;
   enlazadas: number;
+  /** Fichas cuyo SKU ya existe en otra tienda tuya: no se tocan */
+  enOtraTienda?: number;
   incompleto: boolean;
   porEstado: Record<string, number>;
   notaMedia: number | null;
@@ -112,22 +120,25 @@ export const syncApi = {
 
   /** Conecta Yavendió con la API key que el usuario pega. La clave viaja
    *  al backend y nunca vuelve: solo se responde el nombre de la empresa. */
-  connectYavendio: (apiKey: string) =>
+  connectYavendio: (apiKey: string, label?: string) =>
     apiRequest<{ marketplace: string; nickname: string }>('/sync/yavendio/connect', {
       method: 'POST',
-      body: JSON.stringify({ apiKey }),
+      body: JSON.stringify({ apiKey, ...(label?.trim() ? { label: label.trim() } : {}) }),
     }),
 
   /** Conecta Falabella con el UserID (correo) y la API key del Seller Center. */
-  connectFalabella: (userId: string, apiKey: string) =>
+  connectFalabella: (userId: string, apiKey: string, label?: string) =>
     apiRequest<{ marketplace: string; nickname: string }>('/sync/falabella/connect', {
       method: 'POST',
-      body: JSON.stringify({ userId, apiKey }),
+      body: JSON.stringify({ userId, apiKey, ...(label?.trim() ? { label: label.trim() } : {}) }),
     }),
 
   /** Trae las publicaciones que ya existen en Falabella. Con dryRun solo informa qué pasaría. */
-  importFalabellaListings: (dryRun: boolean) =>
-    apiRequest<FalabellaImportSummary>(`/sync/falabella/listings/import?dryRun=${dryRun}`, { method: 'POST' }),
+  importFalabellaListings: (dryRun: boolean, connectionId?: string) =>
+    apiRequest<FalabellaImportSummary>(
+      `/sync/falabella/listings/import?dryRun=${dryRun}${connectionId ? `&connectionId=${connectionId}` : ''}`,
+      { method: 'POST' },
+    ),
 
   /** Categorías de Falabella donde se puede publicar, filtradas por texto. */
   searchFalabellaCategories: (search: string) =>
@@ -148,12 +159,12 @@ export const syncApi = {
     ),
 
   /** URL de autorización OAuth de Mercado Libre */
-  getMeliAuthUrl: () =>
-    apiRequest<{ authUrl: string }>('/sync/mercadolibre/auth-url', { method: 'GET' }),
+  getMeliAuthUrl: (label?: string) =>
+    apiRequest<{ authUrl: string }>(`/sync/mercadolibre/auth-url${label?.trim() ? `?label=${encodeURIComponent(label.trim())}` : ''}`, { method: 'GET' }),
 
   /** Desconecta una cuenta de marketplace */
-  disconnect: (marketplace: string) =>
-    apiRequest<{ message: string }>(`/sync/connections/${marketplace}`, {
+  disconnect: (connectionId: string) =>
+    apiRequest<{ message: string }>(`/sync/connections/${connectionId}`, {
       method: 'DELETE',
     }),
 

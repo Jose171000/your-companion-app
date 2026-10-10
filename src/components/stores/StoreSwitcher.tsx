@@ -19,7 +19,7 @@ import { ManageStoreDialog } from "./ManageStoreDialog";
  * las tiendas a las que el usuario tiene acceso.
  */
 export function StoreSwitcher() {
-  const { stores, activeStore, setActiveStore, isLoading } = useStores();
+  const { stores, activeStore, setActiveStore, isLoading, canCreateStores } = useStores();
   const [createOpen, setCreateOpen] = useState(false);
   const [manage, setManage] = useState<StoreSummary | null>(null);
 
@@ -55,14 +55,16 @@ export function StoreSwitcher() {
               <Settings2 className="w-4 h-4" /> Equipo y enlace de «{activeStore.name}»
             </DropdownMenuItem>
           )}
-          <DropdownMenuItem className="gap-2" onSelect={() => setCreateOpen(true)}>
-            <Plus className="w-4 h-4" /> Crear tienda
-          </DropdownMenuItem>
+          {canCreateStores ? (
+            <DropdownMenuItem className="gap-2" onSelect={() => setCreateOpen(true)}>
+              <Plus className="w-4 h-4" /> Crear tienda
+            </DropdownMenuItem>
+          ) : (
+            <p className="px-2 py-1.5 text-[11px] leading-snug text-muted-foreground">
+              Tu cuenta se creó por invitación: puedes entrar a las tiendas que te compartan, pero no crear tiendas propias.
+            </p>
+          )}
 
-          <DropdownMenuSeparator />
-          <p className="px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
-            Versión de prueba: las conexiones y productos todavía se comparten entre tus tiendas.
-          </p>
         </DropdownMenuContent>
       </DropdownMenu>
 

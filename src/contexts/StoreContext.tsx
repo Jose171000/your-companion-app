@@ -12,6 +12,8 @@ interface StoreContextType {
   stores: StoreSummary[];
   isLoading: boolean;
   activeStore: StoreSummary | null;
+  /** Las cuentas que llegaron por invitación no pueden crear tiendas */
+  canCreateStores: boolean;
   setActiveStore: (id: string) => void;
   refresh: () => void;
 }
@@ -34,18 +36,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     staleTime: 30_000,
   });
 
-  const stores = useMemo(() => data?.data ?? [], [data]);
+  const stores = useMemo(() => data?.data?.stores ?? [], [data]);
+  const canCreateStores = data?.data?.canCreateStores ?? false;
 
   // Si la tienda guardada ya no existe o perdió el acceso, se usa la primera.
-  const activeStore = useMemo(
-    () => stores.find((s) => s.id === activeId) ?? stores[0] ?? null,
-    [stores, activeId],
-  );
+  // El encabezado de las peticiones sale de aquí: se mantiene en sincronía con lo que se ve.
+  const activeStore = useMemo(() => {
+    const store = stores.find((s) => s.id === activeId) ?? stores[0] ?? null;
+    // La tienda que se ve y la que viaja en las peticiones deben ser la misma:
+    // se guarda aquí, antes de que ningún componente hijo pida datos.
+    if (store) {
+      try { if (localStorage.getItem(ACTIVE_KEY) !== store.id) localStorage.setItem(ACTIVE_KEY, store.id); } catch { /* nada */ }
+    }
+    return store;
+  }, [stores, activeId]);
 
   const setActiveStore = useCallback((id: string) => {
     setActiveId(id);
     try { localStorage.setItem(ACTIVE_KEY, id); } catch { /* sin almacenamiento: solo esta sesión */ }
-  }, []);
+    // Los canales, publicaciones y revisiones son de cada tienda: se descarta lo
+    // de la anterior para no mostrarlo ni un instante bajo el nombre de la nueva.
+    queryClient.removeQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('sync-') });
+  }, [queryClient]);
 
   const refresh = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['stores'] });
@@ -70,8 +82,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [isAuthenticated, refresh, setActiveStore]);
 
   const value = useMemo(
-    () => ({ stores, isLoading, activeStore, setActiveStore, refresh }),
-    [stores, isLoading, activeStore, setActiveStore, refresh],
+    () => ({ stores, isLoading, activeStore, canCreateStores, setActiveStore, refresh }),
+    [stores, isLoading, activeStore, canCreateStores, setActiveStore, refresh],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

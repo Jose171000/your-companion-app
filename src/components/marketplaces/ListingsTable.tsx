@@ -128,6 +128,7 @@ export function ListingsTable({ listings, isLoading, isError }: ListingsTablePro
                   <Badge variant="secondary" className="text-[10px] capitalize">
                     {l.marketplace}
                   </Badge>
+                  {l.accountLabel && <p className="text-[11px] text-muted-foreground mt-1 truncate max-w-[140px]">{l.accountLabel}</p>}
                 </td>
                 <td className="px-4 py-3">
                   <StatusBadge listing={l} />

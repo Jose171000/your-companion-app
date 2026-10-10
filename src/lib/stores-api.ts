@@ -33,6 +33,12 @@ export interface PublicStoreSummary {
   averageQuality: number | null;
 }
 
+export interface StoreList {
+  stores: StoreSummary[];
+  /** false en las cuentas creadas por invitación */
+  canCreateStores: boolean;
+}
+
 export const ROLE_LABELS: Record<StoreRole, string> = {
   owner: 'Dueño',
   editor: 'Editor',
@@ -41,7 +47,7 @@ export const ROLE_LABELS: Record<StoreRole, string> = {
 
 export const storesApi = {
   /** Tiendas a las que el usuario tiene acceso */
-  list: () => apiRequest<StoreSummary[]>('/stores', { method: 'GET' }),
+  list: () => apiRequest<StoreList>('/stores', { method: 'GET' }),
 
   create: (name: string) =>
     apiRequest<{ id: string; name: string; role: StoreRole }>('/stores', {
