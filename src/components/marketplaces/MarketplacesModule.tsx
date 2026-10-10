@@ -10,6 +10,7 @@ import { ImportFalabellaDialog } from "./ImportFalabellaDialog";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { ReviewQueue } from "./ReviewQueue";
+import { SalesList } from "./SalesList";
 import { useStores } from "@/contexts/StoreContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
@@ -178,6 +179,7 @@ export function MarketplacesModule() {
         <TabsList>
           <TabsTrigger value="canales">Canales</TabsTrigger>
           <TabsTrigger value="tablero">Tablero</TabsTrigger>
+          <TabsTrigger value="ventas">Ventas</TabsTrigger>
           <TabsTrigger value="revision">
             Revisión{pendingChanges.length > 0 ? ` (${pendingChanges.length})` : ""}
           </TabsTrigger>
@@ -192,6 +194,10 @@ export function MarketplacesModule() {
             isLoading={loadingListings}
             isError={listingsError}
           />
+        </TabsContent>
+
+        <TabsContent value="ventas" className="pt-6">
+          <SalesList accounts={connections} />
         </TabsContent>
 
         <TabsContent value="revision" className="pt-6">

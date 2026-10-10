@@ -59,6 +59,70 @@ export interface UserListing extends ListingInfo {
   price: number | string;
 }
 
+/** Una línea de una venta: lo vendido, a qué precio y cómo quedó el stock. */
+export interface SaleLine {
+  sku: string | null;
+  title: string;
+  quantity: number;
+  /** Lo que pagó el cliente por unidad */
+  unitPrice: number;
+  listPrice?: number | null;
+  shippingAmount?: number | null;
+  status?: string | null;
+  trackingCode?: string | null;
+  carrier?: string | null;
+  shippingType?: string | null;
+  productId?: string | null;
+  /** Stock que había antes y el que quedó después de esta venta */
+  stockBefore?: number | null;
+  stockAfter?: number | null;
+  /** Stock de ahora y foto del producto (null si ya no está en el catálogo) */
+  currentStock: number | null;
+  imageUrl: string | null;
+  productName: string | null;
+}
+
+export interface SaleDetails {
+  customer: { name: string | null; email: string | null; phone: string | null; document: string | null; nickname?: string | null };
+  shipping: {
+    method: string | null; status: string | null; trackingCode: string | null; carrier: string | null;
+    shipBy: string | null; deliveryBy: string | null;
+    address: { line: string | null; city: string | null; region: string | null; country: string | null; postalCode: string | null; receiver: string | null; notes: string | null };
+  };
+  payment: { method: string | null; status: string | null; paidAmount: number | null; installments: number | null; approvedAt: string | null };
+  notes: string | null;
+  channelStatus: string | null;
+}
+
+export interface Sale {
+  id: string;
+  marketplace: string;
+  externalId: string;
+  orderNumber: string;
+  account: { id: string; label: string } | null;
+  orderDate: string;
+  status: string;
+  customerName: string | null;
+  /** Fecha máxima para despachar */
+  shipByDate: string | null;
+  totalAmount: number;
+  currency: string;
+  itemsCount: number;
+  shipping: { status: string | null; method: string | null } | null;
+  lines: SaleLine[];
+  details?: SaleDetails | null;
+}
+
+export interface SalesQuery {
+  from?: string;
+  to?: string;
+  marketplace?: string;
+  connectionId?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
 export type ChangeRequestStatus = 'pending' | 'approved' | 'rejected' | 'sent' | 'error';
 
 export interface ChangeRequest {
@@ -216,6 +280,16 @@ export const syncApi = {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
     }),
+
+  /** Ventas de la tienda activa, con cliente, envío, precio pagado y stock */
+  getSales: (q: SalesQuery = {}) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== '') params.set(k, String(v));
+    const qs = params.toString();
+    return apiRequest<{ total: number; limit: number; offset: number; items: Sale[] }>(`/sync/orders${qs ? `?${qs}` : ''}`, { method: 'GET' });
+  },
+
+  getSale: (id: string) => apiRequest<Sale>(`/sync/orders/${id}`, { method: 'GET' }),
 
   /** Trae ahora las ventas recientes de todas las cuentas de la tienda activa */
   syncOrders: () =>

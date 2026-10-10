@@ -111,6 +111,7 @@ export function AnalyticsModule() {
         toast.error(`${fallidas[0].nombre}: ${fallidas[0].error}`);
       else toast.success(totalNuevos ? `${totalNuevos} venta(s) nueva(s) registradas` : "Las ventas ya estaban al día");
       queryClient.invalidateQueries({ queryKey: ["sales-report"] });
+      queryClient.invalidateQueries({ queryKey: ["sync-orders"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
     },
     onError: () => toast.error("Error al conectar con el servidor"),
