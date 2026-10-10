@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Loader2, Search, ShoppingBag } from "lucide-react";
+import { History, Loader2, Search, ShoppingBag } from "lucide-react";
 import { MarketplaceConnection, Sale, SaleLine, syncApi } from "@/lib/sync-api";
 import { useStores } from "@/contexts/StoreContext";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { channelName, money } from "./format";
 import { ProductThumb } from "./ProductThumb";
 import { OrderDetailSheet } from "./OrderDetailSheet";
+import { ImportHistoryDialog } from "./ImportHistoryDialog";
 import { ShipByBadge, StockCell, fmtDate } from "./SaleParts";
 
 const PAGE = 50;
@@ -28,10 +29,13 @@ interface Row {
 
 interface Props {
   accounts: MarketplaceConnection[];
+  /** Solo el dueño de la tienda puede traer el historial */
+  canImport?: boolean;
 }
 
 /** Todas las ventas de la tienda en una sola lista, una fila por producto vendido. */
-export function SalesList({ accounts }: Props) {
+export function SalesList({ accounts, canImport }: Props) {
+  const [historyOpen, setHistoryOpen] = useState(false);
   const { activeStore } = useStores();
   const storeId = activeStore?.id;
 
@@ -117,6 +121,11 @@ export function SalesList({ accounts }: Props) {
             </Select>
           )}
         </div>
+        {canImport && (
+          <Button size="sm" variant="outline" className="gap-1.5 shrink-0" onClick={() => setHistoryOpen(true)}>
+            <History className="w-3.5 h-3.5" /> Importar historial
+          </Button>
+        )}
         <div className="relative w-full lg:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -253,6 +262,13 @@ export function SalesList({ accounts }: Props) {
       )}
 
       <OrderDetailSheet sale={selected} onClose={() => setSelected(null)} />
+      {canImport && (
+        <ImportHistoryDialog
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          accounts={accounts.filter((c) => c.status === "active" && (c.marketplace === "falabella" || c.marketplace === "mercadolibre"))}
+        />
+      )}
     </div>
   );
 }

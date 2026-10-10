@@ -6,9 +6,9 @@ import { ConnectYavendioDialog } from "./ConnectYavendioDialog";
 import { ConnectFalabellaDialog } from "./ConnectFalabellaDialog";
 import { ListingsTable } from "./ListingsTable";
 import { InventoryBoard } from "./InventoryBoard";
-import { ImportFalabellaDialog } from "./ImportFalabellaDialog";
+import { ImportListingsDialog } from "./ImportListingsDialog";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { Download, Loader2, RefreshCw } from "lucide-react";
 import { ReviewQueue } from "./ReviewQueue";
 import { SalesList } from "./SalesList";
 import { useStores } from "@/contexts/StoreContext";
@@ -61,7 +61,7 @@ export function MarketplacesModule() {
   const [disconnectTarget, setDisconnectTarget] = useState<MarketplaceConnection | null>(null);
   const [yavendioOpen, setYavendioOpen] = useState(false);
   const [falabellaOpen, setFalabellaOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+  const [importFrom, setImportFrom] = useState<"falabella" | "mercadolibre" | null>(null);
 
   // ── Resultado del flujo OAuth (query params que deja el callback) ──────────
   useEffect(() => {
@@ -124,8 +124,26 @@ export function MarketplacesModule() {
   const changes     = changesResult?.data ?? [];
   const pendingChanges = changes.filter((c) => c.status === "pending");
   const falabellaAccounts = connections.filter((c) => c.marketplace === "falabella" && c.status === "active");
+  const meliAccounts = connections.filter((c) => c.marketplace === "mercadolibre" && c.status === "active");
   // Hasta que el servidor responda se asume revisión: es el valor por defecto.
   const reviewMode  = settingsResult?.data?.reviewMode ?? true;
+
+  // Vuelve a leer ahora el estado de las publicaciones (también se hace solo cada 30 minutos).
+  const refreshMutation = useMutation({
+    mutationFn: () => syncApi.refreshListings(),
+    onSuccess: (res) => {
+      if (res.error || !res.data) {
+        toast.error(res.error ?? "No se pudieron actualizar las publicaciones");
+        return;
+      }
+      const n = res.data.cuentas.reduce((t, c) => t + c.actualizadas, 0);
+      const falla = res.data.cuentas.find((c) => c.error);
+      toast.success(`Publicaciones al día: ${n} actualizadas`);
+      if (falla) toast.error(`${falla.nombre}: ${falla.error}`);
+      queryClient.invalidateQueries({ queryKey: ["sync-listings"] });
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const connectMutation = useMutation({
@@ -197,7 +215,7 @@ export function MarketplacesModule() {
         </TabsContent>
 
         <TabsContent value="ventas" className="pt-6">
-          <SalesList accounts={connections} />
+          <SalesList accounts={connections} canImport={isOwner} />
         </TabsContent>
 
         <TabsContent value="revision" className="pt-6">
@@ -240,10 +258,22 @@ export function MarketplacesModule() {
               Productos publicados en tus canales y su estado de sincronización
             </p>
           </div>
-          {isOwner && falabellaAccounts.length > 0 && (
-            <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => setImportOpen(true)}>
-              <Download className="w-3.5 h-3.5" /> Importar desde Falabella
-            </Button>
+          {isOwner && (falabellaAccounts.length > 0 || meliAccounts.length > 0) && (
+            <div className="flex flex-wrap gap-2 shrink-0">
+              <Button variant="outline" size="sm" className="gap-1.5" disabled={refreshMutation.isPending} onClick={() => refreshMutation.mutate()}>
+                {refreshMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Actualizar ahora
+              </Button>
+              {falabellaAccounts.length > 0 && (
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportFrom("falabella")}>
+                  <Download className="w-3.5 h-3.5" /> Importar desde Falabella
+                </Button>
+              )}
+              {meliAccounts.length > 0 && (
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportFrom("mercadolibre")}>
+                  <Download className="w-3.5 h-3.5" /> Importar desde Mercado Libre
+                </Button>
+              )}
+            </div>
           )}
         </div>
 
@@ -289,7 +319,12 @@ export function MarketplacesModule() {
 
       <ConnectYavendioDialog open={yavendioOpen} onOpenChange={setYavendioOpen} />
       <ConnectFalabellaDialog open={falabellaOpen} onOpenChange={setFalabellaOpen} />
-      <ImportFalabellaDialog open={importOpen} onOpenChange={setImportOpen} accounts={falabellaAccounts} />
+      <ImportListingsDialog
+        open={importFrom !== null}
+        onOpenChange={(o) => { if (!o) setImportFrom(null); }}
+        marketplace={importFrom ?? "falabella"}
+        accounts={importFrom === "mercadolibre" ? meliAccounts : falabellaAccounts}
+      />
     </div>
   );
 }

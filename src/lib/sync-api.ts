@@ -165,6 +165,10 @@ export interface FalabellaPreparation {
 }
 
 export interface FalabellaImportSummary {
+  /** Mercado Libre: publicaciones leídas (cada una puede dar varias filas por variante) */
+  publicaciones?: number;
+  /** Mercado Libre: publicaciones o variantes sin SKU, que no se pueden enlazar */
+  sinSku?: number;
   total: number;
   yaEnCatalogo: number;
   nuevas: number;
@@ -203,6 +207,28 @@ export const syncApi = {
       `/sync/falabella/listings/import?dryRun=${dryRun}${connectionId ? `&connectionId=${connectionId}` : ''}`,
       { method: 'POST' },
     ),
+
+  /** Importa (o previsualiza) las publicaciones de una cuenta de Mercado Libre, enlazadas por SKU. */
+  importMeliListings: (dryRun: boolean, connectionId?: string) =>
+    apiRequest<FalabellaImportSummary>(
+      `/sync/mercadolibre/listings/import?dryRun=${dryRun}${connectionId ? `&connectionId=${connectionId}` : ""}`,
+      { method: "POST" },
+    ),
+
+  /** Vuelve a leer ahora el estado de las publicaciones de la tienda. */
+  refreshListings: () =>
+    apiRequest<{ cuentas: { id: string; marketplace: string; nombre: string; revisadas: number; actualizadas: number; ausentes: number; error?: string }[] }>(
+      "/sync/listings/refresh",
+      { method: "POST" },
+    ),
+
+  /** Deja la constancia de las ventas de los últimos N días, sin tocar el stock. */
+  importOrderHistory: (days: number, connectionId?: string) =>
+    apiRequest<{
+      dias: number;
+      totalRegistradas: number;
+      cuentas: { id: string; marketplace: string; nombre: string; registradas: number; yaRegistradas: number; incompleto: boolean; error?: string }[];
+    }>(`/sync/orders/import-history?days=${days}${connectionId ? `&connectionId=${connectionId}` : ""}`, { method: "POST" }),
 
   /** Categorías de Falabella donde se puede publicar, filtradas por texto. */
   searchFalabellaCategories: (search: string) =>

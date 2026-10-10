@@ -19,13 +19,20 @@ import {
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Las cuentas de Falabella de la tienda activa */
+  /** Canal desde el que se importa */
+  marketplace: "falabella" | "mercadolibre";
+  /** Las cuentas de ese canal en la tienda activa */
   accounts: MarketplaceConnection[];
 }
 
+const CANAL = {
+  falabella: "Falabella",
+  mercadolibre: "Mercado Libre",
+};
+
 const ESTADOS: Record<string, string> = {
   published: "Publicadas",
-  pending: "En revisión de Falabella",
+  pending: "En revisión",
   paused: "Pausadas",
   error: "Rechazadas",
 };
@@ -37,29 +44,32 @@ const accountName = (c: MarketplaceConnection) => c.label || c.externalNickname 
  * muestra una vista previa que no escribe nada; solo al confirmar se traen los
  * productos. Si la tienda tiene varias cuentas, se elige de cuál.
  */
-export function ImportFalabellaDialog({ open, onOpenChange, accounts }: Props) {
+export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts }: Props) {
+  const canal = CANAL[marketplace];
+  const llamar = (dryRun: boolean, id: string) =>
+    marketplace === "falabella" ? syncApi.importFalabellaListings(dryRun, id) : syncApi.importMeliListings(dryRun, id);
   const queryClient = useQueryClient();
   const [accountId, setAccountId] = useState<string>("");
   const [preview, setPreview] = useState<FalabellaImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const previewMutation = useMutation({
-    mutationFn: (id: string) => syncApi.importFalabellaListings(true, id),
+    mutationFn: (id: string) => llamar(true, id),
     onSuccess: (res) => {
-      if (res.error || !res.data) setError(res.error ?? "No se pudo leer Falabella");
+      if (res.error || !res.data) setError(res.error ?? "No se pudo leer " + canal);
       else setPreview(res.data);
     },
     onError: () => setError("Error al conectar con el servidor"),
   });
 
   const importMutation = useMutation({
-    mutationFn: () => syncApi.importFalabellaListings(false, accountId),
+    mutationFn: () => llamar(false, accountId),
     onSuccess: (res) => {
       if (res.error || !res.data) {
         toast.error(res.error ?? "No se pudo importar");
         return;
       }
-      toast.success(`Falabella: ${res.data.enlazadas} publicaciones importadas`);
+      toast.success(`${canal}: ${res.data.enlazadas} publicaciones importadas`);
       queryClient.invalidateQueries({ queryKey: ["sync-listings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       onOpenChange(false);
@@ -86,16 +96,16 @@ export function ImportFalabellaDialog({ open, onOpenChange, accounts }: Props) {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Download className="w-4 h-4" /> Importar desde Falabella
+            <Download className="w-4 h-4" /> Importar desde {canal}
           </DialogTitle>
           <DialogDescription>
-            Trae a esta tienda lo que ya tienes publicado en Falabella y lo enlaza a su catálogo.
+            Trae a esta tienda lo que ya tienes publicado en {canal} y lo enlaza a su catálogo.
           </DialogDescription>
         </DialogHeader>
 
         {accounts.length > 1 && (
           <div className="space-y-2">
-            <Label>Cuenta de Falabella</Label>
+            <Label>Cuenta de {canal}</Label>
             <Select value={accountId} onValueChange={setAccountId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -109,7 +119,7 @@ export function ImportFalabellaDialog({ open, onOpenChange, accounts }: Props) {
 
         {!preview && !error && (
           <div className="flex items-center gap-3 py-8 justify-center text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" /> Leyendo tu catálogo de Falabella…
+            <Loader2 className="w-4 h-4 animate-spin" /> Leyendo tu catálogo de {canal}…
           </div>
         )}
 
@@ -120,7 +130,7 @@ export function ImportFalabellaDialog({ open, onOpenChange, accounts }: Props) {
             <div className="grid grid-cols-3 gap-3 text-center">
               <div className="rounded-xl bg-secondary/30 p-3">
                 <p className="text-xl font-semibold tabular-nums">{preview.total}</p>
-                <p className="text-[11px] text-muted-foreground">En Falabella</p>
+                <p className="text-[11px] text-muted-foreground">En {canal}</p>
               </div>
               <div className="rounded-xl bg-secondary/30 p-3">
                 <p className="text-xl font-semibold tabular-nums">{preview.nuevas}</p>
@@ -145,16 +155,23 @@ export function ImportFalabellaDialog({ open, onOpenChange, accounts }: Props) {
               )}
             </div>
 
+            {(preview.sinSku ?? 0) > 0 && (
+              <p className="text-xs text-yellow-400">
+                {preview.sinSku} publicación(es) o variante(s) no tienen SKU y no se pueden enlazar. Ponles un SKU en {canal} y
+                se traerán en la próxima importación.
+              </p>
+            )}
+
             {(preview.enOtraTienda ?? 0) > 0 && (
               <p className="text-xs text-yellow-400">
-                {preview.enOtraTienda} ficha(s) tienen un SKU que ya existe en otra tienda tuya y no se importarán
+                {preview.enOtraTienda} publicación(es) tienen un SKU que ya existe en otra tienda tuya y no se importarán
                 para no mezclar su stock.
               </p>
             )}
 
             {preview.incompleto && (
               <p className="text-xs text-yellow-400">
-                Falabella tiene más publicaciones de las que se pueden leer de una vez. Se importará una parte;
+                {canal} tiene más publicaciones de las que se pueden leer de una vez. Se importará una parte;
                 vuelve a ejecutar la importación para traer el resto.
               </p>
             )}
