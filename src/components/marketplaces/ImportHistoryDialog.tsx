@@ -56,10 +56,9 @@ export function ImportHistoryDialog({ open, onOpenChange, accounts }: Props) {
         return;
       }
       const { totalRegistradas, cuentas } = res.data;
-      const fallidas = cuentas.filter((c) => c.error).length;
       const cortadas = cuentas.some((c) => c.incompleto);
       toast.success(`${totalRegistradas} ventas registradas${cortadas ? " (había más: reduce el periodo y repite)" : ""}`);
-      if (fallidas) toast.error(`${fallidas} cuenta(s) no se pudieron leer: ${cuentas.find((c) => c.error)?.error}`);
+      cuentas.filter((c) => c.error).forEach((c) => toast.error(`${channelName(c.marketplace)} · ${c.nombre}: ${c.error}`, { duration: 15000 }));
       queryClient.invalidateQueries({ queryKey: ["sync-orders"] });
       queryClient.invalidateQueries({ queryKey: ["reports"] });
       onOpenChange(false);

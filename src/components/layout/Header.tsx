@@ -31,7 +31,6 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { StoreSwitcher } from "@/components/stores/StoreSwitcher";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -202,7 +201,7 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton }: HeaderP
                   </p>
                 </div>
               ) : (
-                <ScrollArea className="max-h-80">
+                <div className="max-h-80 overflow-y-auto overscroll-contain">
                   <div className="divide-y divide-border/50">
                     {notifications.map((notif) => (
                       <div
@@ -252,7 +251,7 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton }: HeaderP
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
+                </div>
               )}
             </PopoverContent>
           </Popover>
