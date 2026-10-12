@@ -1,12 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authApi, User, LoginCredentials, RegisterCredentials, ForgotPasswordCredentials, ResetPasswordCredentials } from '@/lib/api';
+import { authApi, User, AuthResponse, LoginCredentials, RegisterCredentials, ForgotPasswordCredentials, ResetPasswordCredentials } from '@/lib/api';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (credentials: LoginCredentials) => Promise<{ success: boolean; error?: string }>;
-  register: (credentials: RegisterCredentials) => Promise<{ success: boolean; error?: string }>;
+  register: (credentials: RegisterCredentials) => Promise<{ success: boolean; error?: string; pending?: boolean; message?: string }>;
   logout: () => Promise<void>;
   forgotPassword: (credentials: ForgotPasswordCredentials) => Promise<{ success: boolean; error?: string }>;
   resetPassword: (credentials: ResetPasswordCredentials) => Promise<{ success: boolean; error?: string }>;
@@ -56,9 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: error || 'Error al registrarse' };
     }
 
-    localStorage.setItem('auth_token', data.accessToken);
-    localStorage.setItem('refresh_token', data.refreshToken);
-    setUser(data.user);
+    // Una cuenta nueva espera la aprobación de un superadmin: no entra, se le explica qué sigue.
+    if ('pending' in data && data.pending) {
+      return { success: true, pending: true, message: data.message };
+    }
+
+    const sesion = data as AuthResponse;
+    localStorage.setItem('auth_token', sesion.accessToken);
+    localStorage.setItem('refresh_token', sesion.refreshToken);
+    setUser(sesion.user);
     return { success: true };
   };
 

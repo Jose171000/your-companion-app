@@ -21,7 +21,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
         <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] rounded-full bg-black/5 blur-[100px]"></div>
       </div>
 
-      <div className="relative w-full max-w-md bg-white dark:bg-[#111111] rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden border border-white/40 dark:border-white/10 transition-colors duration-200">
+      <div className="relative w-full max-w-md sm:max-w-xl bg-white dark:bg-[#111111] rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.15)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.6)] overflow-hidden border border-white/40 dark:border-white/10 transition-colors duration-200">
         <div className="p-8 md:p-12">
           <div className="mb-8 text-center">
             <div className="mb-6 flex justify-center">

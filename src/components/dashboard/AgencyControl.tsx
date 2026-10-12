@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { dashboardApi, AgencyClient, moneyIn } from "@/lib/dashboard-api";
+import { adminApi } from "@/lib/admin-api";
+import { storesApi } from "@/lib/stores-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,9 +12,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, BadgeDollarSign, CalendarClock, Coins, Copy, HandCoins, Percent, TrendingUp, Wallet } from "lucide-react";
+import { AlertTriangle, BadgeDollarSign, CalendarClock, Coins, Copy, HandCoins, Percent, Plus, Trash2, TrendingUp, Wallet } from "lucide-react";
 import {
   Card,
   desglosarIgv,
@@ -198,6 +200,46 @@ function SelectorDeIgv({
         </SelectContent>
       </Select>
       <p className="text-[11px] text-muted-foreground">{ejemplo}</p>
+    </div>
+  );
+}
+
+function refrescarTodo(queryClient: ReturnType<typeof useQueryClient>) {
+  for (const key of ["dashboard-agency", "dashboard-client-detail", "dashboard-accounts", "admin-clients", "admin-finance", "stores"]) {
+    queryClient.invalidateQueries({ queryKey: [key] });
+  }
+}
+
+/** Borrar una tienda con todo lo suyo: solo superadmin, y hay que escribir su nombre. */
+function ZonaDePeligro({ cliente, onDeleted }: { cliente: AgencyClient; onDeleted: () => void }) {
+  const queryClient = useQueryClient();
+  const [texto, setTexto] = useState("");
+  const eliminar = useMutation({
+    mutationFn: () => adminApi.deleteStore(cliente.id),
+    onSuccess: (res) => {
+      if (res.error) return toast.error(res.error);
+      const r = res.data?.resumen;
+      toast.success(r ? `Tienda eliminada: ${r.pedidos} pedidos, ${r.productos} productos y ${r.canales} canales` : "Tienda eliminada");
+      refrescarTodo(queryClient);
+      onDeleted();
+    },
+    onError: () => toast.error("No se pudo eliminar la tienda"),
+  });
+  const coincide = texto.trim().toLowerCase() === cliente.nombre.trim().toLowerCase();
+
+  return (
+    <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 space-y-3">
+      <p className="text-sm font-medium flex items-center gap-1.5 text-destructive"><Trash2 className="w-4 h-4" /> Eliminar tienda</p>
+      <p className="text-xs text-muted-foreground">
+        Se borran sus ventas, productos, canales conectados, miembros e invitaciones. Los pagos registrados se conservan sin tienda. No se puede deshacer.
+      </p>
+      <div className="space-y-1.5">
+        <Label htmlFor="borrar-tienda">Para confirmar, escribe «{cliente.nombre}»</Label>
+        <Input id="borrar-tienda" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder={cliente.nombre} autoComplete="off" />
+      </div>
+      <Button variant="destructive" size="sm" disabled={!coincide || eliminar.isPending} onClick={() => eliminar.mutate()}>
+        {eliminar.isPending ? "Eliminando…" : "Eliminar definitivamente"}
+      </Button>
     </div>
   );
 }
@@ -515,10 +557,82 @@ function FichaDelCliente({ cliente, igv, onClose }: { cliente: AgencyClient | nu
             <Button onClick={() => guardar.mutate()} disabled={guardar.isPending}>
               {guardar.isPending ? "Guardando…" : "Guardar plan"}
             </Button>
+
+            <ZonaDePeligro cliente={cliente} onDeleted={onClose} />
           </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Crea una tienda a nombre de un cliente aprobado: los clientes no pueden crear tiendas por su cuenta. */
+function NuevaTienda() {
+  const queryClient = useQueryClient();
+  const [abierto, setAbierto] = useState(false);
+  const [nombre, setNombre] = useState("");
+  const [dueno, setDueno] = useState("");
+
+  const { data: cuentas } = useQuery({
+    queryKey: ["admin-clients"],
+    queryFn: () => adminApi.getClients(),
+    staleTime: 30_000,
+    enabled: abierto,
+  });
+
+  const crear = useMutation({
+    mutationFn: () => storesApi.create(nombre.trim(), dueno),
+    onSuccess: (res: any) => {
+      if (res?.error) return toast.error(res.error);
+      toast.success("Tienda creada");
+      refrescarTodo(queryClient);
+      setAbierto(false);
+      setNombre("");
+      setDueno("");
+    },
+    onError: () => toast.error("No se pudo crear la tienda"),
+  });
+
+  return (
+    <>
+      <Button size="sm" onClick={() => setAbierto(true)}>
+        <Plus className="w-4 h-4 mr-1.5" />
+        Nueva tienda
+      </Button>
+      <Dialog open={abierto} onOpenChange={setAbierto}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nueva tienda</DialogTitle>
+            <DialogDescription>Se crea a nombre del cliente que elijas. Él podrá conectar canales e invitar a su equipo.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="nt-nombre">Nombre de la tienda</Label>
+              <Input id="nt-nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Laihome" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Dueño</Label>
+              <Select value={dueno} onValueChange={setDueno}>
+                <SelectTrigger><SelectValue placeholder="Elige una cuenta" /></SelectTrigger>
+                <SelectContent>
+                  {(cuentas?.data ?? []).map((u) => (
+                    <SelectItem key={u.id} value={u.id}>
+                      {(u.nameCompany || `${u.name} ${u.lastName ?? ""}`).trim()} · {u.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAbierto(false)}>Cancelar</Button>
+            <Button onClick={() => crear.mutate()} disabled={!nombre.trim() || !dueno || crear.isPending}>
+              {crear.isPending ? "Creando…" : "Crear tienda"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -674,10 +788,13 @@ export function AgencyControl() {
       )}
 
       <section>
-        <SectionTitle
-          title="Cartera de clientes (una fila por tienda)"
-          subtitle="Primero quienes tienen un cobro vencido o próximo. Toca un cliente para ver su cobro, el detalle de su negocio, su propuesta y su plan."
-        />
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <SectionTitle
+            title="Cartera de clientes (una fila por tienda)"
+            subtitle="Primero quienes tienen un cobro vencido o próximo. Toca un cliente para ver su cobro, el detalle de su negocio, su propuesta y su plan."
+          />
+          <NuevaTienda />
+        </div>
         <Card className="p-2 md:p-3">
           {a.clientes.length === 0 ? (
             <p className="text-sm text-muted-foreground p-4 text-center">Todavía no hay tiendas registradas.</p>

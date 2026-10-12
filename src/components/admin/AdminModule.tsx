@@ -8,6 +8,7 @@ import { CreateClientDialog } from "./CreateClientDialog";
 import { DeleteClientDialog } from "./DeleteClientDialog";
 import { CrmModule } from "@/components/crm/CrmModule";
 import { BillingModule } from "./BillingModule";
+import { SignupRequests } from "./SignupRequests";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,6 +40,14 @@ export function AdminModule() {
     enabled: !isAccountant,
   });
 
+  const { data: signupsResult } = useQuery({
+    queryKey: ["admin-signups", "pending"],
+    queryFn: () => adminApi.getSignups("pending"),
+    staleTime: 30_000,
+    enabled: !isAccountant,
+  });
+  const pendientes = signupsResult?.data?.conteo?.pendientes ?? 0;
+
   const clients = clientsResult?.data ?? [];
   const term = search.trim().toLowerCase();
   const filtered = term
@@ -56,6 +65,14 @@ export function AdminModule() {
           <TabsTrigger value="finanzas">Finanzas</TabsTrigger>
           <TabsTrigger value="facturacion">Facturación</TabsTrigger>
           {!isAccountant && <TabsTrigger value="clientes">Clientes ({clients.length})</TabsTrigger>}
+          {!isAccountant && (
+            <TabsTrigger value="solicitudes">
+              Solicitudes
+              {pendientes > 0 && (
+                <span className="ml-1.5 rounded-full bg-[#FCCB34] px-1.5 text-xs font-semibold text-[#111111]">{pendientes}</span>
+              )}
+            </TabsTrigger>
+          )}
           {!isAccountant && <TabsTrigger value="crm">CRM</TabsTrigger>}
         </TabsList>
 
@@ -92,6 +109,9 @@ export function AdminModule() {
             onDelete={(c) => setDeleteTarget(c)}
             currentUserId={user?.id}
           />
+        </TabsContent>
+        <TabsContent value="solicitudes" className="pt-6">
+          <SignupRequests />
         </TabsContent>
         <TabsContent value="crm" className="pt-6">
           <CrmModule />

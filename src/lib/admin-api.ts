@@ -19,6 +19,22 @@ export interface ClientProfile {
   notes?: string;
 }
 
+/** Alguien que se registró y espera (o no obtuvo) la aprobación de un superadmin. */
+export interface SignupRequest {
+  id: string;
+  nombre: string;
+  email: string;
+  tienda: string | null;
+  razonSocial: string | null;
+  ruc: string | null;
+  web: string | null;
+  telefono: string | null;
+  pais: string | null;
+  estado: 'pending' | 'rejected';
+  motivo: string | null;
+  fecha: string;
+}
+
 export interface ClientStats {
   products: number;
   publishedListings: number;
@@ -148,6 +164,25 @@ export const adminApi = {
       method: 'POST',
       body: JSON.stringify(newPassword ? { newPassword } : {}),
     }),
+
+  /** Solicitudes de cuenta: las pendientes de aprobación, o las rechazadas. */
+  getSignups: (status: 'pending' | 'rejected' = 'pending') =>
+    apiRequest<{ conteo: { pendientes: number; rechazadas: number }; solicitudes: SignupRequest[] }>(
+      `/admin/signups?status=${status}`,
+      { method: 'GET' },
+    ),
+
+  /** Aprueba una solicitud: se crea su tienda y se le avisa por correo. */
+  approveSignup: (id: string) =>
+    apiRequest<{ message: string; storeId: string }>(`/admin/signups/${id}/approve`, { method: 'POST' }),
+
+  /** Rechaza una solicitud, con un motivo opcional que recibe por correo. */
+  rejectSignup: (id: string, reason?: string) =>
+    apiRequest<{ message: string }>(`/admin/signups/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+
+  /** Elimina una tienda con todo lo suyo: ventas, productos, canales y miembros. */
+  deleteStore: (id: string) =>
+    apiRequest<{ message: string; resumen: { pedidos: number; productos: number; canales: number } }>(`/admin/stores/${id}`, { method: 'DELETE' }),
 
   /** Elimina la cuenta y todos sus datos */
   deleteClient: (id: string) =>

@@ -40,13 +40,8 @@ export function DeleteClientDialog({ client, onClose }: DeleteClientDialogProps)
     onError: () => toast.error("Error al eliminar la cuenta"),
   });
 
-  const hasData =
-    (client?.stats?.products ?? 0) > 0 ||
-    (client?.stats?.publishedListings ?? 0) > 0 ||
-    (client?.stats?.totalPaid ?? 0) > 0;
-
   // Con datos asociados exigimos escribir el correo: evita borrados por error
-  const requiresTyping = hasData;
+  const requiresTyping = true;
   const canDelete =
     !deleteMutation.isPending &&
     (!requiresTyping || confirmText.trim().toLowerCase() === client?.email.toLowerCase());
@@ -72,6 +67,7 @@ export function DeleteClientDialog({ client, onClose }: DeleteClientDialogProps)
           <div className="p-3 rounded-xl border border-destructive/30 bg-destructive/5 space-y-1">
             <p className="text-sm font-medium">Se borrará también:</p>
             <ul className="text-sm text-muted-foreground list-disc list-inside space-y-0.5">
+              <li>Las tiendas de las que es dueño, con sus ventas, productos y canales conectados</li>
               <li>{client?.stats.products ?? 0} productos y sus imágenes</li>
               <li>{client?.stats.publishedListings ?? 0} publicaciones sincronizadas</li>
               <li>Sus conexiones a marketplaces y su historial de pagos</li>

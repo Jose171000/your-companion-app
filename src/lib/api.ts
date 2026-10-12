@@ -167,6 +167,21 @@ export interface RegisterCredentials {
   password: string;
   name: string;
   lastName: string;
+  /** Nombre de su tienda */
+  nameCompany: string;
+  /** Razón social */
+  businessName: string;
+  /** RUC (11 dígitos) */
+  ruc: string;
+  url?: string;
+  cellPhone?: string;
+}
+
+/** Una cuenta nueva espera aprobación: no hay sesión, solo un aviso. */
+export interface PendingRegisterResponse {
+  user: User;
+  pending: true;
+  message: string;
 }
 
 export interface ForgotPasswordCredentials {
@@ -217,7 +232,7 @@ export const authApi = {
     }),
 
   register: (credentials: RegisterCredentials) =>
-    apiRequest<AuthResponse>('/auth/register', {
+    apiRequest<AuthResponse | PendingRegisterResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(credentials),
     }),

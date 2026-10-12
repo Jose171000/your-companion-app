@@ -49,10 +49,11 @@ export const storesApi = {
   /** Tiendas a las que el usuario tiene acceso */
   list: () => apiRequest<StoreList>('/stores', { method: 'GET' }),
 
-  create: (name: string) =>
+  /** Con ownerId (solo superadmin) la tienda se crea a nombre de un cliente. */
+  create: (name: string, ownerId?: string) =>
     apiRequest<{ id: string; name: string; role: StoreRole }>('/stores', {
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, ...(ownerId ? { ownerId } : {}) }),
     }),
 
   rename: (storeId: string, name: string) =>
