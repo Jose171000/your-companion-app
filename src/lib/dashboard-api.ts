@@ -118,6 +118,21 @@ export interface Propuesta {
   texto: string;
 }
 
+/** De qué manera pertenece una tienda a un cliente. */
+export type OrigenDeTienda = 'asignada' | 'dueno' | 'nombre';
+
+export interface TiendaAsignable {
+  id: string;
+  nombre: string;
+  /** Correo de quien creó la tienda (no siempre es el cliente) */
+  dueno: string;
+  clienteId: string | null;
+  origen: OrigenDeTienda | null;
+  ventasMes: number;
+  pedidosMes: number;
+  canales: number;
+}
+
 export interface AgencyClient {
   id: string;
   nombre: string;
@@ -134,11 +149,14 @@ export interface AgencyClient {
   liquidacionMesAnterior: { periodo: string; comision: number; estado: 'pendiente' | 'facturado' | 'cobrado' } | null;
   propuesta: Propuesta;
   notasDePropuesta: string | null;
+  tiendas: { id: string; nombre: string; origen: OrigenDeTienda | null }[];
 }
 
 export interface Agency {
   hoy: string;
   igvPorcentaje: number;
+  /** Tiendas con ventas o canales que no son de ningún cliente: se asignan desde el panel */
+  sinAsignar: { id: string; nombre: string; dueno: string; ventasMes: number; pedidosMes: number; canales: number }[];
   totales: {
     clientes: number;
     /** Todo lo vendido este mes, de cualquier tienda (solo precio de productos) */
@@ -176,6 +194,14 @@ export interface ClientDetail {
 export const dashboardApi = {
   getInsights: () => apiRequest<DashboardInsights>('/dashboard/insights', { method: 'GET' }),
   getAgency: () => apiRequest<Agency>('/dashboard/agency', { method: 'GET' }),
+  /** Todas las tiendas y a qué cliente pertenece cada una (solo superadmin). */
+  getStoreAssignments: () => apiRequest<TiendaAsignable[]>('/dashboard/agency/stores', { method: 'GET' }),
+  /** Asigna una tienda a un cliente; con clientId null la deja sin asignar. */
+  assignStore: (storeId: string, clientId: string | null) =>
+    apiRequest<{ tiendaId: string; clienteId: string | null }>(`/dashboard/agency/stores/${storeId}/client`, {
+      method: 'PATCH',
+      body: JSON.stringify({ clientId }),
+    }),
   /** El dashboard de un cliente, como lo ve él (solo superadmin). */
   getClientDetail: (clientId: string, storeId?: string) =>
     apiRequest<ClientDetail>(`/dashboard/agency/clients/${clientId}${storeId ? `?storeId=${storeId}` : ''}`, { method: 'GET' }),

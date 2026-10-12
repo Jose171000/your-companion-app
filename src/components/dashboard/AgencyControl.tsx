@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { dashboardApi, AgencyClient, moneyIn } from "@/lib/dashboard-api";
+import { dashboardApi, AgencyClient, moneyIn, OrigenDeTienda } from "@/lib/dashboard-api";
 import { adminApi } from "@/lib/admin-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, BadgeDollarSign, CalendarClock, Coins, Copy, HandCoins, Percent, TrendingUp, Wallet } from "lucide-react";
+import { AlertTriangle, BadgeDollarSign, CalendarClock, Coins, Copy, HandCoins, Percent, Store as StoreIcon, TrendingUp, Wallet } from "lucide-react";
 import {
   Card,
   desglosarIgv,
@@ -91,6 +91,131 @@ function DetalleDelCliente({ clienteId }: { clienteId: string }) {
       )}
       <NegocioView s={d.resumen} />
       <InsightsView i={d.insights} />
+    </div>
+  );
+}
+
+// ─── Tiendas: a qué cliente pertenece cada una ─────────────────────────────────
+
+const NOMBRE_DE_ORIGEN: Record<OrigenDeTienda, string> = {
+  asignada: "Asignada a mano",
+  dueno: "Es suya",
+  nombre: "Por el nombre del negocio",
+};
+
+/** Asigna una tienda a un cliente y refresca todo lo que depende de ello. */
+function useAsignarTienda() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { tiendaId: string; clienteId: string | null }) => dashboardApi.assignStore(v.tiendaId, v.clienteId),
+    onSuccess: (res) => {
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success("Tienda actualizada");
+      queryClient.invalidateQueries({ queryKey: ["dashboard-agency"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-store-assignments"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-client-detail"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-accounts"] });
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
+}
+
+/** Tiendas con ventas o canales que no son de ningún cliente: aquí se les pone dueño. */
+function TiendasSinAsignar({ tiendas, clientes }: { tiendas: { id: string; nombre: string; dueno: string; ventasMes: number; pedidosMes: number; canales: number }[]; clientes: AgencyClient[] }) {
+  const asignar = useAsignarTienda();
+  if (!tiendas.length) return null;
+  return (
+    <section>
+      <SectionTitle
+        title="Tiendas sin cliente asignado"
+        subtitle="Sus ventas se cuentan en el total, pero no en la cartera de ningún cliente. Asígnalas a quien corresponda."
+      />
+      <Card className="p-2 md:p-3 border-amber-500/30">
+        <div className="divide-y divide-border/50">
+          {tiendas.map((t) => (
+            <div key={t.id} className="flex flex-col md:flex-row md:items-center gap-2 md:gap-4 px-2 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-sm flex items-center gap-1.5"><StoreIcon className="w-3.5 h-3.5 shrink-0" /> <span className="truncate">{t.nombre}</span></p>
+                <p className="text-xs text-muted-foreground truncate">
+                  A nombre de {t.dueno} · {t.canales} {t.canales === 1 ? "canal" : "canales"} · {moneyIn(t.ventasMes)} este mes ({t.pedidosMes} ped.)
+                </p>
+              </div>
+              <Select onValueChange={(clienteId) => asignar.mutate({ tiendaId: t.id, clienteId })} disabled={asignar.isPending}>
+                <SelectTrigger className="h-9 md:w-64"><SelectValue placeholder="Asignar a un cliente…" /></SelectTrigger>
+                <SelectContent>
+                  {clientes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.empresa || c.nombre}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </section>
+  );
+}
+
+/** Las tiendas de un cliente, y cuáles más se le pueden asignar. */
+function TiendasDelCliente({ cliente }: { cliente: AgencyClient }) {
+  const asignar = useAsignarTienda();
+  const { data } = useQuery({
+    queryKey: ["dashboard-store-assignments"],
+    queryFn: () => dashboardApi.getStoreAssignments(),
+    staleTime: 30_000,
+  });
+  const todas = data?.data ?? [];
+  const disponibles = todas.filter((t) => t.clienteId !== cliente.id);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Las ventas, los canales y la comisión del cliente salen de estas tiendas. No importa a nombre de quién estén creadas ni quién conectó las cuentas.
+      </p>
+
+      <div className="rounded-xl border border-border divide-y divide-border/50">
+        {cliente.tiendas.length === 0 ? (
+          <p className="text-sm text-muted-foreground p-3">Este cliente todavía no tiene ninguna tienda. Agrégale una abajo.</p>
+        ) : (
+          cliente.tiendas.map((t) => {
+            const info = todas.find((x) => x.id === t.id);
+            return (
+              <div key={t.id} className="flex items-center justify-between gap-3 p-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{t.nombre}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t.origen ? NOMBRE_DE_ORIGEN[t.origen] : ""}
+                    {info && ` · ${info.canales} ${info.canales === 1 ? "canal" : "canales"} · ${moneyIn(info.ventasMes)} este mes`}
+                  </p>
+                </div>
+                {t.origen === "asignada" && (
+                  <Button variant="outline" size="sm" disabled={asignar.isPending} onClick={() => asignar.mutate({ tiendaId: t.id, clienteId: null })}>
+                    Quitar
+                  </Button>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="space-y-2">
+        <Label>Agregar una tienda a este cliente</Label>
+        <Select onValueChange={(tiendaId) => asignar.mutate({ tiendaId, clienteId: cliente.id })} disabled={asignar.isPending || disponibles.length === 0}>
+          <SelectTrigger><SelectValue placeholder={disponibles.length ? "Elige una tienda…" : "No hay más tiendas"} /></SelectTrigger>
+          <SelectContent>
+            {disponibles.map((t) => (
+              <SelectItem key={t.id} value={t.id}>
+                {t.nombre} · {t.dueno}
+                {t.clienteId ? " (hoy de otro cliente)" : ""}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }
@@ -217,6 +342,7 @@ function FichaDelCliente({ cliente, igv, onClose }: { cliente: AgencyClient | nu
           <TabsList>
             <TabsTrigger value="resumen">Cobro</TabsTrigger>
             <TabsTrigger value="detalle">Detalle del negocio</TabsTrigger>
+            <TabsTrigger value="tiendas">Tiendas ({cliente.tiendas.length})</TabsTrigger>
             <TabsTrigger value="propuesta">Propuesta</TabsTrigger>
             <TabsTrigger value="plan">Plan y cobro</TabsTrigger>
           </TabsList>
@@ -318,6 +444,11 @@ function FichaDelCliente({ cliente, igv, onClose }: { cliente: AgencyClient | nu
           {/* ── Detalle del negocio (se carga al abrirla) ── */}
           <TabsContent value="detalle" className="pt-4">
             {tab === "detalle" && <DetalleDelCliente clienteId={cliente.id} />}
+          </TabsContent>
+
+          {/* ── Tiendas del cliente ── */}
+          <TabsContent value="tiendas" className="pt-4">
+            <TiendasDelCliente cliente={cliente} />
           </TabsContent>
 
           {/* ── Propuesta ── */}
@@ -594,6 +725,8 @@ export function AgencyControl() {
           {t.sinPlan} {t.sinPlan === 1 ? "cliente no tiene" : "clientes no tienen"} un plan definido: ábrelos para fijar su cuota o comisión y su fecha de cobro.
         </p>
       )}
+
+      <TiendasSinAsignar tiendas={a.sinAsignar} clientes={a.clientes} />
 
       <section>
         <SectionTitle
