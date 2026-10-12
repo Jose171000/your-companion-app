@@ -17,6 +17,15 @@ export interface ClientProfile {
   reportEmbedUrl?: string;
   reportEmbedTitle?: string;
   notes?: string;
+  // Plan comercial: qué se le cobra y cuándo
+  billingModel?: 'ninguno' | 'fijo' | 'comision' | 'mixto';
+  monthlyFee?: number | null;
+  feeFrequency?: 'mensual' | 'trimestral' | 'anual';
+  commissionRate?: number | null;
+  /** Próximo pago, YYYY-MM-DD */
+  nextDueDate?: string | null;
+  planCurrency?: string;
+  proposalNotes?: string | null;
 }
 
 export interface ClientStats {

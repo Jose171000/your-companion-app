@@ -8,8 +8,10 @@ import {
 } from "@/lib/dashboard-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { Card, Kpi, LoadingGrid, SectionTitle } from "./DashboardParts";
+import { ClientInsights } from "./ClientInsights";
+import { AgencyControl } from "./AgencyControl";
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -18,83 +20,7 @@ import {
   Link2Off,
   Package,
   ShoppingCart,
-  TrendingUp,
-  Users,
 } from "lucide-react";
-
-// ─── Piezas ───────────────────────────────────────────────────────────────────
-
-function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn("glass rounded-2xl border border-border p-4 md:p-5", className)}>
-      {children}
-    </div>
-  );
-}
-
-function Kpi({
-  icon,
-  label,
-  value,
-  hint,
-  tone = "default",
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  hint?: React.ReactNode;
-  tone?: "default" | "warning" | "danger";
-}) {
-  return (
-    <Card>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p
-            className={cn(
-              "text-2xl md:text-3xl font-bold tracking-tight mt-1 truncate",
-              tone === "warning" && "text-amber-500",
-              tone === "danger" && "text-destructive"
-            )}
-          >
-            {value}
-          </p>
-          {hint && <div className="text-xs text-muted-foreground mt-1">{hint}</div>}
-        </div>
-        <div
-          className={cn(
-            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
-            tone === "warning" ? "bg-amber-500/10" : tone === "danger" ? "bg-destructive/10" : "bg-primary/10"
-          )}
-        >
-          {icon}
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <div className="mb-3">
-      <h3 className="font-semibold text-base md:text-lg">{title}</h3>
-      {subtitle && <p className="text-xs md:text-sm text-muted-foreground">{subtitle}</p>}
-    </div>
-  );
-}
-
-function LoadingGrid() {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-      {[0, 1, 2, 3].map((i) => (
-        <Card key={i}>
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-8 w-20 mt-2" />
-        </Card>
-      ))}
-    </div>
-  );
-}
 
 // ─── Resumen del negocio propio ───────────────────────────────────────────────
 
@@ -344,34 +270,14 @@ function PanelDeAgencia() {
   if (isLoading) return <LoadingGrid />;
   if (isError || !data?.data) return null;
 
-  const { cuentas, totales } = data.data;
+  const { cuentas } = data.data;
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-        <Kpi icon={<Users className="w-5 h-5 text-primary" />} label="Clientes" value={String(totales.clientes)} />
-        <Kpi
-          icon={<TrendingUp className="w-5 h-5 text-primary" />}
-          label="Ventas del mes (todos)"
-          value={money(totales.importe)}
-          hint={`${totales.pedidos} pedidos`}
-        />
-        <Kpi
-          icon={<AlertTriangle className="w-5 h-5 text-destructive" />}
-          label="Cuentas que necesitan atención"
-          value={String(
-            cuentas.filter(
-              (c) => c.canalesCaidos > 0 || c.publicaciones.conError > 0 || c.problemasSinLeer > 0
-            ).length
-          )}
-          tone="danger"
-        />
-      </div>
-
       <section>
         <SectionTitle
-          title="Tus clientes"
-          subtitle="Ordenados por quién necesita atención primero"
+          title="Salud de las cuentas"
+          subtitle="Canales caídos y publicaciones con error, quién necesita atención primero"
         />
         <Card className="p-2 md:p-3">
           {cuentas.length === 0 ? (
@@ -399,12 +305,21 @@ export function DashboardModule() {
 
   return (
     <div className="space-y-8">
-      {/* El admin ve primero cómo va la cartera, y debajo su propia cuenta. */}
-      {esAdmin && <PanelDeAgencia />}
+      {/* El superadmin ve primero la cartera (ventas, cobros y propuestas) y la salud de las cuentas; debajo, su propia cuenta. */}
+      {esAdmin && (
+        <>
+          <section>
+            <SectionTitle title="Control de la cartera" subtitle="Cuánto venden tus clientes, qué cobrarles y cuándo" />
+            <AgencyControl />
+          </section>
+          <PanelDeAgencia />
+        </>
+      )}
 
-      <section>
+      <section className="space-y-6">
         {esAdmin && <SectionTitle title="Tu cuenta" subtitle="El resumen de tu propio negocio" />}
         <MiNegocio />
+        <ClientInsights />
       </section>
     </div>
   );
