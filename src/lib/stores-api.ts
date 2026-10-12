@@ -77,7 +77,7 @@ export const storesApi = {
     apiRequest<StoreInvitationInfo[]>(`/stores/${storeId}/invitations`, { method: 'GET' }),
 
   invite: (storeId: string, email: string, role: 'editor' | 'viewer') =>
-    apiRequest<{ email: string; role: string; expiresAt: string; emailSent: boolean }>(
+    apiRequest<{ email: string; role: string; expiresAt: string; emailSent: boolean; acceptUrl: string }>(
       `/stores/${storeId}/invitations`,
       { method: 'POST', body: JSON.stringify({ email, role }) },
     ),

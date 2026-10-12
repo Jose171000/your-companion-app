@@ -61,6 +61,9 @@ export function ManageStoreDialog({ store, onClose }: Props) {
     enabled: !!store && isOwner,
   });
 
+  // Enlace de la última invitación: solo se conoce al crearla, así que se muestra aquí.
+  const [lastInvite, setLastInvite] = useState<{ email: string; url: string } | null>(null);
+
   const inviteMutation = useMutation({
     mutationFn: () => storesApi.invite(id, email.trim(), role),
     onSuccess: (res) => {
@@ -73,6 +76,7 @@ export function ManageStoreDialog({ store, onClose }: Props) {
           ? `Invitación enviada a ${res.data.email}`
           : `Invitación creada, pero el correo no salió. Vuelve a invitar a ${res.data.email}.`,
       );
+      setLastInvite({ email: res.data.email, url: res.data.acceptUrl });
       setEmail("");
       invalidate();
     },
@@ -208,6 +212,24 @@ export function ManageStoreDialog({ store, onClose }: Props) {
                   <p className="text-xs text-muted-foreground">
                     La invitación caduca en 7 días y solo la puede aceptar ese correo.
                   </p>
+                  {lastInvite && (
+                    <div className="rounded-xl bg-secondary/30 p-3 space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Enlace para {lastInvite.email}. Puedes enviárselo por WhatsApp u otro medio; solo funciona con ese correo.
+                      </p>
+                      <div className="flex gap-2">
+                        <Input readOnly value={lastInvite.url} className="text-xs" onFocus={(e) => e.currentTarget.select()} />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="gap-1.5 shrink-0"
+                          onClick={() => navigator.clipboard.writeText(lastInvite.url).then(() => toast.success("Enlace copiado"), () => toast.error("No se pudo copiar; selecciónalo y cópialo a mano"))}
+                        >
+                          <Copy className="w-4 h-4" /> Copiar
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {pending.length > 0 && (
