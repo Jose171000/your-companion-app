@@ -124,17 +124,8 @@ export function PlanCard({ plan }: { plan: PlanDelCliente }) {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Ciclo anterior</p>
-                  <p className="font-semibold">
-                    {plan.liquidacionMesAnterior ? (
-                      <>
-                        {moneyIn(plan.liquidacionMesAnterior.comision, plan.moneda)}{" "}
-                        <span className="text-xs font-normal text-muted-foreground capitalize">· {plan.liquidacionMesAnterior.estado}</span>
-                      </>
-                    ) : (
-                      "—"
-                    )}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Vendido el mes pasado</p>
+                  <p className="font-semibold">{plan.ventasMesAnterior > 0 ? moneyIn(plan.ventasMesAnterior, plan.moneda) : "—"}</p>
                 </div>
               </div>
               <p className="text-[11px] text-muted-foreground mt-3">

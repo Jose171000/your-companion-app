@@ -87,7 +87,6 @@ export interface ResumenDePlan {
 export interface PlanDelCliente extends ResumenDePlan {
   ventasMesAnterior: number;
   ultimoPago: { fecha: string; monto: number; concepto: string } | null;
-  liquidacionMesAnterior: { periodo: string; comision: number; estado: 'pendiente' | 'facturado' | 'cobrado' } | null;
 }
 
 export interface Ganadora {
@@ -118,27 +117,14 @@ export interface Propuesta {
   texto: string;
 }
 
-/** De qué manera pertenece una tienda a un cliente. */
-export type OrigenDeTienda = 'asignada' | 'dueno' | 'nombre';
-
-export interface TiendaAsignable {
+/** Cada tienda es un cliente de la agencia. */
+export interface AgencyClient {
   id: string;
   nombre: string;
   /** Correo de quien creó la tienda (no siempre es el cliente) */
   dueno: string;
-  clienteId: string | null;
-  origen: OrigenDeTienda | null;
-  ventasMes: number;
-  pedidosMes: number;
-  canales: number;
-}
-
-export interface AgencyClient {
-  id: string;
-  nombre: string;
-  email: string;
-  empresa: string | null;
-  estado: string;
+  canales: { marketplace: string; status: string }[];
+  canalesCaidos: number;
   ventas: {
     mes: number;
     pedidosMes: number;
@@ -146,17 +132,13 @@ export interface AgencyClient {
   };
   plan: ResumenDePlan;
   ultimoPago: { fecha: string; monto: number } | null;
-  liquidacionMesAnterior: { periodo: string; comision: number; estado: 'pendiente' | 'facturado' | 'cobrado' } | null;
   propuesta: Propuesta;
   notasDePropuesta: string | null;
-  tiendas: { id: string; nombre: string; origen: OrigenDeTienda | null }[];
 }
 
 export interface Agency {
   hoy: string;
   igvPorcentaje: number;
-  /** Tiendas con ventas o canales que no son de ningún cliente: se asignan desde el panel */
-  sinAsignar: { id: string; nombre: string; dueno: string; ventasMes: number; pedidosMes: number; canales: number }[];
   totales: {
     clientes: number;
     /** Todo lo vendido este mes, de cualquier tienda (solo precio de productos) */
@@ -182,30 +164,52 @@ export interface Agency {
   clientes: AgencyClient[];
 }
 
-/** Lo mismo que ve el cliente en su dashboard, para revisarlo a detalle. */
+/** Lo mismo que ve el dueño de la tienda en su dashboard, para revisarlo a detalle. */
 export interface ClientDetail {
-  tiendas: { id: string; nombre: string }[];
-  tiendaId: string | null;
-  resumen: DashboardSummary | null;
-  insights: DashboardInsights | null;
+  tienda: { id: string; nombre: string; dueno: string };
+  resumen: DashboardSummary;
+  insights: DashboardInsights;
   plan: PlanDelCliente | null;
+  pagos: { id: string; fecha: string; monto: number; concepto: string; tipo: string }[];
+}
+
+/** Lo que se puede cambiar del plan de una tienda. */
+export interface StorePlanDto {
+  billingModel?: ModeloDeCobro;
+  monthlyFee?: number | null;
+  feeFrequency?: 'mensual' | 'trimestral' | 'anual';
+  commissionRate?: number | null;
+  nextDueDate?: string | null;
+  planCurrency?: string;
+  feeIncludesIgv?: boolean;
+  commissionIncludesIgv?: boolean;
+  planStartDate?: string | null;
+  proposalNotes?: string | null;
+}
+
+export interface StorePaymentDto {
+  amount: number;
+  type: 'unico' | 'recurrente';
+  frequency?: 'mensual' | 'trimestral' | 'anual';
+  concept: string;
+  paidAt: string;
+  method?: string;
+  notes?: string;
 }
 
 export const dashboardApi = {
+  getSummary: () => apiRequest<DashboardSummary>('/dashboard/summary', { method: 'GET' }),
   getInsights: () => apiRequest<DashboardInsights>('/dashboard/insights', { method: 'GET' }),
   getAgency: () => apiRequest<Agency>('/dashboard/agency', { method: 'GET' }),
-  /** Todas las tiendas y a qué cliente pertenece cada una (solo superadmin). */
-  getStoreAssignments: () => apiRequest<TiendaAsignable[]>('/dashboard/agency/stores', { method: 'GET' }),
-  /** Asigna una tienda a un cliente; con clientId null la deja sin asignar. */
-  assignStore: (storeId: string, clientId: string | null) =>
-    apiRequest<{ tiendaId: string; clienteId: string | null }>(`/dashboard/agency/stores/${storeId}/client`, {
-      method: 'PATCH',
-      body: JSON.stringify({ clientId }),
-    }),
-  /** El dashboard de un cliente, como lo ve él (solo superadmin). */
-  getClientDetail: (clientId: string, storeId?: string) =>
-    apiRequest<ClientDetail>(`/dashboard/agency/clients/${clientId}${storeId ? `?storeId=${storeId}` : ''}`, { method: 'GET' }),
-  getSummary: () => apiRequest<DashboardSummary>('/dashboard/summary', { method: 'GET' }),
+  /** El dashboard de una tienda (cliente), como lo ve su dueño (solo superadmin). */
+  getClientDetail: (storeId: string) =>
+    apiRequest<ClientDetail>(`/dashboard/agency/stores/${storeId}`, { method: 'GET' }),
+  /** Guarda el plan comercial de una tienda. */
+  updateStorePlan: (storeId: string, dto: StorePlanDto) =>
+    apiRequest<{ id: string }>(`/dashboard/agency/stores/${storeId}/plan`, { method: 'PATCH', body: JSON.stringify(dto) }),
+  /** Registra un pago recibido; si es recurrente, la fecha del próximo cobro avanza sola. */
+  registerStorePayment: (storeId: string, dto: StorePaymentDto) =>
+    apiRequest<{ id: string; proximoPago: string | null }>(`/dashboard/agency/stores/${storeId}/payments`, { method: 'POST', body: JSON.stringify(dto) }),
   getAccounts: () => apiRequest<DashboardAccounts>('/dashboard/accounts', { method: 'GET' }),
 };
 
