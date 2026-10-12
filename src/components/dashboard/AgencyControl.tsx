@@ -269,6 +269,9 @@ function FichaDelCliente({ cliente, onClose }: { cliente: AgencyClient | null; o
               <div className="space-y-2">
                 <Label htmlFor="plan-tasa">Comisión sobre sus ventas (%)</Label>
                 <Input id="plan-tasa" type="number" min="0" max="100" step="0.1" value={tasa} onChange={(e) => setTasa(e.target.value)} placeholder="5" />
+                <p className="text-[11px] text-muted-foreground">
+                  Se aplica sobre el precio de los productos que pagó el comprador. No incluye costos de envío ni otros cargos.
+                </p>
               </div>
             )}
 
@@ -371,7 +374,7 @@ export function AgencyControl() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
         <Kpi
           icon={<TrendingUp className="w-5 h-5 text-primary" />}
-          label="Ventas de tus clientes este mes"
+          label="Ventas de tus clientes este mes (solo productos)"
           value={moneyIn(t.ventasDelMes)}
           hint={`${t.pedidosDelMes} pedidos · ${t.clientes} clientes`}
         />

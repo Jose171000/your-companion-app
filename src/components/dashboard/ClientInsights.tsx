@@ -89,7 +89,7 @@ function PlanCard({ plan }: { plan: PlanDelCliente }) {
               </p>
               <p className="text-2xl md:text-3xl font-bold tracking-tight mt-1">{moneyIn(plan.comisionAcumulada, plan.moneda)}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {plan.tasa}% sobre {moneyIn(plan.ventasMes, plan.moneda)} vendidos
+                {plan.tasa}% sobre {moneyIn(plan.ventasMes, plan.moneda)} en productos vendidos
                 {variacion !== null && (
                   <span className={cn("ml-1 font-medium", variacion >= 0 ? "text-green-500" : "text-destructive")}>
                     ({variacion >= 0 ? "+" : ""}
@@ -121,7 +121,7 @@ function PlanCard({ plan }: { plan: PlanDelCliente }) {
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground mt-3">
-            Crece con tus ventas: cuanto más vendes, más aumenta lo que se factura este mes.
+            Se calcula solo sobre el precio de los productos que pagan tus clientes, sin costos de envío ni otros cargos. Crece con tus ventas: cuanto más vendes, más aumenta lo que se factura este mes.
           </p>
         </Card>
       )}
