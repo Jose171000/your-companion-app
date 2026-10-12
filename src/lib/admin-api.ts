@@ -25,6 +25,12 @@ export interface ClientProfile {
   /** Próximo pago, YYYY-MM-DD */
   nextDueDate?: string | null;
   planCurrency?: string;
+  /** La cuota pactada ya incluye IGV (false: el IGV va aparte) */
+  feeIncludesIgv?: boolean;
+  /** La comisión pactada ya incluye IGV (false: el IGV va aparte) */
+  commissionIncludesIgv?: boolean;
+  /** Desde cuándo rige el plan, YYYY-MM-DD */
+  planStartDate?: string | null;
   proposalNotes?: string | null;
 }
 

@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { useStores } from "@/contexts/StoreContext";
-import { dashboardApi, moneyIn, money, PlanDelCliente, Ganadora } from "@/lib/dashboard-api";
+import { dashboardApi, DashboardInsights, moneyIn, money, PlanDelCliente, Ganadora } from "@/lib/dashboard-api";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, CalendarClock, ClipboardCheck, Flame, Percent, Truck } from "lucide-react";
 import {
   Card,
+  DesgloseIgv,
+  etiquetaIgv,
   fechaCorta,
   NOMBRE_DE_FRECUENCIA,
   NOMBRE_DE_MODELO,
@@ -36,25 +38,30 @@ function Aviso({ icono, titulo, detalle, tono }: { icono: React.ReactNode; titul
 
 // ─── Plan: membresía y comisión ───────────────────────────────────────────────
 
-function PlanCard({ plan }: { plan: PlanDelCliente }) {
+export function PlanCard({ plan }: { plan: PlanDelCliente }) {
   const cobraCuota = plan.modelo === "fijo" || plan.modelo === "mixto";
   const cobraComision = plan.modelo === "comision" || plan.modelo === "mixto";
   const variacion =
     plan.ventasMesAnterior > 0 ? Math.round(((plan.ventasMes - plan.ventasMesAnterior) / plan.ventasMesAnterior) * 100) : null;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-      {cobraCuota && (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        {/* Próximo cobro: la fecha y todo lo que se cobrará ese día */}
         <Card>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <CalendarClock className="w-3.5 h-3.5" /> Tu membresía
+                <CalendarClock className="w-3.5 h-3.5" /> Próximo cobro
               </p>
               <p className="text-2xl md:text-3xl font-bold tracking-tight mt-1">
-                {plan.proximoPago ? fechaCorta(plan.proximoPago) : "Sin fecha de pago"}
+                {plan.proximoPago ? fechaCorta(plan.proximoPago) : "Sin fecha definida"}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">Próximo pago</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {plan.ciclo.conFechaPactada
+                  ? `Incluye lo vendido del ${fechaCorta(plan.ciclo.desde)} al ${fechaCorta(plan.ciclo.hasta)}`
+                  : "Mientras no haya fecha, se cuenta el mes en curso"}
+              </p>
             </div>
             {plan.estadoPago && (
               <Badge className={cn("text-[10px] shrink-0", TONO_DE_PAGO[plan.estadoPago])}>
@@ -62,75 +69,83 @@ function PlanCard({ plan }: { plan: PlanDelCliente }) {
               </Badge>
             )}
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground">Tu cuota</p>
-              <p className="font-semibold">
-                {plan.cuotaFija != null ? moneyIn(plan.cuotaFija, plan.moneda) : "—"}{" "}
-                <span className="text-xs font-normal text-muted-foreground">{NOMBRE_DE_FRECUENCIA[plan.frecuencia] ?? ""}</span>
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Último pago</p>
-              <p className="font-semibold">
-                {plan.ultimoPago ? `${moneyIn(plan.ultimoPago.monto, plan.moneda)} · ${fechaCorta(plan.ultimoPago.fecha)}` : "—"}
-              </p>
-            </div>
+          <div className="mt-4">
+            <p className="text-xs text-muted-foreground mb-1.5">Lo que llevas hasta esa fecha</p>
+            <DesgloseIgv importe={plan.cobro} moneda={plan.moneda} porcentaje={plan.igvPorcentaje} />
           </div>
+          {plan.ultimoPago && (
+            <p className="text-xs text-muted-foreground mt-3">
+              Último pago: {moneyIn(plan.ultimoPago.monto, plan.moneda)} · {fechaCorta(plan.ultimoPago.fecha)}
+            </p>
+          )}
         </Card>
-      )}
 
-      {cobraComision && (
-        <Card>
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                <Percent className="w-3.5 h-3.5" /> Tu facturación con nosotros este mes
+        <div className="space-y-4">
+          {cobraCuota && plan.cobro.cuota && (
+            <Card>
+              <p className="text-xs text-muted-foreground">Tu cuota fija</p>
+              <p className="text-2xl font-bold tracking-tight mt-1">
+                {moneyIn(plan.cobro.cuota.pactado, plan.moneda)}{" "}
+                <span className="text-xs font-normal text-muted-foreground">
+                  {NOMBRE_DE_FRECUENCIA[plan.frecuencia] ?? ""} · {etiquetaIgv(plan.cuotaIncluyeIgv)}
+                </span>
               </p>
-              <p className="text-2xl md:text-3xl font-bold tracking-tight mt-1">{moneyIn(plan.comisionAcumulada, plan.moneda)}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {plan.tasa}% sobre {moneyIn(plan.ventasMes, plan.moneda)} en productos vendidos
+                {plan.cobro.cuota.incluyeIgv
+                  ? `Incluye ${moneyIn(plan.cobro.cuota.igv, plan.moneda)} de IGV`
+                  : `Más ${moneyIn(plan.cobro.cuota.igv, plan.moneda)} de IGV = ${moneyIn(plan.cobro.cuota.total, plan.moneda)}`}
+              </p>
+            </Card>
+          )}
+
+          {cobraComision && plan.cobro.comision && (
+            <Card>
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Percent className="w-3.5 h-3.5" /> Tu facturación por comisión en este ciclo
+              </p>
+              <p className="text-2xl font-bold tracking-tight mt-1">
+                {moneyIn(plan.cobro.comision.pactado, plan.moneda)}{" "}
+                <span className="text-xs font-normal text-muted-foreground">{etiquetaIgv(plan.comisionIncluyeIgv)}</span>
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {plan.tasa}% sobre {moneyIn(plan.ventasCiclo, plan.moneda)} en productos vendidos
                 {variacion !== null && (
                   <span className={cn("ml-1 font-medium", variacion >= 0 ? "text-green-500" : "text-destructive")}>
                     ({variacion >= 0 ? "+" : ""}
-                    {variacion}% vs el mes pasado)
+                    {variacion}% el mes vs el anterior)
                   </span>
                 )}
               </p>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-xs text-muted-foreground">Proyección a fin de mes</p>
-              <p className="font-semibold">
-                {plan.comisionProyectada != null ? moneyIn(plan.comisionProyectada, plan.moneda) : "Disponible desde el día 3"}
+              <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">A la fecha de cobro, a este ritmo</p>
+                  <p className="font-semibold">
+                    {plan.comisionProyectada != null ? moneyIn(plan.comisionProyectada, plan.moneda) : "Desde el 3.er día del ciclo"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Ciclo anterior</p>
+                  <p className="font-semibold">
+                    {plan.liquidacionMesAnterior ? (
+                      <>
+                        {moneyIn(plan.liquidacionMesAnterior.comision, plan.moneda)}{" "}
+                        <span className="text-xs font-normal text-muted-foreground capitalize">· {plan.liquidacionMesAnterior.estado}</span>
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                  </p>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground mt-3">
+                Se calcula solo sobre el precio de los productos que pagan tus clientes, sin costos de envío ni otros cargos. Crece con
+                tus ventas: cuanto más vendes, más aumenta lo que se factura.
               </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Mes pasado</p>
-              <p className="font-semibold">
-                {plan.liquidacionMesAnterior ? (
-                  <>
-                    {moneyIn(plan.liquidacionMesAnterior.comision, plan.moneda)}{" "}
-                    <span className="text-xs font-normal text-muted-foreground capitalize">· {plan.liquidacionMesAnterior.estado}</span>
-                  </>
-                ) : (
-                  "—"
-                )}
-              </p>
-            </div>
-          </div>
-          <p className="text-[11px] text-muted-foreground mt-3">
-            Se calcula solo sobre el precio de los productos que pagan tus clientes, sin costos de envío ni otros cargos. Crece con tus ventas: cuanto más vendes, más aumenta lo que se factura este mes.
-          </p>
-        </Card>
-      )}
-
-      {plan.modelo === "mixto" && (
-        <p className="text-xs text-muted-foreground lg:col-span-2 -mt-2">
-          Plan: {NOMBRE_DE_MODELO[plan.modelo]} · Este mes llevas {moneyIn(plan.totalDelMes, plan.moneda)} entre cuota y comisión.
-        </p>
-      )}
+            </Card>
+          )}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">Plan: {NOMBRE_DE_MODELO[plan.modelo]}.</p>
     </div>
   );
 }
@@ -198,31 +213,14 @@ function VentasRecientes({ dias }: { dias: { dia: string; pedidos: number; impor
   );
 }
 
-// ─── Módulo ───────────────────────────────────────────────────────────────────
+// ─── Vista ────────────────────────────────────────────────────────────────────
 
-/** Lo que ayuda en el día a día a quien tiene una tienda. Va debajo de los números del negocio. */
-export function ClientInsights() {
-  const { activeStore } = useStores();
-  const storeId = activeStore?.id;
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["dashboard-insights", storeId],
-    enabled: !!storeId,
-    queryFn: () => dashboardApi.getInsights(),
-    staleTime: 60_000,
-    refetchInterval: 120_000,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-32 w-full rounded-2xl" />
-        <Skeleton className="h-48 w-full rounded-2xl" />
-      </div>
-    );
-  }
-  if (isError || !data?.data) return null;
-
-  const i = data.data;
+/**
+ * Lo que ayuda en el día a día a quien tiene una tienda: avisos, su plan,
+ * productos ganadores y ventas recientes. Es solo la vista: la usan el
+ * dashboard del cliente y la ficha que ve el superadmin de cada cliente.
+ */
+export function InsightsView({ i }: { i: DashboardInsights }) {
   const avisos = [];
   if (i.porDespachar.total > 0) {
     avisos.push(
@@ -245,7 +243,7 @@ export function ClientInsights() {
         key="revision"
         tono="warning"
         icono={<ClipboardCheck className="w-4 h-4" />}
-        titulo={`${i.pendientesDeRevision} ${i.pendientesDeRevision === 1 ? "cambio espera" : "cambios esperan"} tu aprobación`}
+        titulo={`${i.pendientesDeRevision} ${i.pendientesDeRevision === 1 ? "cambio espera" : "cambios esperan"} aprobación`}
         detalle="Cambios de precio o stock en la pestaña Revisión de Marketplaces."
       />
     );
@@ -269,18 +267,18 @@ export function ClientInsights() {
 
       {i.plan && (
         <section>
-          <SectionTitle title="Tu plan" subtitle={`${NOMBRE_DE_MODELO[i.plan.modelo]} · lo que pagas y cuándo`} />
+          <SectionTitle title="Plan y cobros" subtitle={`${NOMBRE_DE_MODELO[i.plan.modelo]} · lo que se paga y cuándo`} />
           <PlanCard plan={i.plan} />
         </section>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <section>
-          <SectionTitle title="Tus productos ganadores" subtitle="Lo que más se vendió en los últimos 30 días" />
+          <SectionTitle title="Productos ganadores" subtitle="Lo que más se vendió en los últimos 30 días" />
           <Card>
             {i.ganadoras.length === 0 ? (
               <p className="text-sm text-muted-foreground py-2">
-                Cuando tengas ventas, aquí verás qué productos mueven tu negocio y cuándo reponerlos.
+                Cuando haya ventas, aquí se verá qué productos mueven el negocio y cuándo reponerlos.
               </p>
             ) : (
               <div className="divide-y divide-border/50 -my-3">
@@ -292,7 +290,7 @@ export function ClientInsights() {
           </Card>
           {i.ganadoras.length > 0 && (
             <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1">
-              <Flame className="w-3 h-3" /> Mantén a las ganadoras con stock y publicadas: son las que más te dan.
+              <Flame className="w-3 h-3" /> Mantén a las ganadoras con stock y publicadas: son las que más dan.
             </p>
           )}
         </section>
@@ -304,4 +302,30 @@ export function ClientInsights() {
       </div>
     </div>
   );
+}
+
+// ─── Módulo ───────────────────────────────────────────────────────────────────
+
+/** El panel del cliente: lo que le ayuda en el día a día. Va debajo de los números del negocio. */
+export function ClientInsights() {
+  const { activeStore } = useStores();
+  const storeId = activeStore?.id;
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["dashboard-insights", storeId],
+    enabled: !!storeId,
+    queryFn: () => dashboardApi.getInsights(),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-32 w-full rounded-2xl" />
+        <Skeleton className="h-48 w-full rounded-2xl" />
+      </div>
+    );
+  }
+  if (isError || !data?.data) return null;
+  return <InsightsView i={data.data} />;
 }

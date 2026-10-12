@@ -46,20 +46,42 @@ export interface DashboardAccounts {
 export type ModeloDeCobro = 'ninguno' | 'fijo' | 'comision' | 'mixto';
 export type EstadoDePago = 'al_dia' | 'por_vencer' | 'vence_hoy' | 'vencido';
 
+/** Un importe desglosado: lo pactado, el subtotal sin IGV, el IGV y el total con IGV. */
+export interface Importe {
+  pactado: number;
+  incluyeIgv: boolean;
+  subtotal: number;
+  igv: number;
+  total: number;
+}
+
+export interface TotalConIgv {
+  subtotal: number;
+  igv: number;
+  total: number;
+}
+
 /** El plan comercial tal como lo ve el cliente y la agencia. */
 export interface ResumenDePlan {
   modelo: ModeloDeCobro;
   moneda: string;
-  cuotaFija: number | null;
   frecuencia: string;
+  cuotaFija: number | null;
+  cuotaIncluyeIgv: boolean;
   tasa: number | null;
+  comisionIncluyeIgv: boolean;
   proximoPago: string | null;
   estadoPago: EstadoDePago | null;
   diasParaPago: number | null;
+  /** De cuándo a cuándo se cuentan las ventas de este cobro */
+  ciclo: { desde: string; hasta: string; conFechaPactada: boolean };
   ventasMes: number;
+  ventasCiclo: number;
   comisionAcumulada: number;
   comisionProyectada: number | null;
-  totalDelMes: number;
+  /** Lo que se cobrará en la fecha de cobro, con su IGV */
+  cobro: { cuota: Importe | null; comision: Importe | null } & TotalConIgv;
+  igvPorcentaje: number;
 }
 
 export interface PlanDelCliente extends ResumenDePlan {
@@ -116,28 +138,47 @@ export interface AgencyClient {
 
 export interface Agency {
   hoy: string;
+  igvPorcentaje: number;
   totales: {
     clientes: number;
-    /** Todo lo vendido este mes, de cualquier tienda */
+    /** Todo lo vendido este mes, de cualquier tienda (solo precio de productos) */
     ventasDelMes: number;
     pedidosDelMes: number;
     /** La parte que corresponde a los clientes de la lista */
     ventasDeClientes: number;
+    /** Cuotas fijas de clientes activos llevadas a mes, sin IGV */
     ingresoFijoMensual: number;
+    /** Lo que debe ingresar hasta la fecha de cobro de cada cliente: cuota + comisión acumulada */
+    porIngresar: TotalConIgv;
+    porIngresarCuotas: TotalConIgv;
+    porIngresarComisiones: TotalConIgv;
+    /** Comisión acumulada en los ciclos abiertos, sin IGV */
     comisionAcumulada: number;
     comisionProyectada: number;
     cobradoEsteMes: number;
-    vencidos: { cantidad: number; monto: number };
-    proximos: { cantidad: number; monto: number };
+    vencidos: { cantidad: number } & TotalConIgv;
+    proximos: { cantidad: number } & TotalConIgv;
     sinPlan: number;
     porModelo: { fijo: number; comision: number; mixto: number };
   };
   clientes: AgencyClient[];
 }
 
+/** Lo mismo que ve el cliente en su dashboard, para revisarlo a detalle. */
+export interface ClientDetail {
+  tiendas: { id: string; nombre: string }[];
+  tiendaId: string | null;
+  resumen: DashboardSummary | null;
+  insights: DashboardInsights | null;
+  plan: PlanDelCliente | null;
+}
+
 export const dashboardApi = {
   getInsights: () => apiRequest<DashboardInsights>('/dashboard/insights', { method: 'GET' }),
   getAgency: () => apiRequest<Agency>('/dashboard/agency', { method: 'GET' }),
+  /** El dashboard de un cliente, como lo ve él (solo superadmin). */
+  getClientDetail: (clientId: string, storeId?: string) =>
+    apiRequest<ClientDetail>(`/dashboard/agency/clients/${clientId}${storeId ? `?storeId=${storeId}` : ''}`, { method: 'GET' }),
   getSummary: () => apiRequest<DashboardSummary>('/dashboard/summary', { method: 'GET' }),
   getAccounts: () => apiRequest<DashboardAccounts>('/dashboard/accounts', { method: 'GET' }),
 };

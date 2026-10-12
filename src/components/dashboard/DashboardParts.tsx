@@ -1,5 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { moneyIn, TotalConIgv } from "@/lib/dashboard-api";
 
 /** Piezas compartidas por los paneles del dashboard (cliente y agencia). */
 
@@ -106,3 +107,48 @@ export const NOMBRE_DE_FRECUENCIA: Record<string, string> = {
   trimestral: "por trimestre",
   anual: "al año",
 };
+
+/** Etiqueta de cómo se pactó un monto: «IGV incluido» o «+ IGV». */
+export function etiquetaIgv(incluyeIgv: boolean): string {
+  return incluyeIgv ? "IGV incluido" : "+ IGV";
+}
+
+/** Lo mismo que hace el servidor, para mostrar en el formulario cuánto sería el IGV de lo que se escribe. */
+export function desglosarIgv(monto: number, incluyeIgv: boolean, porcentaje = 18): TotalConIgv {
+  const redondear = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  const factor = 1 + porcentaje / 100;
+  const pactado = redondear(Math.max(0, monto || 0));
+  const subtotal = incluyeIgv ? redondear(pactado / factor) : pactado;
+  const total = incluyeIgv ? pactado : redondear(pactado * factor);
+  return { subtotal, igv: redondear(total - subtotal), total };
+}
+
+/** Subtotal + IGV = total, con la moneda del plan. Deja claro cuánto es el IGV y que el total lo incluye. */
+export function DesgloseIgv({
+  importe,
+  moneda,
+  porcentaje = 18,
+  className,
+}: {
+  importe: TotalConIgv;
+  moneda: string;
+  porcentaje?: number;
+  className?: string;
+}) {
+  return (
+    <div className={cn("rounded-xl bg-secondary/30 p-3 text-sm space-y-1", className)}>
+      <div className="flex justify-between gap-3">
+        <span className="text-muted-foreground">Subtotal (sin IGV)</span>
+        <span className="font-medium tabular-nums">{moneyIn(importe.subtotal, moneda)}</span>
+      </div>
+      <div className="flex justify-between gap-3">
+        <span className="text-muted-foreground">IGV ({porcentaje}%)</span>
+        <span className="font-medium tabular-nums">{moneyIn(importe.igv, moneda)}</span>
+      </div>
+      <div className="flex justify-between gap-3 border-t border-border/60 pt-1">
+        <span className="font-semibold">Total (IGV incluido)</span>
+        <span className="font-bold tabular-nums">{moneyIn(importe.total, moneda)}</span>
+      </div>
+    </div>
+  );
+}
