@@ -376,7 +376,7 @@ export function AgencyControl() {
           icon={<TrendingUp className="w-5 h-5 text-primary" />}
           label="Ventas de tus clientes este mes (solo productos)"
           value={moneyIn(t.ventasDelMes)}
-          hint={`${t.pedidosDelMes} pedidos · ${t.clientes} clientes`}
+          hint={`${t.pedidosDelMes} pedidos · de tus clientes: ${moneyIn(t.ventasDeClientes)}`}
         />
         <Kpi
           icon={<BadgeDollarSign className="w-5 h-5 text-primary" />}

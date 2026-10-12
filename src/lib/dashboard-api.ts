@@ -118,8 +118,11 @@ export interface Agency {
   hoy: string;
   totales: {
     clientes: number;
+    /** Todo lo vendido este mes, de cualquier tienda */
     ventasDelMes: number;
     pedidosDelMes: number;
+    /** La parte que corresponde a los clientes de la lista */
+    ventasDeClientes: number;
     ingresoFijoMensual: number;
     comisionAcumulada: number;
     comisionProyectada: number;
