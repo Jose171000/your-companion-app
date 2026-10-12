@@ -201,6 +201,27 @@ export const syncApi = {
       body: JSON.stringify({ userId, apiKey, ...(label?.trim() ? { label: label.trim() } : {}) }),
     }),
 
+  /** Conecta una tienda WooCommerce con su dirección y la clave de la API REST. */
+  connectWooCommerce: (siteUrl: string, consumerKey: string, consumerSecret: string, label?: string) =>
+    apiRequest<{ marketplace: string; nickname: string }>('/sync/woocommerce/connect', {
+      method: 'POST',
+      body: JSON.stringify({ siteUrl, consumerKey, consumerSecret, ...(label?.trim() ? { label: label.trim() } : {}) }),
+    }),
+
+  /** Conecta una tienda Shopify con su dominio .myshopify.com y el token de la Admin API. */
+  connectShopify: (shop: string, accessToken: string, label?: string) =>
+    apiRequest<{ marketplace: string; nickname: string }>('/sync/shopify/connect', {
+      method: 'POST',
+      body: JSON.stringify({ shop, accessToken, ...(label?.trim() ? { label: label.trim() } : {}) }),
+    }),
+
+  /** Trae los productos que ya existen en WooCommerce o Shopify. Con dryRun solo informa qué pasaría. */
+  importChannelListings: (marketplace: 'woocommerce' | 'shopify', dryRun: boolean, connectionId?: string) =>
+    apiRequest<FalabellaImportSummary>(
+      `/sync/channels/${marketplace}/listings/import?dryRun=${dryRun}${connectionId ? `&connectionId=${connectionId}` : ''}`,
+      { method: 'POST' },
+    ),
+
   /** Trae las publicaciones que ya existen en Falabella. Con dryRun solo informa qué pasaría. */
   importFalabellaListings: (dryRun: boolean, connectionId?: string) =>
     apiRequest<FalabellaImportSummary>(

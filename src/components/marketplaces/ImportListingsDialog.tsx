@@ -20,7 +20,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Canal desde el que se importa */
-  marketplace: "falabella" | "mercadolibre";
+  marketplace: "falabella" | "mercadolibre" | "woocommerce" | "shopify";
   /** Las cuentas de ese canal en la tienda activa */
   accounts: MarketplaceConnection[];
 }
@@ -28,6 +28,8 @@ interface Props {
 const CANAL = {
   falabella: "Falabella",
   mercadolibre: "Mercado Libre",
+  woocommerce: "WooCommerce",
+  shopify: "Shopify",
 };
 
 const ESTADOS: Record<string, string> = {
@@ -47,7 +49,11 @@ const accountName = (c: MarketplaceConnection) => c.label || c.externalNickname 
 export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts }: Props) {
   const canal = CANAL[marketplace];
   const llamar = (dryRun: boolean, id: string) =>
-    marketplace === "falabella" ? syncApi.importFalabellaListings(dryRun, id) : syncApi.importMeliListings(dryRun, id);
+    marketplace === "falabella"
+      ? syncApi.importFalabellaListings(dryRun, id)
+      : marketplace === "mercadolibre"
+        ? syncApi.importMeliListings(dryRun, id)
+        : syncApi.importChannelListings(marketplace, dryRun, id);
   const queryClient = useQueryClient();
   const [accountId, setAccountId] = useState<string>("");
   const [preview, setPreview] = useState<FalabellaImportSummary | null>(null);

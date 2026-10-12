@@ -4,6 +4,8 @@ import { syncApi, MarketplaceConnection } from "@/lib/sync-api";
 import { ConnectionCard } from "./ConnectionCard";
 import { ConnectYavendioDialog } from "./ConnectYavendioDialog";
 import { ConnectFalabellaDialog } from "./ConnectFalabellaDialog";
+import { ConnectWooCommerceDialog } from "./ConnectWooCommerceDialog";
+import { ConnectShopifyDialog } from "./ConnectShopifyDialog";
 import { ListingsTable } from "./ListingsTable";
 import { InventoryBoard } from "./InventoryBoard";
 import { ImportListingsDialog } from "./ImportListingsDialog";
@@ -42,7 +44,8 @@ const MARKETPLACES: MarketplaceDef[] = [
   { id: "mercadolibre", name: "MercadoLibre", logo: "/mercadolibre.png", available: true },
   { id: "yavendio",     name: "Yavendió",     logoText: "yavendió",      available: true },
   { id: "falabella",    name: "Falabella",    logo: "/Falabella.png",    available: true },
-  { id: "shopify",      name: "Shopify",      logo: "/shopify.png",      available: false },
+  { id: "woocommerce",  name: "WooCommerce",  logo: "/woocomerce.png",   available: true },
+  { id: "shopify",      name: "Shopify",      logo: "/shopify.png",      available: true },
   { id: "amazon",       name: "Amazon",       logo: "/amazon.png",       imgClass: "scale-[1.7]", available: false },
 ];
 
@@ -61,7 +64,9 @@ export function MarketplacesModule() {
   const [disconnectTarget, setDisconnectTarget] = useState<MarketplaceConnection | null>(null);
   const [yavendioOpen, setYavendioOpen] = useState(false);
   const [falabellaOpen, setFalabellaOpen] = useState(false);
-  const [importFrom, setImportFrom] = useState<"falabella" | "mercadolibre" | null>(null);
+  const [wooOpen, setWooOpen] = useState(false);
+  const [shopifyOpen, setShopifyOpen] = useState(false);
+  const [importFrom, setImportFrom] = useState<"falabella" | "mercadolibre" | "woocommerce" | "shopify" | null>(null);
 
   // ── Resultado del flujo OAuth (query params que deja el callback) ──────────
   useEffect(() => {
@@ -125,6 +130,9 @@ export function MarketplacesModule() {
   const pendingChanges = changes.filter((c) => c.status === "pending");
   const falabellaAccounts = connections.filter((c) => c.marketplace === "falabella" && c.status === "active");
   const meliAccounts = connections.filter((c) => c.marketplace === "mercadolibre" && c.status === "active");
+  const wooAccounts = connections.filter((c) => c.marketplace === "woocommerce" && c.status === "active");
+  const shopifyAccounts = connections.filter((c) => c.marketplace === "shopify" && c.status === "active");
+  const importAccounts = { falabella: falabellaAccounts, mercadolibre: meliAccounts, woocommerce: wooAccounts, shopify: shopifyAccounts };
   // Hasta que el servidor responda se asume revisión: es el valor por defecto.
   const reviewMode  = settingsResult?.data?.reviewMode ?? true;
 
@@ -182,6 +190,8 @@ export function MarketplacesModule() {
     if (marketplaceId === "mercadolibre") connectMutation.mutate();
     if (marketplaceId === "yavendio") setYavendioOpen(true);
     if (marketplaceId === "falabella") setFalabellaOpen(true);
+    if (marketplaceId === "woocommerce") setWooOpen(true);
+    if (marketplaceId === "shopify") setShopifyOpen(true);
   };
 
   // El texto del aviso de desconexión depende del canal.
@@ -258,7 +268,7 @@ export function MarketplacesModule() {
               Productos publicados en tus canales y su estado de sincronización
             </p>
           </div>
-          {isOwner && (falabellaAccounts.length > 0 || meliAccounts.length > 0) && (
+          {isOwner && (falabellaAccounts.length > 0 || meliAccounts.length > 0 || wooAccounts.length > 0 || shopifyAccounts.length > 0) && (
             <div className="flex flex-wrap gap-2 shrink-0">
               <Button variant="outline" size="sm" className="gap-1.5" disabled={refreshMutation.isPending} onClick={() => refreshMutation.mutate()}>
                 {refreshMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Actualizar ahora
@@ -271,6 +281,16 @@ export function MarketplacesModule() {
               {meliAccounts.length > 0 && (
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportFrom("mercadolibre")}>
                   <Download className="w-3.5 h-3.5" /> Importar desde Mercado Libre
+                </Button>
+              )}
+              {wooAccounts.length > 0 && (
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportFrom("woocommerce")}>
+                  <Download className="w-3.5 h-3.5" /> Importar desde WooCommerce
+                </Button>
+              )}
+              {shopifyAccounts.length > 0 && (
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportFrom("shopify")}>
+                  <Download className="w-3.5 h-3.5" /> Importar desde Shopify
                 </Button>
               )}
             </div>
@@ -319,11 +339,13 @@ export function MarketplacesModule() {
 
       <ConnectYavendioDialog open={yavendioOpen} onOpenChange={setYavendioOpen} />
       <ConnectFalabellaDialog open={falabellaOpen} onOpenChange={setFalabellaOpen} />
+      <ConnectWooCommerceDialog open={wooOpen} onOpenChange={setWooOpen} />
+      <ConnectShopifyDialog open={shopifyOpen} onOpenChange={setShopifyOpen} />
       <ImportListingsDialog
         open={importFrom !== null}
         onOpenChange={(o) => { if (!o) setImportFrom(null); }}
         marketplace={importFrom ?? "falabella"}
-        accounts={importFrom === "mercadolibre" ? meliAccounts : falabellaAccounts}
+        accounts={importAccounts[importFrom ?? "falabella"]}
       />
     </div>
   );

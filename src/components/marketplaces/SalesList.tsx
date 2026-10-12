@@ -15,6 +15,8 @@ import { ImportHistoryDialog } from "./ImportHistoryDialog";
 import { ShipByBadge, StockCell, fmtDate } from "./SaleParts";
 
 const PAGE = 50;
+/** Canales de los que se leen ventas. */
+const VENTA_CHANNELS = ["falabella", "mercadolibre", "woocommerce", "shopify"];
 const RANGES = [
   { label: "7 días", days: 7 },
   { label: "30 días", days: 30 },
@@ -90,7 +92,7 @@ export function SalesList({ accounts, canImport }: Props) {
   );
 
   const accountsOfChannel = accounts.filter((a) => marketplace === "all" || a.marketplace === marketplace);
-  const channels = [...new Set(accounts.map((a) => a.marketplace))].filter((m) => m === "falabella" || m === "mercadolibre");
+  const channels = [...new Set(accounts.map((a) => a.marketplace))].filter((m) => VENTA_CHANNELS.includes(m));
 
   return (
     <div className="space-y-4">
@@ -266,7 +268,7 @@ export function SalesList({ accounts, canImport }: Props) {
         <ImportHistoryDialog
           open={historyOpen}
           onOpenChange={setHistoryOpen}
-          accounts={accounts.filter((c) => c.status === "active" && (c.marketplace === "falabella" || c.marketplace === "mercadolibre"))}
+          accounts={accounts.filter((c) => c.status === "active" && VENTA_CHANNELS.includes(c.marketplace))}
         />
       )}
     </div>

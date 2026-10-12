@@ -4,6 +4,7 @@ export const CHANNEL_NAMES: Record<string, string> = {
   falabella: "Falabella",
   yavendio: "Yavendió",
   shopify: "Shopify",
+  woocommerce: "WooCommerce",
   amazon: "Amazon",
 };
 
