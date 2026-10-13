@@ -5,6 +5,7 @@ import { useStores } from "@/contexts/StoreContext";
 import { syncApi } from "@/lib/sync-api";
 import { reportsApi } from "@/lib/admin-api";
 import { EmbeddedReport } from "./EmbeddedReport";
+import { DateRangeFilter, useRangoDeFechas } from "@/components/common/DateRangeFilter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -22,12 +23,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-
-const RANGES = [
-  { label: "7 días", days: 7 },
-  { label: "30 días", days: 30 },
-  { label: "90 días", days: 90 },
-];
 
 const money = (n: number) =>
   `S/ ${Number(n || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -90,7 +85,7 @@ function haceCuanto(iso: string | null | undefined): string {
 }
 
 export function AnalyticsModule() {
-  const [days, setDays] = useState(30);
+  const [rango, setRango] = useRangoDeFechas(30);
   const queryClient = useQueryClient();
   // Las analíticas son de la tienda activa: cada tienda tiene sus propias métricas.
   const { activeStore } = useStores();
@@ -127,8 +122,7 @@ export function AnalyticsModule() {
   const embedUrl = configRes?.data?.embedUrl ?? null;
   const embedTitle = configRes?.data?.embedTitle || "Reporte detallado";
 
-  const from = new Date(Date.now() - (days - 1) * 24 * 3600 * 1000).toISOString().slice(0, 10);
-  const to = new Date().toISOString().slice(0, 10);
+  const { from, to } = rango;
 
   const { data: result, isLoading, isError } = useQuery({
     queryKey: ["sales-report", storeId, from, to],
@@ -192,18 +186,7 @@ export function AnalyticsModule() {
       </div>
 
       {/* Selector de rango */}
-      <div className="flex items-center gap-2">
-        {RANGES.map((r) => (
-          <Button
-            key={r.days}
-            variant={days === r.days ? "default" : "outline"}
-            size="sm"
-            onClick={() => setDays(r.days)}
-          >
-            {r.label}
-          </Button>
-        ))}
-      </div>
+      <DateRangeFilter value={rango} onChange={setRango} />
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

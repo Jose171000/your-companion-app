@@ -12,16 +12,12 @@ import { channelName, money } from "./format";
 import { ProductThumb } from "./ProductThumb";
 import { OrderDetailSheet } from "./OrderDetailSheet";
 import { ImportHistoryDialog } from "./ImportHistoryDialog";
+import { DateRangeFilter, useRangoDeFechas } from "@/components/common/DateRangeFilter";
 import { ShipByBadge, StockCell, fmtDate } from "./SaleParts";
 
 const PAGE = 50;
 /** Canales de los que se leen ventas. */
 const VENTA_CHANNELS = ["falabella", "mercadolibre", "woocommerce", "shopify"];
-const RANGES = [
-  { label: "7 días", days: 7 },
-  { label: "30 días", days: 30 },
-  { label: "90 días", days: 90 },
-];
 
 interface Row {
   sale: Sale;
@@ -41,7 +37,7 @@ export function SalesList({ accounts, canImport }: Props) {
   const { activeStore } = useStores();
   const storeId = activeStore?.id;
 
-  const [days, setDays] = useState(30);
+  const [rango, setRango] = useRangoDeFechas(30);
   const [marketplace, setMarketplace] = useState("all");
   const [connectionId, setConnectionId] = useState("all");
   const [searchInput, setSearchInput] = useState("");
@@ -54,11 +50,10 @@ export function SalesList({ accounts, canImport }: Props) {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  const from = useMemo(() => new Date(Date.now() - (days - 1) * 86_400_000).toISOString().slice(0, 10), [days]);
-  const to = useMemo(() => new Date(Date.now() + 86_400_000).toISOString().slice(0, 10), []);
+  const { from, to } = rango;
 
   const query = useInfiniteQuery({
-    queryKey: ["sync-orders", storeId, from, marketplace, connectionId, search],
+    queryKey: ["sync-orders", storeId, from, to, marketplace, connectionId, search],
     enabled: !!storeId,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
@@ -99,11 +94,7 @@ export function SalesList({ accounts, canImport }: Props) {
       {/* Filtros */}
       <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
         <div className="flex items-center gap-2 flex-wrap">
-          {RANGES.map((r) => (
-            <Button key={r.days} size="sm" variant={days === r.days ? "default" : "outline"} onClick={() => setDays(r.days)}>
-              {r.label}
-            </Button>
-          ))}
+          <DateRangeFilter value={rango} onChange={setRango} />
           <Select value={marketplace} onValueChange={(v) => { setMarketplace(v); setConnectionId("all"); }}>
             <SelectTrigger className="h-9 w-40 text-sm"><SelectValue placeholder="Canal" /></SelectTrigger>
             <SelectContent>

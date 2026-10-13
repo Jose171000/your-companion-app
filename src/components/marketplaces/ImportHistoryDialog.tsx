@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { History, Loader2 } from "lucide-react";
 import { MarketplaceConnection, syncApi } from "@/lib/sync-api";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -40,16 +41,23 @@ export function ImportHistoryDialog({ open, onOpenChange, accounts }: Props) {
   const queryClient = useQueryClient();
   const [days, setDays] = useState("90");
   const [accountId, setAccountId] = useState("all");
+  const [desde, setDesde] = useState("");
+
+  const hoy = new Date().toLocaleDateString("en-CA"); // AAAA-MM-DD en hora local
+  // «Desde una fecha»: cuántos días hay del día elegido a hoy, contando ambos.
+  const diasDesdeFecha = desde ? Math.max(1, Math.round((new Date(hoy).getTime() - new Date(desde).getTime()) / 86_400_000) + 1) : 0;
+  const diasAImportar = days === "custom" ? diasDesdeFecha : Number(days);
 
   useEffect(() => {
     if (open) {
       setDays("90");
+      setDesde("");
       setAccountId("all");
     }
   }, [open]);
 
   const mutation = useMutation({
-    mutationFn: () => syncApi.importOrderHistory(Number(days), accountId === "all" ? undefined : accountId),
+    mutationFn: () => syncApi.importOrderHistory(diasAImportar, accountId === "all" ? undefined : accountId),
     onSuccess: (res) => {
       if (res.error || !res.data) {
         toast.error(res.error ?? "No se pudo importar el historial");
@@ -86,8 +94,17 @@ export function ImportHistoryDialog({ open, onOpenChange, accounts }: Props) {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {PERIODOS.map((p) => <SelectItem key={p.dias} value={String(p.dias)}>{p.label}</SelectItem>)}
+                <SelectItem value="custom">Desde una fecha exacta…</SelectItem>
               </SelectContent>
             </Select>
+            {days === "custom" && (
+              <div className="space-y-1.5">
+                <Input type="date" value={desde} max={hoy} onChange={(e) => setDesde(e.target.value)} />
+                <p className="text-[11px] text-muted-foreground">
+                  {desde ? `Se traen las ventas desde el ${desde} hasta hoy (${diasDesdeFecha} días).` : "Elige el primer día que quieres traer."}
+                </p>
+              </div>
+            )}
           </div>
           {accounts.length > 1 && (
             <div className="space-y-2">
@@ -110,7 +127,7 @@ export function ImportHistoryDialog({ open, onOpenChange, accounts }: Props) {
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button className="gradient-primary" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+          <Button className="gradient-primary" disabled={mutation.isPending || diasAImportar < 1} onClick={() => mutation.mutate()}>
             {mutation.isPending ? (<><Loader2 className="w-4 h-4 animate-spin mr-2" /> Importando…</>) : "Importar historial"}
           </Button>
         </DialogFooter>
