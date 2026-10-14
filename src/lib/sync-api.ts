@@ -280,10 +280,10 @@ export const syncApi = {
     }),
 
   /** Publica un producto en los marketplaces indicados (asíncrono) */
-  publish: (productId: string, marketplaces: string[]) =>
+  publish: (productId: string, marketplaces: string[], connectionIds?: Record<string, string>) =>
     apiRequest<{ message: string }>(`/sync/products/${productId}/publish`, {
       method: 'POST',
-      body: JSON.stringify({ marketplaces }),
+      body: JSON.stringify({ marketplaces, ...(connectionIds ? { connectionIds } : {}) }),
     }),
 
   /** Actualiza stock/precio local y lo sincroniza con los canales publicados */

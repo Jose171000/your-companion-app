@@ -32,9 +32,12 @@ export interface MissingAttribute {
 export interface AiReport {
   vision: AiVision | null;
   missingAttributes: Record<string, MissingAttribute[]>;
+  /** Lo que la IA estimó en vez de leerlo del cliente. */
+  estimated?: { measures: boolean; attributes: Record<string, string[]> } | null;
 }
 
 export interface Product {
+  aiAttributes?: Record<string, any> | null;
   /** Solo viene al crear con IA: lo que se vio en las fotos y lo que falta. */
   aiReport?: AiReport;
   /** Datos de envío que exige Falabella. Nulos hasta que se completan. */

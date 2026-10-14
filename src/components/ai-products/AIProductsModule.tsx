@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { MarketplaceSelector } from "./MarketplaceSelector";
-import { CategorySelector } from "./CategorySelector";
 import { ProductInputForm } from "./ProductInputForm";
 import { GeneratedFieldsPreview } from "./GeneratedFieldsPreview";
 import { ExportActions } from "./ExportActions";
+import { PackageReview } from "./PackageReview";
+import { syncApi } from "@/lib/sync-api";
 import { Sparkles } from "lucide-react";
 import { productsApi } from "@/lib/products-api";
 import { bulkUploadApi } from "@/lib/bulk-upload-api";
@@ -91,8 +92,46 @@ export function AIProductsModule() {
     }
   };
 
+  /** Canales a los que ya se puede publicar desde aquí. */
+  const PUBLICABLES = ["mercadolibre", "falabella"];
+  const NOMBRES: Record<string, string> = { mercadolibre: "Mercado Libre", falabella: "Falabella" };
+
   const handlePublish = async () => {
-    toast.success("Publicación iniciada (simulación)");
+    if (!generatedProduct?.id) return;
+    const canales = selectedMarketplaces.filter((m) => PUBLICABLES.includes(m));
+    const otros = selectedMarketplaces.filter((m) => !PUBLICABLES.includes(m));
+    if (!canales.length) {
+      toast.error("Por ahora solo se publica automáticamente en Mercado Libre y Falabella.");
+      return;
+    }
+
+    const faltantes = (generatedProduct.aiReport?.missingAttributes ?? {}) as Record<string, { description: string }[]>;
+    const cuentas = await syncApi.getConnections();
+    if (cuentas.error || !cuentas.data) {
+      toast.error(cuentas.error ?? "No se pudieron leer los canales conectados");
+      return;
+    }
+
+    let publicados = 0;
+    for (const canal of canales) {
+      // Un canal con datos obligatorios sin completar rechazaría la publicación: se avisa y se sigue con los demás.
+      if (faltantes[canal]?.length) {
+        toast.error(`${NOMBRES[canal]}: faltan ${faltantes[canal].length} datos obligatorios (${faltantes[canal].map((f) => f.description).slice(0, 3).join(", ")}…). Complétalos desde Productos.`);
+        continue;
+      }
+      const activas = cuentas.data.filter((c) => c.marketplace === canal && c.status === "active");
+      if (!activas.length) {
+        toast.error(`${NOMBRES[canal]} no tiene una cuenta activa en esta tienda.`);
+        continue;
+      }
+      for (const cuenta of activas) {
+        const res = await syncApi.publish(generatedProduct.id, [canal], { [canal]: cuenta.id });
+        if (res.error) toast.error(`${NOMBRES[canal]}: ${res.error}`);
+        else publicados++;
+      }
+    }
+    if (publicados) toast.success("Publicación en marcha: verás el estado de cada canal en la sección Marketplaces.");
+    if (otros.length) toast.info("WooCommerce, Shopify y otros canales todavía no se publican automáticamente.");
   };
 
   return (
@@ -143,45 +182,46 @@ export function AIProductsModule() {
         />
       </Card>
 
-      {/* Step 2: Category */}
+      {/* Step 2: Product Input */}
       <Card className="p-4 md:p-6 bg-white dark:bg-[#111111] shadow-sm border border-[#EAEAEA] dark:border-white/20 rounded-[16px] transition-colors duration-200">
         <div className="flex items-center gap-3 mb-4 md:mb-6">
           <span className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#FCCB34] text-[#111111] text-xs md:text-sm font-bold flex items-center justify-center shadow-sm">
             2
-          </span>
-          <span className="font-semibold text-[#111111] dark:text-[#F8F8F5] text-sm md:text-base tracking-tight">Elige la categoría principal</span>
-        </div>
-        <CategorySelector
-          value={selectedCategory}
-          onChange={setSelectedCategory}
-        />
-      </Card>
-
-      {/* Step 3: Product Input */}
-      <Card className="p-4 md:p-6 bg-white dark:bg-[#111111] shadow-sm border border-[#EAEAEA] dark:border-white/20 rounded-[16px] transition-colors duration-200">
-        <div className="flex items-center gap-3 mb-4 md:mb-6">
-          <span className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#FCCB34] text-[#111111] text-xs md:text-sm font-bold flex items-center justify-center shadow-sm">
-            3
           </span>
           <span className="font-semibold text-[#111111] dark:text-[#F8F8F5] text-sm md:text-base tracking-tight">Ingresa la información del producto</span>
         </div>
         <ProductInputForm
           onSubmit={handleSubmit}
           isProcessing={isProcessing}
-          isFormReady={selectedMarketplaces.length > 0 && selectedCategory !== ""}
+          isFormReady={selectedMarketplaces.length > 0}
         />
       </Card>
 
-      {/* Step 4: Generated Fields Preview */}
+      {/* Step 3: Generated Fields Preview */}
       {hasGeneratedContent && (
         <Card className="p-4 md:p-6 bg-white dark:bg-[#111111] shadow-sm border border-[#EAEAEA] dark:border-white/20 rounded-[16px] transition-colors duration-200">
           <div className="flex items-center gap-3 mb-4 md:mb-6">
             <span className="w-7 h-7 md:w-8 md:h-8 rounded-full bg-[#111111] dark:bg-[#FCCB34] text-white dark:text-[#111111] text-xs md:text-sm font-bold flex items-center justify-center shadow-sm">
-              4
+              3
             </span>
             <span className="font-semibold text-[#111111] dark:text-[#F8F8F5] text-sm md:text-base tracking-tight">Revisa los resultados</span>
           </div>
           <GeneratedFieldsPreview visible={hasGeneratedContent} productData={generatedProduct} />
+
+          {selectedMarketplaces.includes("falabella") && generatedProduct && (
+            <div className="mt-4">
+              <PackageReview
+                product={generatedProduct}
+                onReviewed={(m) =>
+                  setGeneratedProduct((p: any) => ({
+                    ...p,
+                    ...m,
+                    aiAttributes: { ...(p.aiAttributes ?? {}), estimated: { ...(p.aiAttributes?.estimated ?? {}), measures: false } },
+                  }))
+                }
+              />
+            </div>
+          )}
 
           <Separator className="my-6 md:my-8" />
 
