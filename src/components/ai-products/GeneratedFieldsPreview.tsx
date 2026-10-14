@@ -10,7 +10,8 @@ import {
   RotateCcw, 
   Copy,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Eye
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -41,6 +42,14 @@ const sampleFields: Field[] = [
   { id: "keywords", label: "Palabras clave SEO", value: "iphone 15 pro max, apple, celular, smartphone, titanio, 256gb, nuevo, original", required: false, type: "text", aiGenerated: true, confidence: "high" },
 ];
 
+const CANALES: Record<string, string> = {
+  mercadolibre: "Mercado Libre",
+  falabella: "Falabella",
+  amazon: "Amazon",
+  shopify: "Shopify",
+  woocommerce: "WooCommerce",
+};
+
 interface GeneratedFieldsPreviewProps {
   visible: boolean;
   productData?: any;
@@ -63,7 +72,9 @@ export function GeneratedFieldsPreview({ visible, productData }: GeneratedFields
       }
 
       if (productData.aiAttributes) {
-        Object.entries(productData.aiAttributes).forEach(([key, val]) => {
+        Object.entries(productData.aiAttributes)
+          .filter(([, val]) => val !== null && typeof val !== "object")
+          .forEach(([key, val]) => {
           newFields.push({ id: `attr_${key}`, label: key, value: String(val), required: false, type: "text", aiGenerated: true, confidence: "high" });
         });
       }
@@ -105,6 +116,49 @@ export function GeneratedFieldsPreview({ visible, productData }: GeneratedFields
           </Button>
         </div>
       </div>
+
+      {/* Lo que la IA vio en las fotos */}
+      {productData?.aiReport?.vision && (
+        <Card className="p-3 md:p-4 border-primary/30 bg-primary/5">
+          <div className="flex items-start gap-3">
+            <Eye className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <div className="space-y-1 min-w-0">
+              <p className="text-sm font-medium">Lo que la IA identificó en tus fotos</p>
+              <p className="text-sm text-muted-foreground">
+                {productData.aiReport.vision.suggestedName}
+                {[productData.aiReport.vision.color, productData.aiReport.vision.material, productData.aiReport.vision.brand]
+                  .filter(Boolean)
+                  .map((v) => ` · ${v}`)
+                  .join("")}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Seguridad de la IA: {Math.round((productData.aiReport.vision.confidence ?? 0) * 100)}%. Revisa los datos antes de publicar.
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Datos obligatorios de cada canal que la IA no pudo deducir */}
+      {Object.entries(productData?.aiReport?.missingAttributes ?? {}).map(([canal, faltan]) => (
+        <div key={canal} className="p-3 md:p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle className="w-4 h-4 text-amber-500" />
+            <p className="text-sm font-medium">
+              Faltan {(faltan as any[]).length} datos obligatorios para {CANALES[canal] ?? canal}
+            </p>
+          </div>
+          <ul className="text-sm text-muted-foreground space-y-1">
+            {(faltan as any[]).map((a) => (
+              <li key={a.name}>
+                <span className="font-medium text-foreground">{a.description || a.name}</span>
+                {a.options?.length ? ` — opciones: ${a.options.slice(0, 6).join(", ")}${a.options.length > 6 ? "…" : ""}` : ""}
+              </li>
+            ))}
+          </ul>
+          <p className="text-[11px] text-muted-foreground mt-2">La IA no los inventa: complétalos antes de publicar en ese canal.</p>
+        </div>
+      ))}
 
       {/* Fields Grid */}
       <div className="grid gap-3 md:gap-4">

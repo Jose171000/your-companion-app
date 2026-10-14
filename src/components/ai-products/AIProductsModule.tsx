@@ -52,8 +52,9 @@ export function AIProductsModule() {
         // ── Producto individual: genera contenido con IA ──
         const dto = {
           sku: data.sku,
-          name: data.content,
-          description: data.content,
+          // Sin texto, la IA arma el nombre y la descripción a partir de las fotos.
+          name: data.content.trim() || undefined,
+          description: data.content.trim() || undefined,
           category: selectedCategory,
           targetMarketplaces: selectedMarketplaces,
           price: data.price,

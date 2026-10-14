@@ -10,7 +10,33 @@ export interface ProductImage {
   order: number;
 }
 
+/** Lo que la IA identificó en las fotos del producto. */
+export interface AiVision {
+  productType: string;
+  suggestedName: string;
+  description: string;
+  brand: string | null;
+  color: string | null;
+  material: string | null;
+  gender: string | null;
+  confidence: number;
+}
+
+/** Datos obligatorios de un canal que la IA no pudo deducir. */
+export interface MissingAttribute {
+  name: string;
+  description: string;
+  options?: string[];
+}
+
+export interface AiReport {
+  vision: AiVision | null;
+  missingAttributes: Record<string, MissingAttribute[]>;
+}
+
 export interface Product {
+  /** Solo viene al crear con IA: lo que se vio en las fotos y lo que falta. */
+  aiReport?: AiReport;
   /** Datos de envío que exige Falabella. Nulos hasta que se completan. */
   packageWidth?: number | null;
   packageLength?: number | null;
@@ -56,8 +82,9 @@ export interface CreateProductDto {
 
 export interface CreateProductWithAiDto {
   sku: string;
-  name: string;
-  description: string;
+  /** Opcionales: si faltan, la IA los deduce de las fotos. */
+  name?: string;
+  description?: string;
   category?: string;
   subCategory?: string;
   price?: number;

@@ -83,7 +83,8 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
     }
   };
 
-  const isSingleDisabled = !singleProduct || !sku || images.length === 0;
+  // Con fotos y SKU alcanza: la IA completa nombre, descripción, categoría y atributos.
+  const isSingleDisabled = !sku || images.length === 0;
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -151,11 +152,11 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
           {/* Description */}
           <div className="space-y-1.5 md:space-y-2">
             <Label htmlFor="product-description" className="text-xs md:text-sm text-[#111111] dark:text-[#F8F8F5] font-medium">
-              Descripción o información adicional <span className="text-red-500">*</span>
+              Descripción o información adicional <span className="text-muted-foreground font-normal">(opcional)</span>
             </Label>
             <Textarea
               id="product-description"
-              placeholder="Describe el producto, características, especificaciones técnicas, o cualquier información que tengas disponible."
+              placeholder="Opcional: marca, modelo, medidas… La IA ya lee tus fotos; lo que escribas aquí tiene prioridad."
               value={singleProduct}
               onChange={(e) => setSingleProduct(e.target.value)}
               className="min-h-24 md:min-h-32 bg-white dark:bg-[#1A1A1A] border-[#EAEAEA] dark:border-white/20 focus-visible:border-[#FCCB34] focus-visible:ring-[#FCCB34] resize-none text-sm px-4 py-3 shadow-sm dark:text-[#F8F8F5]"
