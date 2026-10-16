@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Check, Loader2, Package, Search } from "lucide-react";
+import { FalabellaBrandField } from "./FalabellaBrandField";
 
 interface Props {
   product: Product | null;
@@ -56,6 +57,7 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
   const [categoria, setCategoria] = useState<{ id: string; path: string } | null>(null);
   const [medidas, setMedidas] = useState({ ancho: "", largo: "", alto: "", peso: "" });
   const [atributos, setAtributos] = useState<Record<string, string>>({});
+  const [marca, setMarca] = useState("GENERICO");
 
   const busquedaDiferida = useDebounced(busqueda);
 
@@ -70,7 +72,10 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
       alto: product.packageHeight != null ? String(product.packageHeight) : "",
       peso: product.packageWeight != null ? String(product.packageWeight) : "",
     });
-    setAtributos({});
+    // Lo que la IA ya completó se muestra, para revisarlo en vez de escribirlo de nuevo.
+    const previos = (product.aiAttributes as any) || {};
+    setAtributos(Object.fromEntries(Object.entries(previos).filter(([, v]) => typeof v === "string")) as Record<string, string>);
+    setMarca(previos.brand || "GENERICO");
     setBusqueda("");
   }, [open, product]);
 
@@ -193,6 +198,15 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
               </>
             )}
           </div>
+
+          {/* ── Marca ─────────────────────────────────────────────────── */}
+          {product && (
+            <FalabellaBrandField
+              productId={product.id}
+              value={marca}
+              onSaved={(m) => setMarca(m)}
+            />
+          )}
 
           {/* ── Medidas ───────────────────────────────────────────────── */}
           <div className="space-y-2">

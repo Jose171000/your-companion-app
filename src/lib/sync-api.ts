@@ -155,6 +155,15 @@ export interface FalabellaField {
   options: string[];
 }
 
+export interface FalabellaPrepReport {
+  listo: boolean;
+  motivo?: string;
+  category: { id: string; path: string; auto: boolean } | null;
+  brand: { value: string; replaced: boolean; original?: string };
+  measures: { width: number | null; length: number | null; height: number | null; weight: number | null; estimated: boolean };
+  estimatedAttributes: string[];
+}
+
 export interface FalabellaPreparation {
   categoryId: string;
   packageWidth: number;
@@ -257,6 +266,21 @@ export const syncApi = {
       `/sync/falabella/categories?search=${encodeURIComponent(search)}`,
       { method: 'GET' },
     ),
+
+  /** Marcas del catálogo de Falabella que coinciden con lo escrito. */
+  searchFalabellaBrands: (search: string) =>
+    apiRequest<string[]>(`/sync/falabella/brands?search=${encodeURIComponent(search)}`, { method: 'GET' }),
+
+  /** Cambia la marca con la que se publica un producto en Falabella (solo del catálogo). */
+  setFalabellaBrand: (productId: string, brand: string) =>
+    apiRequest<{ brand: string }>(`/sync/falabella/products/${productId}/brand`, {
+      method: 'PATCH',
+      body: JSON.stringify({ brand }),
+    }),
+
+  /** Deja el producto listo para Falabella: categoría, marca, medidas y datos obligatorios. */
+  autoPrepareFalabella: (productId: string) =>
+    apiRequest<FalabellaPrepReport>(`/ai/products/${productId}/prepare-falabella`, { method: 'POST', body: JSON.stringify({}) }),
 
   /** Datos obligatorios que hay que pedirle a la persona para esa categoría. */
   getFalabellaCategoryFields: (categoryId: string) =>
