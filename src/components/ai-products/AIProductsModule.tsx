@@ -6,8 +6,8 @@ import { ProductInputForm } from "./ProductInputForm";
 import { GeneratedFieldsPreview } from "./GeneratedFieldsPreview";
 import { ExportActions } from "./ExportActions";
 import { PackageReview } from "./PackageReview";
-import { syncApi } from "@/lib/sync-api";
-import { Sparkles } from "lucide-react";
+import { syncApi, LaunchReport } from "@/lib/sync-api";
+import { Loader2, Sparkles } from "lucide-react";
 import { productsApi } from "@/lib/products-api";
 import { bulkUploadApi } from "@/lib/bulk-upload-api";
 import { toast } from "sonner";
@@ -19,6 +19,8 @@ export function AIProductsModule() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [hasGeneratedContent, setHasGeneratedContent] = useState(false);
   const [generatedProduct, setGeneratedProduct] = useState<any>(null);
+  const [launch, setLaunch] = useState<LaunchReport | null>(null);
+  const [launching, setLaunching] = useState(false);
   const { setDirty } = useFormDraft();
 
   // Report dirty state whenever the user configures anything
@@ -26,11 +28,35 @@ export function AIProductsModule() {
     const dirty = selectedMarketplaces.length > 0 || selectedCategory !== "";
     setDirty("ai-products", dirty);
   }, [selectedMarketplaces, selectedCategory, setDirty]);
+  /** Prepara cada canal (categoría, marca, medidas, atributos, descripción HTML) y publica el producto. */
+  const lanzar = async (productId: string) => {
+    const canales = selectedMarketplaces.filter((m) => ["mercadolibre", "falabella"].includes(m));
+    if (!canales.length) {
+      toast.info("WooCommerce, Shopify y otros canales todavía no se publican automáticamente.");
+      return;
+    }
+    setLaunching(true);
+    try {
+      const res = await syncApi.launchProduct(productId, canales);
+      if (res.error || !res.data) {
+        toast.error(res.error ?? "No se pudo publicar");
+        return;
+      }
+      setLaunch(res.data);
+      res.data.channels.forEach((c) =>
+        c.status === "error" ? toast.error(c.message) : c.status === "omitido" ? toast.info(c.message) : toast.success(c.message),
+      );
+    } finally {
+      setLaunching(false);
+    }
+  };
+
   const handleSubmit = async (data: {
     mode: "single" | "bulk";
     content: string;
     sku: string;
     price?: number;
+    stock?: number;
     images: File[];
     bulkFile?: File;
   }) => {
@@ -59,6 +85,7 @@ export function AIProductsModule() {
           category: selectedCategory,
           targetMarketplaces: selectedMarketplaces,
           price: data.price,
+          stock: data.stock,
         };
         const response = await productsApi.createWithAIAndFiles(dto, data.images);
         if (response.error) {
@@ -66,9 +93,11 @@ export function AIProductsModule() {
         } else {
           setHasGeneratedContent(true);
           setGeneratedProduct(response.data);
+          setLaunch(null);
           setDirty("ai-products", false);
-          toast.success("Contenido generado exitosamente");
-          console.log("Generated Content:", response.data);
+          toast.success("Contenido generado. Preparando y publicando en tus canales…");
+          // Sin pasos intermedios: se deja listo cada canal y se publica.
+          if (response.data?.id) await lanzar(response.data.id);
         }
       }
     } catch (error) {
@@ -92,46 +121,9 @@ export function AIProductsModule() {
     }
   };
 
-  /** Canales a los que ya se puede publicar desde aquí. */
-  const PUBLICABLES = ["mercadolibre", "falabella"];
-  const NOMBRES: Record<string, string> = { mercadolibre: "Mercado Libre", falabella: "Falabella" };
-
+  /** Reintenta: vuelve a preparar y publicar los canales elegidos. */
   const handlePublish = async () => {
-    if (!generatedProduct?.id) return;
-    const canales = selectedMarketplaces.filter((m) => PUBLICABLES.includes(m));
-    const otros = selectedMarketplaces.filter((m) => !PUBLICABLES.includes(m));
-    if (!canales.length) {
-      toast.error("Por ahora solo se publica automáticamente en Mercado Libre y Falabella.");
-      return;
-    }
-
-    const faltantes = (generatedProduct.aiReport?.missingAttributes ?? {}) as Record<string, { description: string }[]>;
-    const cuentas = await syncApi.getConnections();
-    if (cuentas.error || !cuentas.data) {
-      toast.error(cuentas.error ?? "No se pudieron leer los canales conectados");
-      return;
-    }
-
-    let publicados = 0;
-    for (const canal of canales) {
-      // Un canal con datos obligatorios sin completar rechazaría la publicación: se avisa y se sigue con los demás.
-      if (faltantes[canal]?.length) {
-        toast.error(`${NOMBRES[canal]}: faltan ${faltantes[canal].length} datos obligatorios (${faltantes[canal].map((f) => f.description).slice(0, 3).join(", ")}…). Complétalos desde Productos.`);
-        continue;
-      }
-      const activas = cuentas.data.filter((c) => c.marketplace === canal && c.status === "active");
-      if (!activas.length) {
-        toast.error(`${NOMBRES[canal]} no tiene una cuenta activa en esta tienda.`);
-        continue;
-      }
-      for (const cuenta of activas) {
-        const res = await syncApi.publish(generatedProduct.id, [canal], { [canal]: cuenta.id });
-        if (res.error) toast.error(`${NOMBRES[canal]}: ${res.error}`);
-        else publicados++;
-      }
-    }
-    if (publicados) toast.success("Publicación en marcha: verás el estado de cada canal en la sección Marketplaces.");
-    if (otros.length) toast.info("WooCommerce, Shopify y otros canales todavía no se publican automáticamente.");
+    if (generatedProduct?.id) await lanzar(generatedProduct.id);
   };
 
   return (
@@ -220,6 +212,36 @@ export function AIProductsModule() {
                   }))
                 }
               />
+            </div>
+          )}
+
+          {launching && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" /> La IA está preparando cada canal y publicando…
+            </div>
+          )}
+
+          {launch && (
+            <div className="mt-4 rounded-xl border border-border p-3 md:p-4 space-y-2">
+              <p className="text-sm font-medium">Resultado de la publicación</p>
+              {launch.channels.map((c) => (
+                <p key={c.marketplace} className={`text-sm break-words ${c.status === "error" ? "text-red-400" : c.status === "omitido" ? "text-amber-500" : "text-green-500"}`}>
+                  {c.status === "encolado" ? "✓" : c.status === "omitido" ? "•" : "✗"} {c.message}
+                </p>
+              ))}
+              {launch.falabella && (
+                <p className="text-xs text-muted-foreground break-words">
+                  Falabella: {launch.falabella.category ? launch.falabella.category.path : "sin categoría"} · marca {launch.falabella.brand.value}
+                  {launch.falabella.attributes ? ` · atributos ${launch.falabella.attributes.filled} de ${launch.falabella.attributes.total}` : ""}
+                  {launch.falabella.listo ? "" : ` · todavía ${launch.falabella.motivo}`}
+                </p>
+              )}
+              {launch.estimatedMeli.length > 0 && (
+                <p className="text-xs text-amber-500 break-words">Mercado Libre: la IA estimó estos datos obligatorios, revísalos en la ficha: {launch.estimatedMeli.join(", ")}.</p>
+              )}
+              <p className="text-[11px] text-muted-foreground">
+                Lo que la IA estimó (medidas, algunos atributos) queda marcado para revisarlo. Puedes corregirlo desde la <b>Ficha</b> del producto y se envía solo a los canales.
+              </p>
             </div>
           )}
 

@@ -13,6 +13,7 @@ interface ProductInputFormProps {
     content: string;
     sku: string;
     price?: number;
+    stock?: number;
     images: File[];
     bulkFile?: File;
   }) => void;
@@ -25,6 +26,7 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
   const [singleProduct, setSingleProduct] = useState("");
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState("");
+  const [stock, setStock] = useState("");
   const [images, setImages] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -76,6 +78,7 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
         content: singleProduct,
         sku,
         price: price ? parseFloat(price) : undefined,
+        stock: stock !== "" ? Math.max(0, Math.trunc(Number(stock))) : undefined,
         images,
       });
     } else if (bulkFile) {
@@ -110,8 +113,8 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
         </TabsList>
 
         <TabsContent value="single" className="mt-4 md:mt-6 space-y-3 md:space-y-4">
-          {/* SKU + Price row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+          {/* SKU + Price + Stock row */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
             <div className="space-y-1.5 md:space-y-2">
               <Label htmlFor="product-sku" className="text-xs md:text-sm text-[#111111] dark:text-[#F8F8F5] font-medium">
                 SKU <span className="text-red-500">*</span>
@@ -134,6 +137,19 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
                 placeholder="Ej: 1299.99"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
+                className="bg-white dark:bg-[#1A1A1A] border-[#EAEAEA] dark:border-white/20 focus-visible:border-[#FCCB34] focus-visible:ring-[#FCCB34] h-10 md:h-12 text-sm px-4 shadow-sm dark:text-[#F8F8F5]"
+              />
+            </div>
+            <div className="space-y-1.5 md:space-y-2">
+              <Label htmlFor="product-stock" className="text-xs md:text-sm text-[#111111] dark:text-[#F8F8F5] font-medium">Stock</Label>
+              <Input
+                id="product-stock"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="Ej: 20"
+                value={stock}
+                onChange={(e) => setStock(e.target.value)}
                 className="bg-white dark:bg-[#1A1A1A] border-[#EAEAEA] dark:border-white/20 focus-visible:border-[#FCCB34] focus-visible:ring-[#FCCB34] h-10 md:h-12 text-sm px-4 shadow-sm dark:text-[#F8F8F5]"
               />
             </div>

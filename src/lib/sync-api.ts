@@ -190,6 +190,12 @@ export interface FalabellaField {
   required?: boolean;
 }
 
+export interface LaunchReport {
+  channels: { marketplace: string; accounts: number; status: 'encolado' | 'omitido' | 'error'; message: string }[];
+  falabella?: FalabellaPrepReport;
+  estimatedMeli: string[];
+}
+
 export interface FalabellaPrepReport {
   listo: boolean;
   motivo?: string;
@@ -320,6 +326,13 @@ export const syncApi = {
   /** Deja el producto listo para Falabella: categoría, marca, medidas y datos obligatorios. */
   autoPrepareFalabella: (productId: string) =>
     apiRequest<FalabellaPrepReport>(`/ai/products/${productId}/prepare-falabella`, { method: 'POST', body: JSON.stringify({}) }),
+
+  /** Lanza el producto: deja listos los canales (categoría, marca, medidas, atributos, descripción HTML) y lo publica. */
+  launchProduct: (productId: string, marketplaces: string[]) =>
+    apiRequest<LaunchReport>(`/ai/products/${productId}/launch`, {
+      method: 'POST',
+      body: JSON.stringify({ marketplaces }),
+    }),
 
   /** La ficha del producto: lo que se envía a cada canal donde está publicado. */
   getProductSheet: (productId: string) =>
