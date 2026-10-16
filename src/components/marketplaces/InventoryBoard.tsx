@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, Clock, LayoutGrid, List, Pencil, Search } from "lucide-react";
+import { AlertCircle, Clock, FileText, LayoutGrid, List, Pencil, Search } from "lucide-react";
+import { Product } from "@/lib/products-api";
+import { ProductSheetDialog } from "@/components/products/ProductSheetDialog";
 import { ChangeRequest, UserListing } from "@/lib/sync-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -161,6 +163,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
   const [view, setView] = useState<"rows" | "grid">("rows");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<EditableProduct | null>(null);
+  const [sheetFor, setSheetFor] = useState<Product | null>(null);
 
   const rows = useMemo(() => buildRows(listings, pending), [listings, pending]);
   const visible = useMemo(() => {
@@ -264,11 +267,16 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
                   <ChannelChip key={c.listing.id} cell={c} />
                 ))}
               </div>
-              {canEdit && (
-                <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => setEditing(r)}>
-                  <Pencil className="w-3.5 h-3.5" /> Editar
+              <div className="flex gap-2 shrink-0">
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSheetFor({ id: r.productId, name: r.name } as Product)}>
+                  <FileText className="w-3.5 h-3.5" /> Ficha
                 </Button>
-              )}
+                {canEdit && (
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditing(r)}>
+                    <Pencil className="w-3.5 h-3.5" /> Editar
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>
@@ -285,17 +293,16 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
                     <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
                   </div>
                 </div>
-                {canEdit && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8 shrink-0"
-                    onClick={() => setEditing(r)}
-                    aria-label="Editar"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
+                <div className="flex gap-1 shrink-0">
+                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSheetFor({ id: r.productId, name: r.name } as Product)} aria-label="Ficha" title="Ficha: lo que se envía a cada canal">
+                    <FileText className="w-3.5 h-3.5" />
                   </Button>
-                )}
+                  {canEdit && (
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setEditing(r)} aria-label="Editar">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-6 text-sm tabular-nums">
                 <span className="font-semibold">{money(r.price, r.channels[0]?.listing.currency)}</span>
@@ -314,6 +321,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
       )}
 
       <EditInventoryDialog product={editing} reviewMode={reviewMode} onClose={() => setEditing(null)} />
+      <ProductSheetDialog product={sheetFor} onClose={() => setSheetFor(null)} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { Product } from "@/lib/products-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Edit, Trash2, Sparkles, ImageOff, Rocket } from "lucide-react";
+import { Edit, Trash2, Sparkles, ImageOff, Rocket, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ProductCardProps {
@@ -10,9 +10,10 @@ interface ProductCardProps {
   onDelete: (product: Product) => void;
   onRegenerate: (product: Product) => void;
   onPublish: (product: Product) => void;
+  onSheet?: (product: Product) => void;
 }
 
-export function ProductCard({ product, onEdit, onDelete, onRegenerate, onPublish }: ProductCardProps) {
+export function ProductCard({ product, onEdit, onDelete, onRegenerate, onPublish, onSheet }: ProductCardProps) {
   const marketplaces = product.targetMarketplaces ?? [];
 
   return (
@@ -42,6 +43,17 @@ export function ProductCard({ product, onEdit, onDelete, onRegenerate, onPublish
 
           {/* Actions */}
           <div className="flex gap-0.5 shrink-0">
+            {onSheet && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-primary"
+                onClick={() => onSheet(product)}
+                title="Ficha: lo que se envía a cada canal"
+              >
+                <FileText className="w-3.5 h-3.5" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="icon"

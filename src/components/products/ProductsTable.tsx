@@ -2,7 +2,7 @@ import { Product } from "@/lib/products-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Edit, ImageOff, Package, Rocket, Sparkles, Trash2, PackageCheck } from "lucide-react";
+import { Edit, FileText, ImageOff, Package, Rocket, Sparkles, Trash2, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProductCard } from "./ProductCard";
 
@@ -15,6 +15,7 @@ interface ProductsTableProps {
   onRegenerate: (product: Product) => void;
   onPublish: (product: Product) => void;
   onPrepareFalabella: (product: Product) => void;
+  onSheet: (product: Product) => void;
 }
 
 export function ProductsTable({
@@ -26,6 +27,7 @@ export function ProductsTable({
   onRegenerate,
   onPublish,
   onPrepareFalabella,
+  onSheet,
 }: ProductsTableProps) {
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (isLoading) {
@@ -212,6 +214,15 @@ export function ProductsTable({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 hover:text-primary hover:bg-primary/10"
+                        onClick={() => onSheet(product)}
+                        title="Ficha: lo que se envía a cada canal"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 hover:text-primary hover:bg-primary/10"
                         onClick={() => onPublish(product)}
                         title="Publicar en marketplaces"
                       >
@@ -272,6 +283,7 @@ export function ProductsTable({
             onDelete={onDelete}
             onRegenerate={onRegenerate}
             onPublish={onPublish}
+            onSheet={onSheet}
           />
         ))}
       </div>

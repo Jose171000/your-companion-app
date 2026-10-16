@@ -148,6 +148,38 @@ export interface UpdateInventoryDto {
 // Sync API
 // ─────────────────────────────────────────────
 
+/** Un canal donde el producto está publicado, con lo que se le envía. */
+export interface SheetChannel {
+  marketplace: string;
+  connectionId: string;
+  account: string;
+  status: string;
+  lastError: string | null;
+  permalink: string | null;
+  sent: Record<string, any>;
+  listo: boolean;
+  motivo?: string;
+}
+
+export interface SheetData {
+  product: {
+    id: string;
+    sku: string;
+    name: string;
+    description: string;
+    aiTitle: string | null;
+    aiDescription: string | null;
+    descriptionHtml: string | null;
+    brand: string | null;
+    color: string | null;
+    price: number | null;
+    stock: number;
+    images: string[];
+    measures: { width: number | null; length: number | null; height: number | null; weight: number | null; estimated: boolean };
+  };
+  channels: SheetChannel[];
+}
+
 export interface FalabellaField {
   name: string;
   label: string;
@@ -288,6 +320,21 @@ export const syncApi = {
   /** Deja el producto listo para Falabella: categoría, marca, medidas y datos obligatorios. */
   autoPrepareFalabella: (productId: string) =>
     apiRequest<FalabellaPrepReport>(`/ai/products/${productId}/prepare-falabella`, { method: 'POST', body: JSON.stringify({}) }),
+
+  /** La ficha del producto: lo que se envía a cada canal donde está publicado. */
+  getProductSheet: (productId: string) =>
+    apiRequest<SheetData>(`/sync/products/${productId}/sheet`, { method: 'GET' }),
+
+  /** Guarda cambios de la ficha; se envían solos a los canales donde está publicado. */
+  saveProductSheet: (productId: string, cambios: Record<string, any>) =>
+    apiRequest<{ saved: boolean; willUpdate: string[] }>(`/sync/products/${productId}/sheet`, {
+      method: 'PATCH',
+      body: JSON.stringify(cambios),
+    }),
+
+  /** Envía ya el contenido actual a cada canal publicado. */
+  syncProductSheetNow: (productId: string) =>
+    apiRequest<{ results: { marketplace: string; ok: boolean; message: string }[] }>(`/sync/products/${productId}/sheet/sync`, { method: 'POST' }),
 
   /** Pone al día en Falabella una ficha ya publicada (nombre, descripción, marca y atributos). */
   updateFalabellaContent: (productId: string, regenerar = false) =>

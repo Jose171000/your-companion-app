@@ -8,6 +8,7 @@ import { ProductFormDialog } from "./ProductFormDialog";
 import { DeleteProductDialog } from "./DeleteProductDialog";
 import { RegenerateAIDialog } from "./RegenerateAIDialog";
 import { PublishProductDialog } from "./PublishProductDialog";
+import { ProductSheetDialog } from "./ProductSheetDialog";
 import { PrepareFalabellaDialog } from "./PrepareFalabellaDialog";
 import { toast } from "sonner";
 
@@ -28,6 +29,7 @@ export function ProductsModule() {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [regenTarget, setRegenTarget]   = useState<Product | null>(null);
   const [publishTarget, setPublishTarget] = useState<Product | null>(null);
+  const [sheetTarget, setSheetTarget] = useState<Product | null>(null);
   const [falabellaTarget, setFalabellaTarget] = useState<Product | null>(null);
 
   // ── Query ─────────────────────────────────────────────────────────────────
@@ -113,6 +115,7 @@ export function ProductsModule() {
         onRegenerate={(p) => setRegenTarget(p)}
         onPublish={(p) => setPublishTarget(p)}
         onPrepareFalabella={(p) => setFalabellaTarget(p)}
+        onSheet={(p) => setSheetTarget(p)}
       />
 
       {/* Pagination */}
@@ -159,6 +162,8 @@ export function ProductsModule() {
         product={publishTarget}
         onClose={() => setPublishTarget(null)}
       />
+
+      <ProductSheetDialog product={sheetTarget} onClose={() => setSheetTarget(null)} />
     </div>
   );
 }
