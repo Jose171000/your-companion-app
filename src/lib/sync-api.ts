@@ -162,6 +162,8 @@ export interface FalabellaPrepReport {
   brand: { value: string; replaced: boolean; original?: string };
   measures: { width: number | null; length: number | null; height: number | null; weight: number | null; estimated: boolean };
   estimatedAttributes: string[];
+  /** La IA redactó la descripción HTML estándar en este paso. */
+  descriptionGenerated?: boolean;
 }
 
 export interface FalabellaPreparation {

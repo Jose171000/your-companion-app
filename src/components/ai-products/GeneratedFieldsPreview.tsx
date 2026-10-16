@@ -73,7 +73,7 @@ export function GeneratedFieldsPreview({ visible, productData }: GeneratedFields
 
       if (productData.aiAttributes) {
         Object.entries(productData.aiAttributes)
-          .filter(([, val]) => val !== null && typeof val !== "object")
+          .filter(([key, val]) => val !== null && typeof val !== "object" && key !== "descriptionHtml")
           .forEach(([key, val]) => {
           newFields.push({ id: `attr_${key}`, label: key, value: String(val), required: false, type: "text", aiGenerated: true, confidence: "high" });
         });
@@ -136,6 +136,22 @@ export function GeneratedFieldsPreview({ visible, productData }: GeneratedFields
               </p>
             </div>
           </div>
+        </Card>
+      )}
+
+      {/* Descripción HTML estándar (Falabella y otros canales con HTML) */}
+      {productData?.aiAttributes?.descriptionHtml && (
+        <Card className="p-3 md:p-4">
+          <p className="text-sm font-medium mb-2">Descripción HTML (Falabella y canales que aceptan HTML)</p>
+          <iframe
+            title="Vista previa de la descripción HTML"
+            sandbox=""
+            srcDoc={productData.aiAttributes.descriptionHtml}
+            className="w-full h-96 rounded-lg border border-border bg-white"
+          />
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Usa tus GIFs si los pasaste en la descripción; si no, las fotos del producto.
+          </p>
         </Card>
       )}
 

@@ -74,7 +74,7 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
     });
     // Lo que la IA ya completó se muestra, para revisarlo en vez de escribirlo de nuevo.
     const previos = (product.aiAttributes as any) || {};
-    setAtributos(Object.fromEntries(Object.entries(previos).filter(([, v]) => typeof v === "string")) as Record<string, string>);
+    setAtributos(Object.fromEntries(Object.entries(previos).filter(([k, v]) => typeof v === "string" && k !== "descriptionHtml")) as Record<string, string>);
     setMarca(previos.brand || "GENERICO");
     setBusqueda("");
   }, [open, product]);

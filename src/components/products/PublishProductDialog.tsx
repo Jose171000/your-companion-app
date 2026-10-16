@@ -261,6 +261,12 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
                     </p>
                   </div>
 
+                  {prep.descriptionGenerated && (
+                    <p className="text-[11px] text-muted-foreground break-words">
+                      La IA redactó la descripción con el formato HTML estándar (con tus GIFs o las fotos del producto).
+                    </p>
+                  )}
+
                   {prep.estimatedAttributes.length > 0 && (
                     <p className="text-[11px] text-amber-500 break-words">
                       Datos estimados por la IA: {prep.estimatedAttributes.join(", ")}. Revísalos antes de publicar.
