@@ -43,6 +43,19 @@ export function AIProductsModule() {
         return;
       }
       setLaunch(res.data);
+      // El servidor eligió categoría, marca y medidas al preparar Falabella: la tarjeta de medidas debe verlos.
+      const f = res.data.falabella;
+      if (f) {
+        setGeneratedProduct((p: any) => ({
+          ...p,
+          marketplaceIds: { ...(p?.marketplaceIds ?? {}), ...(f.category ? { falabella_category_id: f.category.id } : {}) },
+          packageWidth: f.measures.width,
+          packageLength: f.measures.length,
+          packageHeight: f.measures.height,
+          packageWeight: f.measures.weight,
+          aiAttributes: { ...(p?.aiAttributes ?? {}), brand: f.brand.value, estimated: { ...(p?.aiAttributes?.estimated ?? {}), measures: f.measures.estimated } },
+        }));
+      }
       res.data.channels.forEach((c) =>
         c.status === "error" ? toast.error(c.message) : c.status === "omitido" ? toast.info(c.message) : toast.success(c.message),
       );
