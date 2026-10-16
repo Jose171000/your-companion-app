@@ -118,7 +118,9 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
     onError: () => toast.error("Error al guardar los datos de Falabella"),
   });
 
-  const faltanCampos = campos.filter((c) => !atributos[c.name]?.trim());
+  const obligatorios = campos.filter((c) => c.required !== false);
+  const recomendados = campos.filter((c) => c.required === false);
+  const faltanCampos = obligatorios.filter((c) => !atributos[c.name]?.trim());
   const medidasCompletas =
     Number(medidas.ancho) > 0 &&
     Number(medidas.largo) > 0 &&
@@ -246,7 +248,7 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
                 <Label>Datos que pide esta categoría</Label>
                 {!cargandoCampos && (
                   <Badge variant="outline" className="text-[10px]">
-                    {campos.length === 0 ? "ninguno" : campos.length}
+                    {campos.length === 0 ? "ninguno" : `${obligatorios.length} obligatorios · ${recomendados.length} recomendados`}
                   </Badge>
                 )}
               </div>
@@ -259,11 +261,17 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {campos.map((campo) => (
+                  {[...obligatorios, ...recomendados].map((campo) => (
                     <div key={campo.name} className="space-y-1">
                       <Label htmlFor={`fb-attr-${campo.name}`} className="text-xs">
                         {campo.label}
+                        {campo.required === false ? (
+                          <span className="ml-1 text-[10px] text-muted-foreground font-normal">recomendado: sube la calidad</span>
+                        ) : (
+                          <span className="ml-1 text-[10px] text-destructive font-normal">obligatorio</span>
+                        )}
                       </Label>
+                      {campo.description && <p className="text-[11px] text-muted-foreground break-words">{campo.description}</p>}
                       {campo.options.length > 0 ? (
                         <Select
                           value={atributos[campo.name] ?? ""}

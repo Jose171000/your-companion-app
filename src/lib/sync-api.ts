@@ -151,8 +151,11 @@ export interface UpdateInventoryDto {
 export interface FalabellaField {
   name: string;
   label: string;
+  description?: string;
   inputType: string;
   options: string[];
+  /** Obligatorio. Los demás son opcionales pero suben la calidad del contenido en Falabella. */
+  required?: boolean;
 }
 
 export interface FalabellaPrepReport {
@@ -164,6 +167,8 @@ export interface FalabellaPrepReport {
   estimatedAttributes: string[];
   /** La IA redactó la descripción HTML estándar en este paso. */
   descriptionGenerated?: boolean;
+  /** Atributos de la categoría con valor, de cuántos hay. */
+  attributes?: { filled: number; total: number };
 }
 
 export interface FalabellaPreparation {
@@ -283,6 +288,13 @@ export const syncApi = {
   /** Deja el producto listo para Falabella: categoría, marca, medidas y datos obligatorios. */
   autoPrepareFalabella: (productId: string) =>
     apiRequest<FalabellaPrepReport>(`/ai/products/${productId}/prepare-falabella`, { method: 'POST', body: JSON.stringify({}) }),
+
+  /** Pone al día en Falabella una ficha ya publicada (nombre, descripción, marca y atributos). */
+  updateFalabellaContent: (productId: string, regenerar = false) =>
+    apiRequest<{ message: string; report: FalabellaPrepReport }>(`/ai/products/${productId}/update-falabella`, {
+      method: 'POST',
+      body: JSON.stringify({ regenerar }),
+    }),
 
   /** Datos obligatorios que hay que pedirle a la persona para esa categoría. */
   getFalabellaCategoryFields: (categoryId: string) =>

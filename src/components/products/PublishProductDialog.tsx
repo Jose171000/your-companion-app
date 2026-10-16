@@ -113,6 +113,23 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
     onError: () => toast.error("Error al conectar con el servidor"),
   });
 
+  // Cambiar datos de una ficha que ya está en Falabella (nombre, descripción, atributos…).
+  const [regenerar, setRegenerar] = useState(false);
+  const actualizarFalabella = useMutation({
+    mutationFn: () => syncApi.updateFalabellaContent(product!.id, regenerar),
+    onSuccess: (res) => {
+      if (res.error || !res.data) {
+        toast.error(res.error ?? "No se pudo actualizar la ficha en Falabella");
+        return;
+      }
+      const a = res.data.report.attributes;
+      toast.success(`${res.data.message}${a ? ` Atributos con valor: ${a.filled} de ${a.total}.` : ""}`);
+      setRegenerar(false);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
+
   const toggle = (id: string) =>
     setSelected((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
@@ -261,6 +278,12 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
                     </p>
                   </div>
 
+                  {prep.attributes && prep.attributes.total > 0 && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Atributos de la categoría con valor: <b>{prep.attributes.filled}</b> de {prep.attributes.total} (más atributos = mejor calidad de la ficha).
+                    </p>
+                  )}
+
                   {prep.descriptionGenerated && (
                     <p className="text-[11px] text-muted-foreground break-words">
                       La IA redactó la descripción con el formato HTML estándar (con tus GIFs o las fotos del producto).
@@ -280,6 +303,23 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
                   </Button>
                 </>
               ) : null}
+            </div>
+          )}
+
+          {falabellaPublicado && (
+            <div className="rounded-xl border border-border p-3 space-y-2 min-w-0">
+              <p className="text-sm font-medium">Actualizar la ficha en Falabella</p>
+              <p className="text-xs text-muted-foreground">
+                Envía a Falabella el nombre, la descripción, la marca y todos los atributos actuales del producto. La IA completa los que falten.
+              </p>
+              <label className="flex items-start gap-2 text-xs cursor-pointer">
+                <input type="checkbox" className="mt-0.5" checked={regenerar} onChange={(e) => setRegenerar(e.target.checked)} />
+                <span>Volver a redactar el nombre y la descripción con la IA (úsalo si cambiaste el texto del producto)</span>
+              </label>
+              <Button size="sm" variant="outline" onClick={() => actualizarFalabella.mutate()} disabled={actualizarFalabella.isPending}>
+                {actualizarFalabella.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Rocket className="w-3.5 h-3.5 mr-2" />}
+                Actualizar en Falabella
+              </Button>
             </div>
           )}
 
