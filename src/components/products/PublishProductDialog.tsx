@@ -89,8 +89,18 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
     connections.some((c) => c.marketplace === marketplace && c.status === "active");
 
   // ── Publicar ───────────────────────────────────────────────────────────────
+  // Lo que ya está publicado no se vuelve a enviar: Falabella rechazaría el SKU repetido.
+  const publicados = new Set(listings.filter((l) => l.syncStatus === "published").map((l) => l.marketplace));
+  const porPublicar = selected.filter((id) => !publicados.has(id));
+
+  // Al publicarse un canal sale de la selección.
+  useEffect(() => {
+    setSelected((prev) => (prev.some((id) => publicados.has(id)) ? prev.filter((id) => !publicados.has(id)) : prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listings]);
+
   const publishMutation = useMutation({
-    mutationFn: () => syncApi.publish(product!.id, selected),
+    mutationFn: () => syncApi.publish(product!.id, porPublicar),
     onSuccess: (res) => {
       if (res.error) {
         toast.error(res.error);
@@ -118,10 +128,10 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
   }, [open, falabellaElegido, falabellaPublicado, product?.id, version, connections.length]);
 
   const canPublish =
-    selected.length > 0 &&
+    porPublicar.length > 0 &&
     !missingPrice &&
-    selected.every((mp) => isConnected(mp)) &&
-    (!falabellaElegido || falabellaPublicado || !!prep?.listo) &&
+    porPublicar.every((mp) => isConnected(mp)) &&
+    (!porPublicar.includes("falabella") || !!prep?.listo) &&
     !publishMutation.isPending;
 
   return (
@@ -285,7 +295,7 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
             ) : (
               <Rocket className="w-4 h-4 mr-2" />
             )}
-            Publicar
+            {porPublicar.length === 0 && publicados.size > 0 ? "Ya publicado" : "Publicar"}
           </Button>
         </DialogFooter>
       </DialogContent>
