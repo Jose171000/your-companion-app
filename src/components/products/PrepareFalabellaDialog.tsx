@@ -95,6 +95,27 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
 
   const campos = camposResult?.data ?? [];
 
+  // Al elegir (o cambiar) la categoría, la IA llena todos los atributos que se puedan sacar del producto.
+  const sugerir = useMutation({
+    mutationFn: (categoryId: string) => syncApi.suggestFalabellaAttributes(product!.id, categoryId),
+    onSuccess: (res) => {
+      if (res.error || !res.data) {
+        toast.error(res.error ?? "No se pudieron sugerir los datos de la categoría");
+        return;
+      }
+      // Lo que la persona ya escribió tiene prioridad sobre lo que sugiere la IA.
+      setAtributos((previos) => ({
+        ...res.data!.values,
+        ...Object.fromEntries(Object.entries(previos).filter(([, v]) => v?.trim())),
+      }));
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
+  useEffect(() => {
+    if (open && product && categoria?.id) sugerir.mutate(categoria.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, product?.id, categoria?.id]);
+
   const guardar = useMutation({
     mutationFn: () =>
       syncApi.prepareFalabella(product!.id, {
@@ -252,6 +273,17 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
                   </Badge>
                 )}
               </div>
+
+              {sugerir.isPending && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> La IA está completando los datos con lo que sabe del producto…
+                </p>
+              )}
+              {sugerir.data?.data && !sugerir.isPending && (
+                <p className="text-[11px] text-muted-foreground">
+                  La IA completó {sugerir.data.data.filled} de {sugerir.data.data.total} datos. Revisa los que quedaron vacíos: son los que no se pueden deducir del producto (por ejemplo, garantías o certificaciones).
+                </p>
+              )}
 
               {cargandoCampos ? (
                 <Skeleton className="h-10 w-full" />

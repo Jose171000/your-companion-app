@@ -327,6 +327,13 @@ export const syncApi = {
   autoPrepareFalabella: (productId: string) =>
     apiRequest<FalabellaPrepReport>(`/ai/products/${productId}/prepare-falabella`, { method: 'POST', body: JSON.stringify({}) }),
 
+  /** Valores sugeridos para todos los atributos de una categoría de Falabella (no guarda nada). */
+  suggestFalabellaAttributes: (productId: string, categoryId: string) =>
+    apiRequest<{ values: Record<string, string>; estimated: string[]; filled: number; total: number }>(
+      `/ai/products/${productId}/suggest-falabella-attributes`,
+      { method: 'POST', body: JSON.stringify({ categoryId }) },
+    ),
+
   /** Lanza el producto: deja listos los canales (categoría, marca, medidas, atributos, descripción HTML) y lo publica. */
   launchProduct: (productId: string, marketplaces: string[]) =>
     apiRequest<LaunchReport>(`/ai/products/${productId}/launch`, {
