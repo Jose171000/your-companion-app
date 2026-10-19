@@ -13,7 +13,14 @@ import { bulkUploadApi } from "@/lib/bulk-upload-api";
 import { toast } from "sonner";
 import { useFormDraft } from "@/contexts/FormDraftContext";
 
-export function AIProductsModule() {
+interface AIProductsModuleProps {
+  /** Dentro de una ventana: sin la tarjeta de bienvenida. */
+  compact?: boolean;
+  /** Se llama cuando el producto ya se creó y cuando termina el lanzamiento, para refrescar listados. */
+  onCreated?: () => void;
+}
+
+export function AIProductsModule({ compact = false, onCreated }: AIProductsModuleProps = {}) {
   const [selectedMarketplaces, setSelectedMarketplaces] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -25,9 +32,11 @@ export function AIProductsModule() {
 
   // Report dirty state whenever the user configures anything
   useEffect(() => {
+    // En la ventana de Nuevo producto no se avisa al cambiar de sección: la ventana se cierra sola.
+    if (compact) return;
     const dirty = selectedMarketplaces.length > 0 || selectedCategory !== "";
     setDirty("ai-products", dirty);
-  }, [selectedMarketplaces, selectedCategory, setDirty]);
+  }, [selectedMarketplaces, selectedCategory, setDirty, compact]);
   /** Prepara cada canal (categoría, marca, medidas, atributos, descripción HTML) y publica el producto. */
   const lanzar = async (productId: string) => {
     const canales = selectedMarketplaces.filter((m) => ["mercadolibre", "falabella"].includes(m));
@@ -43,6 +52,7 @@ export function AIProductsModule() {
         return;
       }
       setLaunch(res.data);
+      onCreated?.();
       // El servidor eligió categoría, marca y medidas al preparar Falabella: la tarjeta de medidas debe verlos.
       const f = res.data.falabella;
       if (f) {
@@ -108,6 +118,7 @@ export function AIProductsModule() {
           setGeneratedProduct(response.data);
           setLaunch(null);
           setDirty("ai-products", false);
+          onCreated?.();
           toast.success("Contenido generado. Preparando y publicando en tus canales…");
           // Sin pasos intermedios: se deja listo cada canal y se publica.
           if (response.data?.id) await lanzar(response.data.id);
@@ -141,37 +152,40 @@ export function AIProductsModule() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 md:space-y-8">
-      {/* Hero Section */}
-      <Card className="p-4 md:p-8 bg-white dark:bg-[#111111] shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:shadow-none border border-[#EAEAEA] dark:border-white/20 overflow-hidden relative rounded-[20px] transition-colors duration-200">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-[#FCCB34] opacity-5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
-
-        <div className="relative flex flex-col sm:flex-row items-start gap-4 md:gap-6">
-          <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-[#FCCB34] shadow-[0_8px_16px_rgba(252,203,52,0.3)] flex items-center justify-center shrink-0">
-            <Sparkles className="w-6 h-6 md:w-8 md:h-8 text-[#111111]" />
-          </div>
-
-          <div>
-            <h2 className="text-xl md:text-2xl font-bold text-[#111111] dark:text-[#F8F8F5]">Optimiza tus productos con IA</h2>
-            <p className="text-sm md:text-base text-[#666666] dark:text-[#A1A1AA] mt-2 max-w-xl leading-relaxed">
-              Ingresa información básica de tus productos y nuestra IA generará
-              automáticamente títulos optimizados, descripciones atractivas y
-              todos los campos necesarios para cada marketplace.
-            </p>
-
-            <div className="flex flex-wrap gap-2 md:gap-3 mt-4">
-              <span className="text-[10px] md:text-xs px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-[#FFF1B8] dark:bg-[#FCCB34]/20 text-[#111111] dark:text-[#FCCB34] font-semibold border border-[#FCCB34]/30 dark:border-[#FCCB34]/20 shadow-sm">
-                ✨ Títulos SEO optimizados
-              </span>
-              <span className="text-[10px] md:text-xs px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-[#F8F8F5] dark:bg-[#1A1A1A] text-[#111111] dark:text-[#F8F8F5] font-medium border border-[#EAEAEA] dark:border-white/20 shadow-sm">
-                📝 Descripciones que venden
-              </span>
-              <span className="text-[10px] md:text-xs px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white dark:bg-[#222222] text-[#111111] dark:text-[#F8F8F5] font-medium border border-[#EAEAEA] dark:border-white/20 shadow-sm">
-                🏷️ Atributos automáticos
-              </span>
+      {/* Hero Section: solo en la página, no dentro de la ventana de Nuevo producto */}
+      {!compact && (
+        <Card className="p-4 md:p-8 bg-white dark:bg-[#111111] shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:shadow-none border border-[#EAEAEA] dark:border-white/20 overflow-hidden relative rounded-[20px] transition-colors duration-200">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-[#FCCB34] opacity-5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2" />
+  
+          <div className="relative flex flex-col sm:flex-row items-start gap-4 md:gap-6">
+            <div className="w-12 h-12 md:w-16 md:h-16 rounded-xl md:rounded-2xl bg-[#FCCB34] shadow-[0_8px_16px_rgba(252,203,52,0.3)] flex items-center justify-center shrink-0">
+              <Sparkles className="w-6 h-6 md:w-8 md:h-8 text-[#111111]" />
+            </div>
+  
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-[#111111] dark:text-[#F8F8F5]">Optimiza tus productos con IA</h2>
+              <p className="text-sm md:text-base text-[#666666] dark:text-[#A1A1AA] mt-2 max-w-xl leading-relaxed">
+                Ingresa información básica de tus productos y nuestra IA generará
+                automáticamente títulos optimizados, descripciones atractivas y
+                todos los campos necesarios para cada marketplace.
+              </p>
+  
+              <div className="flex flex-wrap gap-2 md:gap-3 mt-4">
+                <span className="text-[10px] md:text-xs px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-[#FFF1B8] dark:bg-[#FCCB34]/20 text-[#111111] dark:text-[#FCCB34] font-semibold border border-[#FCCB34]/30 dark:border-[#FCCB34]/20 shadow-sm">
+                  ✨ Títulos SEO optimizados
+                </span>
+                <span className="text-[10px] md:text-xs px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-[#F8F8F5] dark:bg-[#1A1A1A] text-[#111111] dark:text-[#F8F8F5] font-medium border border-[#EAEAEA] dark:border-white/20 shadow-sm">
+                  📝 Descripciones que venden
+                </span>
+                <span className="text-[10px] md:text-xs px-2 md:px-3 py-1 md:py-1.5 rounded-full bg-white dark:bg-[#222222] text-[#111111] dark:text-[#F8F8F5] font-medium border border-[#EAEAEA] dark:border-white/20 shadow-sm">
+                  🏷️ Atributos automáticos
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+  
+      )}
 
       {/* Step 1: Marketplaces */}
       <Card className="p-4 md:p-6 bg-white dark:bg-[#111111] shadow-sm border border-[#EAEAEA] dark:border-white/20 rounded-[16px] transition-colors duration-200">

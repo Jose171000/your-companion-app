@@ -5,6 +5,7 @@ import { ProductsToolbar } from "./ProductsToolbar";
 import { ProductsTable } from "./ProductsTable";
 import { ProductsPagination } from "./ProductsPagination";
 import { ProductFormDialog } from "./ProductFormDialog";
+import { NewProductDialog } from "./NewProductDialog";
 import { DeleteProductDialog } from "./DeleteProductDialog";
 import { RegenerateAIDialog } from "./RegenerateAIDialog";
 import { PublishProductDialog } from "./PublishProductDialog";
@@ -70,7 +71,9 @@ export function ProductsModule() {
   const handleMarketplaceChange = (v: string) => { setMarketplace(v); setPage(1); };
   const handleInStockChange = (v: boolean) => { setInStock(v); setPage(1); };
 
-  const openCreate = () => { setFormProduct(undefined); setFormOpen(true); };
+  // «Nuevo producto» usa el mismo flujo de IA Productos; la ventana de edición se queda para cambiar un producto existente.
+  const [newOpen, setNewOpen] = useState(false);
+  const openCreate = () => setNewOpen(true);
   const openEdit   = (p: Product) => { setFormProduct(p); setFormOpen(true); };
   const closeForm  = () => setFormOpen(false);
 
@@ -128,7 +131,9 @@ export function ProductsModule() {
         />
       )}
 
-      {/* Create / Edit dialog */}
+      <NewProductDialog open={newOpen} onClose={() => setNewOpen(false)} />
+
+      {/* Edit dialog */}
       <ProductFormDialog
         open={formOpen}
         product={formProduct}
