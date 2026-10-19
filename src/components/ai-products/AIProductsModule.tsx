@@ -6,6 +6,8 @@ import { ProductInputForm } from "./ProductInputForm";
 import { GeneratedFieldsPreview } from "./GeneratedFieldsPreview";
 import { ExportActions } from "./ExportActions";
 import { PackageReview } from "./PackageReview";
+import { LaunchStatus } from "./LaunchStatus";
+import { Button } from "@/components/ui/button";
 import { syncApi, LaunchReport } from "@/lib/sync-api";
 import { Loader2, Sparkles } from "lucide-react";
 import { productsApi } from "@/lib/products-api";
@@ -28,6 +30,8 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
   const [generatedProduct, setGeneratedProduct] = useState<any>(null);
   const [launch, setLaunch] = useState<LaunchReport | null>(null);
   const [launching, setLaunching] = useState(false);
+  // Al cambiar, el formulario se vacía: queda listo para el siguiente producto.
+  const [formKey, setFormKey] = useState(0);
   const { setDirty } = useFormDraft();
 
   // Report dirty state whenever the user configures anything
@@ -117,6 +121,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
           setHasGeneratedContent(true);
           setGeneratedProduct(response.data);
           setLaunch(null);
+          setFormKey((k) => k + 1);
           setDirty("ai-products", false);
           onCreated?.();
           toast.success("Contenido generado. Preparando y publicando en tus canales…");
@@ -210,6 +215,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
           <span className="font-semibold text-[#111111] dark:text-[#F8F8F5] text-sm md:text-base tracking-tight">Ingresa la información del producto</span>
         </div>
         <ProductInputForm
+          key={formKey}
           onSubmit={handleSubmit}
           isProcessing={isProcessing}
           isFormReady={selectedMarketplaces.length > 0}
@@ -266,11 +272,26 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
               {launch.estimatedMeli.length > 0 && (
                 <p className="text-xs text-amber-500 break-words">Mercado Libre: la IA estimó estos datos obligatorios, revísalos en la ficha: {launch.estimatedMeli.join(", ")}.</p>
               )}
+              {generatedProduct?.id && <LaunchStatus productId={generatedProduct.id} />}
               <p className="text-[11px] text-muted-foreground">
                 Lo que la IA estimó (medidas, algunos atributos) queda marcado para revisarlo. Puedes corregirlo desde la <b>Ficha</b> del producto y se envía solo a los canales.
               </p>
             </div>
           )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Button
+              onClick={() => {
+                setHasGeneratedContent(false);
+                setGeneratedProduct(null);
+                setLaunch(null);
+                setFormKey((k) => k + 1);
+              }}
+            >
+              Crear otro producto
+            </Button>
+            <span className="text-xs text-muted-foreground">El formulario ya está vacío. Este producto sigue en proceso y lo ves en Productos o Marketplaces.</span>
+          </div>
 
           <Separator className="my-6 md:my-8" />
 
