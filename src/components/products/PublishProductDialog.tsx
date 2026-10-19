@@ -92,6 +92,9 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
   // Lo que ya está publicado no se vuelve a enviar: Falabella rechazaría el SKU repetido.
   const publicados = new Set(listings.filter((l) => l.syncStatus === "published").map((l) => l.marketplace));
   const porPublicar = selected.filter((id) => !publicados.has(id));
+  // Un canal que todavía procesa el envío anterior no recibe otro: se espera a que termine.
+  const enProceso = new Set(listings.filter((l) => l.syncStatus === "pending").map((l) => l.marketplace));
+  const enviando = porPublicar.length > 0 && porPublicar.every((mp) => enProceso.has(mp));
 
   // Al publicarse un canal sale de la selección.
   useEffect(() => {
@@ -146,6 +149,7 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
 
   const canPublish =
     porPublicar.length > 0 &&
+    !enviando &&
     !missingPrice &&
     porPublicar.every((mp) => isConnected(mp)) &&
     (!porPublicar.includes("falabella") || !!prep?.listo) &&
@@ -341,7 +345,7 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
             ) : (
               <Rocket className="w-4 h-4 mr-2" />
             )}
-            {porPublicar.length === 0 && publicados.size > 0 ? "Ya publicado" : "Publicar"}
+            {enviando ? "Publicando…" : porPublicar.length === 0 && publicados.size > 0 ? "Ya publicado" : "Publicar"}
           </Button>
         </DialogFooter>
       </DialogContent>
