@@ -131,6 +131,13 @@ async function apiDownload(
   if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
+  // La plantilla de carga masiva depende de la tienda activa (sus canales conectados).
+  if (endpoint.startsWith('/bulk-upload/')) {
+    try {
+      const storeId = localStorage.getItem('active_store_id');
+      if (storeId) (headers as Record<string, string>)['X-Store-Id'] = storeId;
+    } catch { /* sin almacenamiento: el servidor usa la tienda por defecto */ }
+  }
 
   const response = await fetch(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
     ...options,

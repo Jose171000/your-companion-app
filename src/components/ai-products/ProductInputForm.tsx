@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, FileSpreadsheet, Sparkles, Loader2, X, ImagePlus, Download, FileArchive } from "lucide-react";
 import { bulkUploadApi } from "@/lib/bulk-upload-api";
+import { useStores } from "@/contexts/StoreContext";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface ProductInputFormProps {
@@ -24,6 +26,7 @@ interface ProductInputFormProps {
 }
 
 export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }: ProductInputFormProps) {
+  const { activeStore } = useStores();
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [singleProduct, setSingleProduct] = useState("");
   const [sku, setSku] = useState("");
@@ -301,9 +304,9 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={() => bulkUploadApi.downloadProductTemplate()}>
+            <Button type="button" variant="outline" size="sm" onClick={() => bulkUploadApi.downloadProductTemplate(activeStore?.name).catch((e) => toast.error(e.message))}>
               <Download className="w-4 h-4 mr-2" />
-              Descargar plantilla
+              Descargar plantilla{activeStore ? ` de ${activeStore.name}` : ""}
             </Button>
             <input type="file" accept=".zip" onChange={handleZipChange} className="hidden" id="bulk-zip" />
             <Button type="button" variant="outline" size="sm" asChild>

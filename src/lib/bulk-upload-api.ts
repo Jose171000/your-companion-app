@@ -28,7 +28,10 @@ export interface BulkUploadStatus {
 
 export const bulkUploadApi = {
   /** Plantilla de Excel para la creación masiva de productos. */
-  downloadProductTemplate: () => apiDownload('/bulk-upload/products/template', 'plantilla-productos.xlsx'),
+  downloadProductTemplate: (storeName = '') => {
+    const tienda = storeName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
+    return apiDownload('/bulk-upload/products/template', `plantilla-productos${tienda ? `-${tienda}` : ''}.xlsx`);
+  },
 
   /**
    * Carga masiva de productos via Excel + ZIP opcional de imágenes.
