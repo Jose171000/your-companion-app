@@ -37,10 +37,12 @@ export const bulkUploadApi = {
    * Carga masiva de productos via Excel + ZIP opcional de imágenes.
    * Columnas Excel: sku | precio | stock | fotos | nombre | descripcion | canales (solo JPG)
    */
-  uploadProducts: (excelFile: File, zipFile?: File) => {
+  uploadProducts: (excelFile: File, zipFile?: File, canales: string[] = []) => {
     const form = new FormData();
     form.append('excel', excelFile);
     if (zipFile) form.append('zip', zipFile);
+    // Canales marcados en pantalla: valen para las filas sin columna `canales`.
+    if (canales.length) form.append('canales', canales.join(','));
     return apiRequestMultipart<BulkUploadResponse>('/bulk-upload/products', form);
   },
 

@@ -327,7 +327,7 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
             <p className="text-xs md:text-sm">
               <strong>Fotos sin enlaces:</strong> pon las fotos JPG en un ZIP. En la columna <em>fotos</em> escribe sus
               rutas separadas por coma, o déjala vacía y nómbralas con el SKU (MK-001.jpg, MK-001-2.jpg) o ponlas en una
-              carpeta con el SKU. La IA completa lo demás.
+              carpeta con el SKU. La IA completa lo demás. Los canales marcados arriba se aplican a las filas que no traen su propia columna <em>canales</em>.
             </p>
           </div>
         </TabsContent>

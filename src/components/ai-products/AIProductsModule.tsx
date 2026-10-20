@@ -96,7 +96,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
           toast.error("No se encontró el archivo Excel.");
           return;
         }
-        const response = await bulkUploadApi.uploadProducts(data.bulkFile, data.zipFile);
+        const response = await bulkUploadApi.uploadProducts(data.bulkFile, data.zipFile, selectedMarketplaces);
         if (response.error) {
           toast.error(response.error);
         } else {
