@@ -201,7 +201,9 @@ export interface LaunchReport {
 export interface FalabellaPrepReport {
   listo: boolean;
   motivo?: string;
-  category: { id: string; path: string; auto: boolean } | null;
+  category: { id: string; path: string; auto: boolean; /** alta: verificada; baja: conviene revisarla; manual: la eligió una persona */ confidence?: 'alta' | 'baja' | 'manual' } | null;
+  /** Por qué la categoría necesita revisión, si la necesita. */
+  categoryNote?: string;
   brand: { value: string; replaced: boolean; original?: string };
   measures: { width: number | null; length: number | null; height: number | null; weight: number | null; estimated: boolean };
   estimatedAttributes: string[];

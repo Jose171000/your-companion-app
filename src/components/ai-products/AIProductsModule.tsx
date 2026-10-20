@@ -274,6 +274,13 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
                   {launch.falabella.listo ? "" : ` · todavía ${launch.falabella.motivo}`}
                 </p>
               )}
+              {launch.falabella?.categoryNote && (
+                <p className="text-xs text-amber-500 break-words">
+                  {launch.falabella.category
+                    ? `Revisa la categoría de Falabella: ${launch.falabella.categoryNote}. Puedes cambiarla desde Publicar → Preparar para Falabella.`
+                    : `Falabella: no se encontró una categoría segura (${launch.falabella.categoryNote}). No se publicó para evitar una categoría equivocada: elígela desde Publicar → Preparar para Falabella.`}
+                </p>
+              )}
               {launch.estimatedMeli.length > 0 && (
                 <p className="text-xs text-amber-500 break-words">Mercado Libre: la IA estimó estos datos obligatorios, revísalos en la ficha: {launch.estimatedMeli.join(", ")}.</p>
               )}

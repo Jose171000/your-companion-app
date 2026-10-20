@@ -281,6 +281,12 @@ export function ProductSheetDialog({ product, onClose }: { product: Product | nu
                 <div className="rounded-lg border border-border p-3 space-y-1 text-sm break-words">
                   <p><span className="text-muted-foreground">Nombre que se envía:</span> {fal.sent.name}</p>
                   <p><span className="text-muted-foreground">Categoría:</span> {fal.sent.categoryPath ?? fal.sent.categoryId ?? "sin asignar"}</p>
+                  {fal.sent.categoryReview && (
+                    <p className="text-xs text-amber-500 flex gap-1.5">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <span>Revisa la categoría: {String(fal.sent.categoryReview)}. Si es correcta, ignora este aviso; para cambiarla usa Publicar → Preparar para Falabella.</span>
+                    </p>
+                  )}
                   <p><span className="text-muted-foreground">Marca:</span> {fal.sent.brand}</p>
                   <p><span className="text-muted-foreground">Descripción:</span> {fal.sent.isHtml ? "HTML estándar de la agencia" : "texto plano"}</p>
                 </div>
