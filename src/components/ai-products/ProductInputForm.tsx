@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, FileSpreadsheet, Sparkles, Loader2, X, ImagePlus } from "lucide-react";
+import { Upload, FileSpreadsheet, Sparkles, Loader2, X, ImagePlus, Download, FileArchive } from "lucide-react";
+import { bulkUploadApi } from "@/lib/bulk-upload-api";
 import { cn } from "@/lib/utils";
 
 interface ProductInputFormProps {
@@ -16,6 +17,7 @@ interface ProductInputFormProps {
     stock?: number;
     images: File[];
     bulkFile?: File;
+    zipFile?: File;
   }) => void;
   isProcessing: boolean;
   isFormReady?: boolean;
@@ -31,6 +33,7 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
   const [previews, setPreviews] = useState<string[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
   const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [zipFile, setZipFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addImages = useCallback((newFiles: File[]) => {
@@ -64,6 +67,11 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
     if (file) setBulkFile(file);
   };
 
+  const handleZipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) setZipFile(file);
+  };
+
   const handleImageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files ?? []);
     addImages(files);
@@ -82,7 +90,7 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
         images,
       });
     } else if (bulkFile) {
-      onSubmit({ mode: "bulk", content: bulkFile.name, sku: "", price: undefined, images: [], bulkFile });
+      onSubmit({ mode: "bulk", content: bulkFile.name, sku: "", price: undefined, images: [], bulkFile, zipFile: zipFile ?? undefined });
     }
   };
 
@@ -283,20 +291,40 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
                 </>
               ) : (
                 <>
-                  <p className="font-medium text-sm md:text-base">Sube tu archivo CSV o Excel</p>
+                  <p className="font-medium text-sm md:text-base">Sube tu archivo Excel</p>
                   <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                    Incluye las columnas: nombre, descripción, SKU, precio
+                    Columnas: sku, precio, stock, fotos (nombre y descripción son opcionales)
                   </p>
                 </>
               )}
             </label>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => bulkUploadApi.downloadProductTemplate()}>
+              <Download className="w-4 h-4 mr-2" />
+              Descargar plantilla
+            </Button>
+            <input type="file" accept=".zip" onChange={handleZipChange} className="hidden" id="bulk-zip" />
+            <Button type="button" variant="outline" size="sm" asChild>
+              <label htmlFor="bulk-zip" className="cursor-pointer">
+                <FileArchive className="w-4 h-4 mr-2" />
+                {zipFile ? zipFile.name : "Subir ZIP con las fotos (JPG)"}
+              </label>
+            </Button>
+            {zipFile && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setZipFile(null)}>
+                <X className="w-4 h-4" />
+              </Button>
+            )}
+          </div>
+
           <div className="flex items-start gap-2 p-3 md:p-4 rounded-xl bg-accent/10 border border-accent/20">
             <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-accent shrink-0 mt-0.5" />
             <p className="text-xs md:text-sm">
-              <strong>Pro tip:</strong> Puedes incluir información parcial, la IA
-              completará los campos faltantes.
+              <strong>Fotos sin enlaces:</strong> pon las fotos JPG en un ZIP. En la columna <em>fotos</em> escribe sus
+              rutas separadas por coma, o déjala vacía y nómbralas con el SKU (MK-001.jpg, MK-001-2.jpg) o ponlas en una
+              carpeta con el SKU. La IA completa lo demás.
             </p>
           </div>
         </TabsContent>

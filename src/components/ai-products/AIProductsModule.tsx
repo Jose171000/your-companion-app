@@ -86,6 +86,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
     stock?: number;
     images: File[];
     bulkFile?: File;
+    zipFile?: File;
   }) => {
     setIsProcessing(true);
     try {
@@ -95,11 +96,15 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
           toast.error("No se encontró el archivo Excel.");
           return;
         }
-        const response = await bulkUploadApi.uploadProducts(data.bulkFile);
+        const response = await bulkUploadApi.uploadProducts(data.bulkFile, data.zipFile);
         if (response.error) {
           toast.error(response.error);
         } else {
+          const rechazos = response.data?.rejectedDetails ?? [];
           toast.success(response.data?.message ?? "Productos encolados correctamente");
+          if (rechazos.length) {
+            toast.warning(`No se cargaron ${rechazos.length} fila(s):\n${rechazos.slice(0, 6).join("\n")}${rechazos.length > 6 ? "\n…" : ""}`, { duration: 20000 });
+          }
           console.log("Bulk upload response:", response.data);
         }
       } else {

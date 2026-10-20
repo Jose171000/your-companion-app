@@ -1,4 +1,4 @@
-import { apiRequest, apiRequestMultipart } from './api';
+import { apiRequest, apiRequestMultipart, apiDownload } from './api';
 
 // ─────────────────────────────────────────────
 // Types
@@ -8,6 +8,10 @@ export interface BulkUploadResponse {
   jobId?: string;
   message: string;
   accepted?: number;
+  totalQueued?: number;
+  totalSkipped?: number;
+  /** Una línea por fila rechazada, con su motivo. */
+  rejectedDetails?: string[];
 }
 
 export interface BulkUploadStatus {
@@ -23,9 +27,12 @@ export interface BulkUploadStatus {
 // ─────────────────────────────────────────────
 
 export const bulkUploadApi = {
+  /** Plantilla de Excel para la creación masiva de productos. */
+  downloadProductTemplate: () => apiDownload('/bulk-upload/products/template', 'plantilla-productos.xlsx'),
+
   /**
    * Carga masiva de productos via Excel + ZIP opcional de imágenes.
-   * Columnas Excel: sku | productName | description | targetMarketplaces | image
+   * Columnas Excel: sku | precio | stock | fotos | nombre | descripcion | canales (solo JPG)
    */
   uploadProducts: (excelFile: File, zipFile?: File) => {
     const form = new FormData();
