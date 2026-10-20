@@ -63,6 +63,7 @@ function buildRows(listings: UserListing[], pending: ChangeRequest[]): Row[] {
         price: Number(l.price),
         stock: l.stock,
         webPrice: l.webPrice != null ? Number(l.webPrice) : null,
+        promo: l.promo?.price != null ? { price: Number(l.promo.price), start: l.promo.start ? String(l.promo.start).slice(0, 10) : null, end: l.promo.end ? String(l.promo.end).slice(0, 10) : null } : null,
         imageUrl: null,
         variation: null,
         channels: [],

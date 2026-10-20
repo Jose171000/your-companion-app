@@ -52,6 +52,8 @@ export interface UserListing extends ListingInfo {
   parentSku?: string | null;
   /** Precio con descuento de la tienda web (futura conexión WooCommerce) */
   webPrice?: number | string | null;
+  /** Promoción del producto en los marketplaces (precio con descuento y fechas AAAA-MM-DD) */
+  promo?: { price: number | string | null; start: string | null; end: string | null } | null;
   productId: string;
   productName: string;
   sku: string;
@@ -402,6 +404,13 @@ export const syncApi = {
   getProductStatus: (productId: string) =>
     apiRequest<ProductSyncStatus>(`/sync/products/${productId}/status`, {
       method: 'GET',
+    }),
+
+  /** Precio con descuento y fechas para Falabella; salePrice null lo quita de Synkro. No pasa por revisión. */
+  setPromo: (productId: string, dto: { salePrice: number | null; saleStartDate?: string | null; saleEndDate?: string | null }) =>
+    apiRequest<{ message: string }>(`/sync/products/${productId}/promo`, {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
     }),
 
   /** Precio con descuento de la tienda web; null lo quita. No pasa por revisión. */
