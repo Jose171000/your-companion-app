@@ -151,6 +151,9 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
 
   const resultados = useMemo(() => categorias?.data ?? [], [categorias]);
 
+  // Las categorías más cercanas que dejó la IA cuando ninguna encajó del todo.
+  const sugeridas: { id: string; path: string }[] = ((product?.aiAttributes as any)?._categoriaDudosa?.options ?? []).filter((c: any) => c?.id && c?.path);
+
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
@@ -182,6 +185,27 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
               </div>
             ) : (
               <>
+                {sugeridas.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-muted-foreground">
+                      {(product?.aiAttributes as any)?._categoriaDudosa?.motivo
+                        ? `La IA no encontró una que encaje del todo (${(product?.aiAttributes as any)._categoriaDudosa.motivo}). Estas son las más cercanas:`
+                        : "Las más cercanas al producto:"}
+                    </p>
+                    <div className="rounded-lg border border-border divide-y divide-border/50">
+                      {sugeridas.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => setCategoria({ id: c.id, path: c.path })}
+                          className="w-full text-left p-3 hover:bg-secondary/40 transition-colors"
+                        >
+                          <p className="text-sm font-medium">{c.path}</p>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Elige una o busca otra abajo. Al elegirla, la IA llena sus datos con lo que sabe del producto.</p>
+                  </div>
+                )}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
