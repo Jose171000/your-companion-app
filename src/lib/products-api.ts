@@ -62,6 +62,25 @@ export interface Product {
   updatedAt: string;
 }
 
+/** Categoría real, estado real en cada canal y qué falta para publicar (lo calcula el servidor con las reglas de publicación). */
+export interface ProductOverview {
+  categories: {
+    falabella: { id: string; path: string | null } | null;
+    mercadolibre: { id: string } | null;
+    internal: string | null;
+  };
+  channels: { linkId: string; marketplace: string; channel: string; account: string | null; status: string; statusLabel: string; error: string | null; permalink: string | null }[];
+  completeness: { ready: boolean; missing: string[]; byChannel: Record<string, { ready: boolean; missing: string[] }> };
+}
+
+export interface ProductsSummary {
+  total: number;
+  sinCategoria: number;
+  sinPublicar: number;
+  conError: number;
+  incompletos: number;
+}
+
 export interface PaginatedProducts {
   data: Product[];
   total: number;
@@ -109,6 +128,7 @@ export interface ProductsQueryParams {
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;
+  estado?: 'sin-categoria' | 'sin-publicar' | 'con-error' | 'incompletos';
   sortBy?: 'createdAt' | 'name' | 'price' | 'stock' | 'sku';
   order?: 'asc' | 'desc';
 }
@@ -140,6 +160,13 @@ export const productsApi = {
     apiRequest<PaginatedProducts>(`/products${buildQueryString(params)}`, {
       method: 'GET',
     }),
+
+  /** Cuántos productos de la tienda hay en cada situación */
+  summary: () => apiRequest<ProductsSummary>('/products/summary', { method: 'GET' }),
+
+  /** Categoría real, estado en cada canal y qué falta, de los productos indicados */
+  overview: (ids: string[]) =>
+    apiRequest<Record<string, ProductOverview>>(`/products/overview?ids=${ids.join(',')}`, { method: 'GET' }),
 
   /** Obtener un producto por ID */
   findOne: (id: string) =>

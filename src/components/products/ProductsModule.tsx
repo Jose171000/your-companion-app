@@ -4,6 +4,7 @@ import { productsApi, Product, ProductsQueryParams } from "@/lib/products-api";
 import { ProductsToolbar } from "./ProductsToolbar";
 import { ProductsTable } from "./ProductsTable";
 import { ProductsPagination } from "./ProductsPagination";
+import { EstadoFiltro, ProductsSummaryBar } from "./ProductsSummaryBar";
 import { ProductFormDialog } from "./ProductFormDialog";
 import { NewProductDialog } from "./NewProductDialog";
 import { DeleteProductDialog } from "./DeleteProductDialog";
@@ -23,6 +24,7 @@ export function ProductsModule() {
   const [search, setSearch]         = useState("");
   const [marketplace, setMarketplace] = useState("");
   const [inStock, setInStock]       = useState(false);
+  const [estado, setEstado]         = useState<EstadoFiltro>("");
 
   // ── Dialog state ──────────────────────────────────────────────────────────
   const [formOpen, setFormOpen]       = useState(false);
@@ -40,6 +42,7 @@ export function ProductsModule() {
     search:      search || undefined,
     marketplace: marketplace || undefined,
     inStock:     inStock || undefined,
+    estado:      estado || undefined,
     sortBy:      "createdAt",
     order:       "desc",
   };
@@ -54,6 +57,20 @@ export function ProductsModule() {
   const products      = paginatedData?.data ?? [];
   const totalPages    = paginatedData?.totalPages ?? 1;
   const total         = paginatedData?.total ?? 0;
+
+  // Lo que no viene en la lista: categoría real, estado de cada canal y qué falta (una consulta por página).
+  const ids = products.map((p) => p.id);
+  const { data: overviewResult, isLoading: overviewLoading } = useQuery({
+    queryKey: ["products-overview", ids],
+    queryFn: () => productsApi.overview(ids),
+    enabled: ids.length > 0,
+    staleTime: 30_000,
+  });
+  const { data: summaryResult } = useQuery({
+    queryKey: ["products-summary"],
+    queryFn: () => productsApi.summary(),
+    staleTime: 30_000,
+  });
 
   // ── Delete mutation ───────────────────────────────────────────────────────
   const deleteMutation = useMutation({
@@ -70,6 +87,7 @@ export function ProductsModule() {
   const handleSearchChange = (v: string) => { setSearch(v); setPage(1); };
   const handleMarketplaceChange = (v: string) => { setMarketplace(v); setPage(1); };
   const handleInStockChange = (v: boolean) => { setInStock(v); setPage(1); };
+  const handleEstadoChange = (v: EstadoFiltro) => { setEstado(v); setPage(1); };
 
   // «Nuevo producto» usa el mismo flujo de IA Productos; la ventana de edición se queda para cambiar un producto existente.
   const [newOpen, setNewOpen] = useState(false);
@@ -108,9 +126,13 @@ export function ProductsModule() {
         onExport={handleExport}
       />
 
+      <ProductsSummaryBar summary={summaryResult?.data} value={estado} onChange={handleEstadoChange} />
+
       {/* Table */}
       <ProductsTable
         products={products}
+        overview={overviewResult?.data}
+        overviewLoading={overviewLoading}
         isLoading={isLoading}
         isError={isError}
         onEdit={openEdit}

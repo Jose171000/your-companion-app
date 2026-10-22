@@ -1,13 +1,16 @@
-import { Product } from "@/lib/products-api";
+import { Product, ProductOverview } from "@/lib/products-api";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Edit, FileText, ImageOff, Package, Rocket, Sparkles, Trash2, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProductCard } from "./ProductCard";
+import { CategoryCell, ChannelsCell, CompletenessCell } from "./ProductStatusCells";
 
 interface ProductsTableProps {
   products: Product[];
+  /** Categoría real, estado por canal y completitud de cada producto de la página */
+  overview?: Record<string, ProductOverview>;
+  overviewLoading?: boolean;
   isLoading: boolean;
   isError: boolean;
   onEdit: (product: Product) => void;
@@ -20,6 +23,8 @@ interface ProductsTableProps {
 
 export function ProductsTable({
   products,
+  overview,
+  overviewLoading,
   isLoading,
   isError,
   onEdit,
@@ -103,6 +108,9 @@ export function ProductsTable({
               <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Canales
               </th>
+              <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Datos
+              </th>
               <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Acciones
               </th>
@@ -146,18 +154,7 @@ export function ProductsTable({
 
                   {/* Category */}
                   <td className="px-4 py-3">
-                    <span className="text-sm text-muted-foreground">
-                      {product.category ? (
-                        <>
-                          {product.category}
-                          {product.subCategory && (
-                            <span className="text-muted-foreground/60">
-                              {" / "}{product.subCategory}
-                            </span>
-                          )}
-                        </>
-                      ) : "—"}
-                    </span>
+                    <CategoryCell overview={overview?.[product.id]} loading={overviewLoading} />
                   </td>
 
                   {/* Price */}
@@ -189,22 +186,12 @@ export function ProductsTable({
 
                   {/* Marketplaces */}
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {marketplaces.slice(0, 2).map((mp) => (
-                        <Badge
-                          key={mp}
-                          variant="secondary"
-                          className="text-[10px] py-0 px-1.5 capitalize"
-                        >
-                          {mp}
-                        </Badge>
-                      ))}
-                      {marketplaces.length > 2 && (
-                        <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
-                          +{marketplaces.length - 2}
-                        </Badge>
-                      )}
-                    </div>
+                    <ChannelsCell overview={overview?.[product.id]} intended={marketplaces} loading={overviewLoading} />
+                  </td>
+
+                  {/* Completeness */}
+                  <td className="px-4 py-3">
+                    <CompletenessCell overview={overview?.[product.id]} loading={overviewLoading} />
                   </td>
 
                   {/* Actions */}
@@ -279,6 +266,8 @@ export function ProductsTable({
           <ProductCard
             key={product.id}
             product={product}
+            overview={overview?.[product.id]}
+            overviewLoading={overviewLoading}
             onEdit={onEdit}
             onDelete={onDelete}
             onRegenerate={onRegenerate}

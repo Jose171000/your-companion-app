@@ -1,11 +1,13 @@
-import { Product } from "@/lib/products-api";
+import { Product, ProductOverview } from "@/lib/products-api";
+import { CategoryCell, ChannelsCell, CompletenessCell } from "./ProductStatusCells";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Edit, Trash2, Sparkles, ImageOff, Rocket, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ProductCardProps {
   product: Product;
+  overview?: ProductOverview;
+  overviewLoading?: boolean;
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
   onRegenerate: (product: Product) => void;
@@ -13,7 +15,7 @@ interface ProductCardProps {
   onSheet?: (product: Product) => void;
 }
 
-export function ProductCard({ product, onEdit, onDelete, onRegenerate, onPublish, onSheet }: ProductCardProps) {
+export function ProductCard({ product, overview, overviewLoading, onEdit, onDelete, onRegenerate, onPublish, onSheet }: ProductCardProps) {
   const marketplaces = product.targetMarketplaces ?? [];
 
   return (
@@ -114,21 +116,12 @@ export function ProductCard({ product, onEdit, onDelete, onRegenerate, onPublish
           )}
         </div>
 
-        {/* Marketplace badges */}
-        {marketplaces.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {marketplaces.slice(0, 3).map((mp) => (
-              <Badge key={mp} variant="secondary" className="text-[10px] py-0 px-1.5 capitalize">
-                {mp}
-              </Badge>
-            ))}
-            {marketplaces.length > 3 && (
-              <Badge variant="secondary" className="text-[10px] py-0 px-1.5">
-                +{marketplaces.length - 3}
-              </Badge>
-            )}
-          </div>
-        )}
+        {/* Categoría, canales y datos reales */}
+        <div className="mt-2 space-y-1.5">
+          <CategoryCell overview={overview} loading={overviewLoading} />
+          <ChannelsCell overview={overview} intended={marketplaces} loading={overviewLoading} />
+          <CompletenessCell overview={overview} loading={overviewLoading} />
+        </div>
       </div>
     </div>
   );
