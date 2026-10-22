@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, Clock, FileText, LayoutGrid, List, MoreVertical, Pause, Pencil, Play, Power, Search, Trash2 } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronRight, Clock, FileText, LayoutGrid, List, MoreVertical, Pause, Pencil, Play, Power, Search, Trash2 } from "lucide-react";
 import { Product } from "@/lib/products-api";
 import { ProductSheetDialog } from "@/components/products/ProductSheetDialog";
 import { ChangeRequest, ChannelActionType, UserListing } from "@/lib/sync-api";
@@ -35,6 +35,11 @@ interface ChannelCell {
 interface Row extends EditableProduct {
   imageUrl: string | null;
   variation: string | null;
+  groupId: string | null;
+  groupName: string | null;
+  groupCode: string | null;
+  /** «Rojo / M»: lo que distingue a esta variante dentro de su grupo */
+  variantLabel: string | null;
   channels: ChannelCell[];
   pendingCount: number;
 }
@@ -70,6 +75,10 @@ function buildRows(listings: UserListing[], pending: ChangeRequest[]): Row[] {
         promo: l.promo?.price != null ? { price: Number(l.promo.price), start: l.promo.start ? String(l.promo.start).slice(0, 10) : null, end: l.promo.end ? String(l.promo.end).slice(0, 10) : null } : null,
         imageUrl: null,
         variation: null,
+        groupId: l.groupId ?? null,
+        groupName: l.groupName ?? null,
+        groupCode: l.groupCode ?? null,
+        variantLabel: l.variantValues ? Object.values(l.variantValues).join(" / ") : null,
         channels: [],
         pendingCount: pending.filter((p) => p.product.id === l.productId).length,
       };
@@ -86,6 +95,75 @@ function buildRows(listings: UserListing[], pending: ChangeRequest[]): Row[] {
     });
   }
   return [...byProduct.values()];
+}
+
+/** Un producto con variantes: una sola fila que se despliega en sus variantes. */
+interface GroupItem {
+  group: true;
+  groupId: string;
+  name: string;
+  code: string | null;
+  imageUrl: string | null;
+  children: Row[];
+}
+type Item = Row | GroupItem;
+const isGroup = (i: Item): i is GroupItem => (i as GroupItem).group === true;
+
+/** Junta las variantes de cada grupo bajo una sola fila; el resto de productos queda como estaba. */
+function buildItems(rows: Row[]): Item[] {
+  const items: Item[] = [];
+  const grupos = new Map<string, GroupItem>();
+  for (const r of rows) {
+    if (!r.groupId) { items.push(r); continue; }
+    let g = grupos.get(r.groupId);
+    if (!g) {
+      g = { group: true, groupId: r.groupId, name: r.groupName ?? r.name, code: r.groupCode, imageUrl: r.imageUrl, children: [] };
+      grupos.set(r.groupId, g);
+      items.push(g);
+    }
+    g.imageUrl = g.imageUrl ?? r.imageUrl;
+    g.children.push(r);
+  }
+  return items;
+}
+
+/** Cuántas variantes hay en cada estado, canal por canal: «Falabella: 5 publicado, 1 error». */
+function GroupChannels({ children }: { children: Row[] }) {
+  const porCanal = new Map<string, { canal: string; estados: Map<string, number> }>();
+  for (const r of children) {
+    for (const c of r.channels) {
+      const clave = `${c.listing.marketplace}|${c.listing.accountLabel ?? ""}`;
+      const fila = porCanal.get(clave) ?? { canal: `${channelName(c.listing.marketplace)}${c.listing.accountLabel ? ` · ${c.listing.accountLabel}` : ""}`, estados: new Map<string, number>() };
+      const e = estadoVisible(c.listing);
+      fila.estados.set(e, (fila.estados.get(e) ?? 0) + 1);
+      porCanal.set(clave, fila);
+    }
+  }
+  return (
+    <div className="flex flex-wrap gap-2">
+      {[...porCanal.entries()].map(([clave, f]) => (
+        <div key={clave} className="rounded-xl border border-border bg-secondary/20 px-3 py-2 text-xs space-y-1 min-w-[132px]">
+          <p className="font-semibold truncate">{f.canal}</p>
+          <div className="flex flex-wrap gap-1">
+            {[...f.estados.entries()].map(([estado, n]) => (
+              <Badge key={estado} className={cn("text-[10px] py-0 px-1.5", STATUS_STYLES[estado] ?? STATUS_STYLES.pending)}>
+                {n} {(STATUS_LABELS[estado] ?? estado).toLowerCase()}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function rangoDePrecio(children: Row[]): string {
+  const precios = children.map((c) => c.price).filter((p) => Number.isFinite(p));
+  if (!precios.length) return "—";
+  const min = Math.min(...precios);
+  const max = Math.max(...precios);
+  const moneda = children[0]?.channels[0]?.listing.currency;
+  return min === max ? money(min, moneda) : `${money(min, moneda)} – ${money(max, moneda)}`;
 }
 
 /** Precio regular y, si hay promoción vigente, el precio con descuento del canal. */
@@ -230,15 +308,101 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
   const [editing, setEditing] = useState<EditableProduct | null>(null);
   const [sheetFor, setSheetFor] = useState<Product | null>(null);
   const [channelAction, setChannelAction] = useState<PendingChannelAction | null>(null);
+  const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
+  const alternar = (id: string) => setAbiertos((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const rows = useMemo(() => buildRows(listings, pending), [listings, pending]);
+  const items = useMemo(() => buildItems(rows), [rows]);
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return q ? rows.filter((r) => r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q)) : rows;
-  }, [rows, search]);
+    const coincide = (r: Row) => r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q) || (r.variantLabel ?? "").toLowerCase().includes(q);
+    if (!q) return items;
+    return items.filter((i) => (isGroup(i) ? i.name.toLowerCase().includes(q) || (i.code ?? "").toLowerCase().includes(q) || i.children.some(coincide) : coincide(i)));
+  }, [items, search]);
 
   const askChannelAction = (r: Row): OnChannelAction => (action, listing) =>
     setChannelAction({ productId: r.productId, productName: r.name, action, listing, listings: r.channels.map((c) => c.listing) });
+
+  const renderRow = (r: Row, nested = false) => (
+              <div
+                key={r.productId}
+                className={cn("p-4 flex flex-col lg:flex-row lg:items-center gap-4 hover:bg-secondary/20 transition-colors", nested && "lg:pl-10 bg-secondary/10 border-l-2 border-border")}
+              >
+                <div className="lg:w-72 shrink-0 min-w-0 flex items-center gap-3">
+                  <ProductThumb src={r.imageUrl} alt={r.name} />
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{nested ? (r.variantLabel ?? r.name) : r.name}</p>
+                    {r.variation && <p className="text-[11px] text-muted-foreground truncate">{r.variation}</p>}
+                    <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
+                  </div>
+                </div>
+                <div className="flex items-center gap-6 text-sm tabular-nums lg:w-80 shrink-0">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Precio</p>
+                    <p className="font-semibold">{money(r.price, r.channels[0]?.listing.currency)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stock</p>
+                    <p className="font-semibold">{r.stock} u.</p>
+                  </div>
+                  <WebPrice value={r.webPrice} />
+                  <PendingBadge count={r.pendingCount} long />
+                </div>
+                <div className="flex flex-wrap gap-2 flex-1">
+                  {r.channels.map((c) => (
+                    <ChannelChip key={c.listing.id} cell={c} canEdit={canEdit} onAction={askChannelAction(r)} />
+                  ))}
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSheetFor({ id: r.productId, name: r.name } as Product)}>
+                    <FileText className="w-3.5 h-3.5" /> Ficha
+                  </Button>
+                  {canEdit && (
+                    <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditing(r)}>
+                      <Pencil className="w-3.5 h-3.5" /> Editar
+                    </Button>
+                  )}
+                  {canEdit && <AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} />}
+                </div>
+              </div>
+  );
+
+  const renderCard = (r: Row, nested = false) => (
+              <div key={r.productId} className="glass rounded-2xl p-4 space-y-3 border border-border">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex items-center gap-3">
+                    <ProductThumb src={r.imageUrl} alt={r.name} />
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{nested ? (r.variantLabel ?? r.name) : r.name}</p>
+                      {r.variation && <p className="text-[11px] text-muted-foreground truncate">{r.variation}</p>}
+                      <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSheetFor({ id: r.productId, name: r.name } as Product)} aria-label="Ficha" title="Ficha: lo que se envía a cada canal">
+                      <FileText className="w-3.5 h-3.5" />
+                    </Button>
+                    {canEdit && (
+                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setEditing(r)} aria-label="Editar">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-6 text-sm tabular-nums">
+                  <span className="font-semibold">{money(r.price, r.channels[0]?.listing.currency)}</span>
+                  <span className="text-muted-foreground">{r.stock} u.</span>
+                  <WebPrice value={r.webPrice} />
+                  <PendingBadge count={r.pendingCount} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {r.channels.map((c) => (
+                    <ChannelChip key={c.listing.id} cell={c} canEdit={canEdit} onAction={askChannelAction(r)} />
+                  ))}
+                </div>
+                {canEdit && <div className="flex justify-end"><AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} /></div>}
+              </div>
+  );
 
   if (isLoading) {
     return (
@@ -306,88 +470,65 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
 
       {view === "rows" ? (
         <div className="glass rounded-2xl overflow-hidden divide-y divide-border/50">
-          {visible.map((r) => (
-            <div
-              key={r.productId}
-              className="p-4 flex flex-col lg:flex-row lg:items-center gap-4 hover:bg-secondary/20 transition-colors"
-            >
-              <div className="lg:w-72 shrink-0 min-w-0 flex items-center gap-3">
-                <ProductThumb src={r.imageUrl} alt={r.name} />
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">{r.name}</p>
-                  {r.variation && <p className="text-[11px] text-muted-foreground truncate">{r.variation}</p>}
-                  <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
+          {visible.map((item) => {
+            if (!isGroup(item)) return renderRow(item);
+            const abierto = abiertos.has(item.groupId);
+            return (
+              <div key={item.groupId}>
+                <div className="p-4 flex flex-col lg:flex-row lg:items-center gap-4 hover:bg-secondary/20 transition-colors cursor-pointer" onClick={() => alternar(item.groupId)}>
+                  <div className="lg:w-72 shrink-0 min-w-0 flex items-center gap-3">
+                    {abierto ? <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
+                    <ProductThumb src={item.imageUrl} alt={item.name} />
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm truncate">{item.name}</p>
+                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5">{item.children.length} variantes</Badge>
+                      {item.code && <code className="ml-1 text-[10px] font-mono text-muted-foreground">{item.code}</code>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-6 text-sm tabular-nums lg:w-80 shrink-0">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Precio</p>
+                      <p className="font-semibold whitespace-nowrap">{rangoDePrecio(item.children)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stock</p>
+                      <p className="font-semibold">{item.children.reduce((n, c) => n + (c.stock ?? 0), 0)} u.</p>
+                    </div>
+                  </div>
+                  <div className="flex-1"><GroupChannels children={item.children} /></div>
+                  <span className="text-xs text-muted-foreground shrink-0">{abierto ? "Ocultar" : "Ver variantes"}</span>
                 </div>
+                {abierto && item.children.map((c) => renderRow(c, true))}
               </div>
-              <div className="flex items-center gap-6 text-sm tabular-nums lg:w-80 shrink-0">
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Precio</p>
-                  <p className="font-semibold">{money(r.price, r.channels[0]?.listing.currency)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stock</p>
-                  <p className="font-semibold">{r.stock} u.</p>
-                </div>
-                <WebPrice value={r.webPrice} />
-                <PendingBadge count={r.pendingCount} long />
-              </div>
-              <div className="flex flex-wrap gap-2 flex-1">
-                {r.channels.map((c) => (
-                  <ChannelChip key={c.listing.id} cell={c} canEdit={canEdit} onAction={askChannelAction(r)} />
-                ))}
-              </div>
-              <div className="flex gap-2 shrink-0">
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSheetFor({ id: r.productId, name: r.name } as Product)}>
-                  <FileText className="w-3.5 h-3.5" /> Ficha
-                </Button>
-                {canEdit && (
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditing(r)}>
-                    <Pencil className="w-3.5 h-3.5" /> Editar
-                  </Button>
-                )}
-                {canEdit && <AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} />}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
-          {visible.map((r) => (
-            <div key={r.productId} className="glass rounded-2xl p-4 space-y-3 border border-border">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex items-center gap-3">
-                  <ProductThumb src={r.imageUrl} alt={r.name} />
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{r.name}</p>
-                    {r.variation && <p className="text-[11px] text-muted-foreground truncate">{r.variation}</p>}
-                    <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
+          {visible.map((item) => {
+            if (!isGroup(item)) return renderCard(item);
+            const abierto = abiertos.has(item.groupId);
+            return (
+              <div key={item.groupId} className="glass rounded-2xl p-4 space-y-3 border border-border md:col-span-2 xl:col-span-3">
+                <button type="button" className="w-full flex items-center gap-3 text-left" onClick={() => alternar(item.groupId)} aria-expanded={abierto}>
+                  {abierto ? <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
+                  <ProductThumb src={item.imageUrl} alt={item.name} />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate">{item.name}</p>
+                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5">{item.children.length} variantes</Badge>
                   </div>
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSheetFor({ id: r.productId, name: r.name } as Product)} aria-label="Ficha" title="Ficha: lo que se envía a cada canal">
-                    <FileText className="w-3.5 h-3.5" />
-                  </Button>
-                  {canEdit && (
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setEditing(r)} aria-label="Editar">
-                      <Pencil className="w-3.5 h-3.5" />
-                    </Button>
-                  )}
-                </div>
+                  <span className="text-sm font-semibold tabular-nums whitespace-nowrap">{rangoDePrecio(item.children)}</span>
+                  <span className="text-sm text-muted-foreground tabular-nums">{item.children.reduce((n, c) => n + (c.stock ?? 0), 0)} u.</span>
+                </button>
+                <GroupChannels children={item.children} />
+                {abierto && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+                    {item.children.map((c) => renderCard(c, true))}
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-6 text-sm tabular-nums">
-                <span className="font-semibold">{money(r.price, r.channels[0]?.listing.currency)}</span>
-                <span className="text-muted-foreground">{r.stock} u.</span>
-                <WebPrice value={r.webPrice} />
-                <PendingBadge count={r.pendingCount} />
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {r.channels.map((c) => (
-                  <ChannelChip key={c.listing.id} cell={c} canEdit={canEdit} onAction={askChannelAction(r)} />
-                ))}
-              </div>
-              {canEdit && <div className="flex justify-end"><AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} /></div>}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

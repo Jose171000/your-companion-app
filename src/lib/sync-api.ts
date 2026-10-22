@@ -59,6 +59,11 @@ export interface UserListing extends ListingInfo {
   imageUrl?: string | null;
   variation?: string | null;
   parentSku?: string | null;
+  /** Variantes de un producto de Synkro: el tablero las junta bajo su grupo */
+  groupId?: string | null;
+  groupName?: string | null;
+  groupCode?: string | null;
+  variantValues?: Record<string, string> | null;
   /** Precio con descuento de la tienda web (futura conexión WooCommerce) */
   webPrice?: number | string | null;
   /** Promoción del producto en los marketplaces (precio con descuento y fechas AAAA-MM-DD) */

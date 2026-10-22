@@ -59,7 +59,8 @@ export function ProductsModule() {
   const total         = paginatedData?.total ?? 0;
 
   // Lo que no viene en la lista: categoría real, estado de cada canal y qué falta (una consulta por página).
-  const ids = products.map((p) => p.id);
+  // Un grupo de variantes es una fila, pero su estado se calcula con todas sus variantes.
+  const ids = [...new Set(products.flatMap((p) => [p.id, ...(p.groupSummary?.variantIds ?? [])]))];
   const { data: overviewResult, isLoading: overviewLoading } = useQuery({
     queryKey: ["products-overview", ids],
     queryFn: () => productsApi.overview(ids),

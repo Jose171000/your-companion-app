@@ -47,6 +47,11 @@ export interface Product {
   packageWeight?: number | null;
   /** Ids por canal, incluida la categoría de Falabella. */
   marketplaceIds?: Record<string, unknown> | null;
+  /** Grupo de variantes al que pertenece (si lo tiene) y los valores de esta variante */
+  group?: { id: string; name: string; parentSku: string; axes: { name: string; values: string[] }[] } | null;
+  variantValues?: Record<string, string> | null;
+  /** Solo en la lista: resumen de todas las variantes del grupo (la lista muestra un grupo como una sola fila) */
+  groupSummary?: { variantCount: number; priceMin: number | null; priceMax: number | null; stockTotal: number; variantIds: string[] } | null;
   id: string;
   sku: string;
   name: string;
@@ -129,6 +134,8 @@ export interface ProductsQueryParams {
   maxPrice?: number;
   inStock?: boolean;
   estado?: 'sin-categoria' | 'sin-publicar' | 'con-error' | 'incompletos';
+  /** Pide las variantes de un grupo en vez de una sola fila por grupo */
+  groupId?: string;
   sortBy?: 'createdAt' | 'name' | 'price' | 'stock' | 'sku';
   order?: 'asc' | 'desc';
 }

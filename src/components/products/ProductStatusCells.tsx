@@ -119,3 +119,57 @@ export function CompletenessCell({ overview, loading }: { overview?: ProductOver
     </Popover>
   );
 }
+
+/** Estado de las variantes de un grupo en cada canal: «Falabella · Maba: 5 Publicado, 1 Error». */
+export function GroupChannelsCell({ overviews, total, loading }: { overviews: ProductOverview[]; total: number; loading?: boolean }) {
+  if (!overviews.length) return <span className="text-sm text-muted-foreground">{loading ? "…" : "—"}</span>;
+  const porCanal = new Map<string, { canal: string; cuenta: string | null; estados: Map<string, { etiqueta: string; estado: string; n: number }> }>();
+  for (const ov of overviews) {
+    for (const c of ov.channels) {
+      const clave = `${c.marketplace}|${c.account ?? ""}`;
+      const fila = porCanal.get(clave) ?? { canal: c.channel, cuenta: c.account, estados: new Map() };
+      const e = fila.estados.get(c.status) ?? { etiqueta: c.statusLabel, estado: c.status, n: 0 };
+      e.n += 1;
+      fila.estados.set(c.status, e);
+      porCanal.set(clave, fila);
+    }
+  }
+  if (!porCanal.size) return <Badge variant="secondary" className="text-[10px] py-0 px-1.5">Sin publicar</Badge>;
+  return (
+    <div className="flex flex-col gap-1">
+      {[...porCanal.entries()].map(([clave, f]) => (
+        <div key={clave} className="text-xs space-y-0.5">
+          <span className="font-medium">{f.canal}{f.cuenta && <span className="font-normal text-muted-foreground"> · {f.cuenta}</span>}</span>
+          <div className="flex flex-wrap gap-1">
+            {[...f.estados.values()].map((e) => (
+              <Badge key={e.estado} className={cn("text-[10px] gap-1 py-0 px-1.5", ESTADO_ESTILO[e.estado] ?? ESTADO_ESTILO.pending)}>
+                {e.n} {e.etiqueta.toLowerCase()}
+              </Badge>
+            ))}
+            {[...f.estados.values()].reduce((n, e) => n + e.n, 0) < total && (
+              <Badge variant="secondary" className="text-[10px] py-0 px-1.5">{total - [...f.estados.values()].reduce((n, e) => n + e.n, 0)} sin publicar</Badge>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** «Listo» si todas las variantes lo están; si no, cuántas tienen datos pendientes. El detalle está en cada variante. */
+export function GroupCompletenessCell({ overviews, total, loading }: { overviews: ProductOverview[]; total: number; loading?: boolean }) {
+  if (!overviews.length) return <span className="text-sm text-muted-foreground">{loading ? "…" : "—"}</span>;
+  const pendientes = overviews.filter((o) => !o.completeness.ready).length;
+  if (!pendientes) {
+    return (
+      <Badge className="text-[10px] gap-1 bg-green-500/10 text-green-400 border-green-500/30">
+        <CheckCircle2 className="w-3 h-3" /> Listo
+      </Badge>
+    );
+  }
+  return (
+    <Badge className="text-[10px] gap-1 bg-yellow-500/10 text-yellow-400 border-yellow-500/30">
+      <AlertCircle className="w-3 h-3" /> {pendientes} de {total} incompletas
+    </Badge>
+  );
+}

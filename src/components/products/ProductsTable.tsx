@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Edit, FileText, ImageOff, Package, Rocket, Sparkles, Trash2, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProductCard } from "./ProductCard";
-import { CategoryCell, ChannelsCell, CompletenessCell } from "./ProductStatusCells";
+import { GroupCard, GroupRows, ProductRow } from "./ProductsRows";
 
 interface ProductsTableProps {
   products: Product[];
@@ -118,151 +118,22 @@ export function ProductsTable({
           </thead>
 
           <tbody className="divide-y divide-border/50">
-            {products.map((product) => {
-              const marketplaces = product.targetMarketplaces ?? [];
-              return (
-                <tr
-                  key={product.id}
-                  className="hover:bg-secondary/20 transition-colors group"
-                >
-                  {/* Product */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary/50 border border-border flex items-center justify-center shrink-0">
-                        {product.images?.[0] ? (
-                          <img
-                            src={product.images[0].url}
-                            alt={product.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <ImageOff className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                      <span className="font-medium text-sm truncate max-w-[200px]">
-                        {product.name}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* SKU */}
-                  <td className="px-4 py-3">
-                    <code className="text-xs font-mono bg-secondary/70 text-muted-foreground px-2 py-1 rounded">
-                      {product.sku}
-                    </code>
-                  </td>
-
-                  {/* Category */}
-                  <td className="px-4 py-3">
-                    <CategoryCell overview={overview?.[product.id]} loading={overviewLoading} />
-                  </td>
-
-                  {/* Price */}
-                  <td className="px-4 py-3">
-                    <span className="text-sm font-semibold">
-                      {product.price != null
-                        ? `$${Number(product.price).toFixed(2)}`
-                        : <span className="text-muted-foreground font-normal">—</span>}
-                    </span>
-                  </td>
-
-                  {/* Stock */}
-                  <td className="px-4 py-3">
-                    {product.stock != null ? (
-                      <span
-                        className={cn(
-                          "text-xs font-semibold px-2 py-1 rounded",
-                          Number(product.stock) > 0
-                            ? "bg-green-500/10 text-green-400"
-                            : "bg-red-500/10 text-red-400"
-                        )}
-                      >
-                        {Number(product.stock) > 0 ? product.stock : "Sin stock"}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">—</span>
-                    )}
-                  </td>
-
-                  {/* Marketplaces */}
-                  <td className="px-4 py-3">
-                    <ChannelsCell overview={overview?.[product.id]} intended={marketplaces} loading={overviewLoading} />
-                  </td>
-
-                  {/* Completeness */}
-                  <td className="px-4 py-3">
-                    <CompletenessCell overview={overview?.[product.id]} loading={overviewLoading} />
-                  </td>
-
-                  {/* Actions */}
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:text-primary hover:bg-primary/10"
-                        onClick={() => onSheet(product)}
-                        title="Ficha: lo que se envía a cada canal"
-                      >
-                        <FileText className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:text-primary hover:bg-primary/10"
-                        onClick={() => onPublish(product)}
-                        title="Publicar en marketplaces"
-                      >
-                        <Rocket className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:text-primary hover:bg-primary/10"
-                        onClick={() => onPrepareFalabella(product)}
-                        title="Preparar para Falabella (categoría, medidas y atributos)"
-                      >
-                        <PackageCheck className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:text-accent hover:bg-accent/10"
-                        onClick={() => onRegenerate(product)}
-                        title="Regenerar con IA"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:text-primary hover:bg-primary/10"
-                        onClick={() => onEdit(product)}
-                        title="Editar"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => onDelete(product)}
-                        title="Eliminar"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+            {products.map((product) =>
+              product.group && product.groupSummary ? (
+                <GroupRows key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onSheet={onSheet} />
+              ) : (
+                <ProductRow key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onSheet={onSheet} />
+              ),
+            )}
           </tbody>
         </table>
       </div>
 
       {/* ── Mobile cards ───────────────────────────────────────────────────── */}
       <div className="md:hidden divide-y divide-border/50">
-        {products.map((product) => (
+        {products.map((product) => product.group && product.groupSummary ? (
+          <GroupCard key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onSheet={onSheet} />
+        ) : (
           <ProductCard
             key={product.id}
             product={product}
