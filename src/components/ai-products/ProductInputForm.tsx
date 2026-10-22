@@ -303,7 +303,7 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
           </div>
 
           {/* Variantes */}
-          {images.length > 0 && (
+          {(
             <div className="space-y-3">
               <div className="rounded-xl border border-border bg-card/40 p-3 md:p-4">
                 <p className="text-sm font-medium mb-2">¿Este producto tiene variantes?</p>
@@ -331,7 +331,13 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
                 </div>
               )}
 
-              {tiene === "si" && (
+              {tiene === "si" && images.length === 0 && (
+                <p className="rounded-xl border border-dashed border-border p-3 text-xs text-muted-foreground animate-in fade-in duration-300">
+                  Sube primero las fotos del producto (arriba): con ellas armas las variantes y asignas qué foto va en cada una.
+                </p>
+              )}
+
+              {tiene === "si" && images.length > 0 && (
                 <VariantsWizard
                   photos={previews.map((src) => ({ src }))}
                   parentSku={sku}
