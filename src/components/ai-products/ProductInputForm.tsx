@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, FileSpreadsheet, Sparkles, Loader2, X, ImagePlus, Download, FileArchive } from "lucide-react";
 import { bulkUploadApi } from "@/lib/bulk-upload-api";
 import { useStores } from "@/contexts/StoreContext";
+import { VariantsWizard, type ResultadoDelRecorrido } from "./VariantsWizard";
+import { variantsApi, type DeteccionDeVariantes } from "@/lib/variants-api";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -21,11 +23,18 @@ interface ProductInputFormProps {
     bulkFile?: File;
     zipFile?: File;
   }) => void;
+  /** Producto con variantes: el recorrido terminó y hay que crear el grupo. */
+  onSubmitVariants?: (data: {
+    sku: string;
+    content: string;
+    images: File[];
+    wizard: ResultadoDelRecorrido;
+  }) => void;
   isProcessing: boolean;
   isFormReady?: boolean;
 }
 
-export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }: ProductInputFormProps) {
+export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isFormReady = true }: ProductInputFormProps) {
   const { activeStore } = useStores();
   const [mode, setMode] = useState<"single" | "bulk">("single");
   const [singleProduct, setSingleProduct] = useState("");
@@ -37,12 +46,17 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
   const [isDragOver, setIsDragOver] = useState(false);
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [zipFile, setZipFile] = useState<File | null>(null);
+  // Variantes: null = sin responder (la IA revisa las fotos al generar), 'si' = recorrido, 'no' = producto simple.
+  const [tiene, setTiene] = useState<"si" | "no" | null>(null);
+  const [sugerencia, setSugerencia] = useState<DeteccionDeVariantes | null>(null);
+  const [detectando, setDetectando] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addImages = useCallback((newFiles: File[]) => {
     const validFiles = newFiles.filter((f) => f.type.startsWith("image/"));
     if (!validFiles.length) return;
 
+    setSugerencia(null);
     setImages((prev) => [...prev, ...validFiles]);
     validFiles.forEach((file) => {
       const url = URL.createObjectURL(file);
@@ -55,6 +69,7 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
       URL.revokeObjectURL(prev[index]);
       return prev.filter((_, i) => i !== index);
     });
+    setSugerencia(null);
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -82,16 +97,35 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleSubmit = () => {
+  const enviarProductoSimple = () =>
+    onSubmit({
+      mode: "single",
+      content: singleProduct,
+      sku,
+      price: price ? parseFloat(price) : undefined,
+      stock: stock !== "" ? Math.max(0, Math.trunc(Number(stock))) : undefined,
+      images,
+    });
+
+  const handleSubmit = async () => {
     if (mode === "single") {
-      onSubmit({
-        mode: "single",
-        content: singleProduct,
-        sku,
-        price: price ? parseFloat(price) : undefined,
-        stock: stock !== "" ? Math.max(0, Math.trunc(Number(stock))) : undefined,
-        images,
-      });
+      // Filtro previo: si no se ha dicho nada sobre variantes, la IA revisa las fotos y el texto. Sin señales concretas no pregunta.
+      if (tiene === null && images.length > 0) {
+        setDetectando(true);
+        let resultado: DeteccionDeVariantes | null = null;
+        try {
+          const resp = await variantsApi.detect(images, singleProduct);
+          resultado = resp.data?.resultado ?? null;
+        } catch {
+          resultado = null;
+        }
+        setDetectando(false);
+        if (resultado?.recomendar) {
+          setSugerencia(resultado);
+          return;
+        }
+      }
+      enviarProductoSimple();
     } else if (bulkFile) {
       onSubmit({ mode: "bulk", content: bulkFile.name, sku: "", price: undefined, images: [], bulkFile, zipFile: zipFile ?? undefined });
     }
@@ -260,6 +294,50 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
               </div>
             )}
           </div>
+
+          {/* Variantes */}
+          {images.length > 0 && (
+            <div className="space-y-3">
+              <div className="rounded-xl border border-border bg-card/40 p-3 md:p-4">
+                <p className="text-sm font-medium mb-2">¿Este producto tiene variantes?</p>
+                <p className="text-[11px] text-muted-foreground mb-2">Por ejemplo, el mismo producto en varios colores o tallas.</p>
+                <button type="button" onClick={() => { setTiene("no"); setSugerencia(null); }} className={cn("inline-flex rounded-lg border px-3 py-2 text-xs md:text-sm mr-2 transition-colors", tiene === "no" ? "border-[#FCCB34] bg-[#FCCB34]/15" : "border-border text-muted-foreground hover:border-[#FCCB34]/50")}>No, es un solo producto</button>
+                <button type="button" onClick={() => setTiene("si")} className={cn("inline-flex rounded-lg border px-3 py-2 text-xs md:text-sm transition-colors", tiene === "si" ? "border-[#FCCB34] bg-[#FCCB34]/15" : "border-border text-muted-foreground hover:border-[#FCCB34]/50")}>Sí, tiene variantes</button>
+              </div>
+
+              {sugerencia && tiene === null && (
+                <div className="rounded-xl border border-[#FCCB34]/60 bg-[#FCCB34]/10 p-3 md:p-4 animate-in fade-in slide-in-from-top-1 duration-300">
+                  <p className="text-sm font-medium mb-1">Este producto parece tener variantes</p>
+                  <p className="text-[11px] text-muted-foreground mb-2">Antes de crearlo como un solo producto, revisa lo que encontré:</p>
+                  <ul className="space-y-1 mb-2">
+                    {sugerencia.ejes.map((e) => (
+                      <li key={e.name} className="text-xs">
+                        <span className="font-medium">{e.name}: {e.values.join(" · ")}</span>
+                        {e.evidence && <span className="text-muted-foreground"> — {e.evidence}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" onClick={() => setTiene("si")}>Sí, crear con variantes</Button>
+                    <Button type="button" size="sm" variant="outline" onClick={() => { setTiene("no"); setSugerencia(null); enviarProductoSimple(); }}>No, es un solo producto</Button>
+                  </div>
+                </div>
+              )}
+
+              {tiene === "si" && (
+                <VariantsWizard
+                  photos={previews.map((src) => ({ src }))}
+                  parentSku={sku}
+                  onParentSkuChange={setSku}
+                  basePrice={price}
+                  baseStock={stock}
+                  deteccion={sugerencia}
+                  busy={isProcessing}
+                  onSubmit={(wizard) => onSubmitVariants?.({ sku, content: singleProduct, images, wizard })}
+                />
+              )}
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="bulk" className="mt-4 md:mt-6 space-y-3 md:space-y-4">
@@ -333,17 +411,23 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
         </TabsContent>
       </Tabs>
 
+      {!(mode === "single" && tiene === "si") && (
       <Button
         onClick={handleSubmit}
-        disabled={isProcessing || !isFormReady || (mode === "single" && isSingleDisabled) || (mode === "bulk" && !bulkFile)}
+        disabled={isProcessing || detectando || !isFormReady || (mode === "single" && isSingleDisabled) || (mode === "bulk" && !bulkFile)}
         className={cn(
           "w-full h-12 rounded-[12px] font-semibold text-sm md:text-base transition-all",
-          (isProcessing || !isFormReady || (mode === "single" && isSingleDisabled) || (mode === "bulk" && !bulkFile))
+          (isProcessing || detectando || !isFormReady || (mode === "single" && isSingleDisabled) || (mode === "bulk" && !bulkFile))
             ? "bg-[#FFF3C4] dark:bg-[#333333] text-[#111111]/50 dark:text-[#A1A1AA] shadow-none cursor-not-allowed"
             : "bg-[#111111] dark:bg-[#FCCB34] hover:bg-[#222222] dark:hover:bg-[#E6B620] text-white dark:text-[#111111] shadow-[0_8px_16px_rgba(0,0,0,0.1)] hover:shadow-[0_12px_20px_rgba(0,0,0,0.15)] hover:-translate-y-0.5"
         )}
       >
-        {isProcessing ? (
+        {detectando ? (
+          <>
+            <Loader2 className="w-4 h-4 md:w-5 md:h-5 mr-2 animate-spin" />
+            Revisando fotos…
+          </>
+        ) : isProcessing ? (
           <>
             <Loader2 className="w-4 h-4 md:w-5 md:h-5 mr-2 animate-spin" />
             Procesando con IA...
@@ -355,6 +439,7 @@ export function ProductInputForm({ onSubmit, isProcessing, isFormReady = true }:
           </>
         )}
       </Button>
+      )}
     </div>
   );
 }

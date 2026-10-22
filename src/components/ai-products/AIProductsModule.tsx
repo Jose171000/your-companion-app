@@ -12,6 +12,9 @@ import { syncApi, LaunchReport } from "@/lib/sync-api";
 import { Loader2, Sparkles } from "lucide-react";
 import { productsApi } from "@/lib/products-api";
 import { bulkUploadApi } from "@/lib/bulk-upload-api";
+import { uploadApi } from "@/lib/upload-api";
+import { variantsApi, type VistaDeGrupo } from "@/lib/variants-api";
+import type { ResultadoDelRecorrido } from "./VariantsWizard";
 import { toast } from "sonner";
 import { useFormDraft } from "@/contexts/FormDraftContext";
 
@@ -32,6 +35,8 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
   const [launching, setLaunching] = useState(false);
   // Al cambiar, el formulario se vacía: queda listo para el siguiente producto.
   const [formKey, setFormKey] = useState(0);
+  // Resultado de crear un producto con variantes.
+  const [grupoCreado, setGrupoCreado] = useState<VistaDeGrupo | null>(null);
   const { setDirty } = useFormDraft();
 
   // Report dirty state whenever the user configures anything
@@ -142,6 +147,61 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
     }
   };
 
+  /** Producto con variantes: sube las fotos usadas, crea el grupo y genera con IA el contenido una sola vez. */
+  const handleVariants = async (data: { sku: string; content: string; images: File[]; wizard: ResultadoDelRecorrido }) => {
+    setIsProcessing(true);
+    try {
+      const usados = [...new Set(data.wizard.variants.flatMap((v) => v.photoIndexes))].sort((a, b) => a - b);
+      const urlPorIndice: Record<number, string> = {};
+      for (let i = 0; i < usados.length; i += 10) {
+        const lote = usados.slice(i, i + 10);
+        const resp = await uploadApi.uploadImages(lote.map((ix) => data.images[ix]));
+        const subidas = resp.data?.images ?? [];
+        if (resp.error || subidas.length !== lote.length) {
+          toast.error(resp.error ?? "No se pudieron subir las fotos. Inténtalo de nuevo.");
+          return;
+        }
+        lote.forEach((ix, j) => { urlPorIndice[ix] = subidas[j].url; });
+      }
+
+      const contenido = data.content.trim();
+      const res = await variantsApi.createGroup({
+        parentSku: data.sku.trim(),
+        // Un texto corto es el nombre; uno largo es la descripción. Sin texto, la IA arma ambos desde las fotos.
+        ...(contenido && contenido.length <= 120 ? { name: contenido } : {}),
+        description: contenido || undefined,
+        targetMarketplaces: selectedMarketplaces,
+        generateWithAi: true,
+        axes: data.wizard.axes,
+        variants: data.wizard.variants.map((v) => ({
+          values: v.values,
+          sku: v.sku,
+          price: v.price,
+          stock: v.stock,
+          images: v.photoIndexes.map((ix) => urlPorIndice[ix]),
+        })),
+      });
+      if (res.error || !res.data) {
+        toast.error(res.error ?? "No se pudo crear el producto con variantes");
+        return;
+      }
+      setGrupoCreado(res.data);
+      setHasGeneratedContent(false);
+      setGeneratedProduct(null);
+      setLaunch(null);
+      setFormKey((k) => k + 1);
+      setDirty("ai-products", false);
+      onCreated?.();
+      if (res.data.ia?.ok === false) toast.warning(`Variantes creadas, pero la IA no pudo completar el contenido: ${res.data.ia.motivo ?? "error desconocido"}`);
+      else toast.success(`Producto con ${res.data.variants.length} variantes creado`);
+    } catch (error) {
+      toast.error("Error al conectar con el servidor");
+      console.error(error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleExport = async (format: string) => {
     if (!generatedProduct) return;
     try {
@@ -221,11 +281,55 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
         </div>
         <ProductInputForm
           key={formKey}
-          onSubmit={handleSubmit}
+          onSubmit={(d) => { setGrupoCreado(null); return handleSubmit(d); }}
+          onSubmitVariants={handleVariants}
           isProcessing={isProcessing}
           isFormReady={selectedMarketplaces.length > 0}
         />
       </Card>
+
+      {/* Resultado de un producto con variantes */}
+      {grupoCreado && (
+        <Card className="p-4 md:p-6 bg-white dark:bg-[#111111] shadow-sm border border-[#EAEAEA] dark:border-white/20 rounded-[16px] space-y-3 animate-in fade-in duration-300">
+          <div>
+            <p className="font-semibold text-sm md:text-base">Producto con {grupoCreado.variants.length} variantes creado</p>
+            <p className="text-xs text-muted-foreground">Código del grupo: {grupoCreado.parentSku} · {grupoCreado.axes.map((e) => e.name).join(" y ")}</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-muted-foreground text-left">
+                  <th className="font-normal pb-1 pr-3">Variante</th>
+                  <th className="font-normal pb-1 pr-3">SKU</th>
+                  <th className="font-normal pb-1 pr-3">Precio</th>
+                  <th className="font-normal pb-1 pr-3">Stock</th>
+                  <th className="font-normal pb-1">Fotos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {grupoCreado.variants.map((v) => (
+                  <tr key={v.id} className="border-t border-border">
+                    <td className="py-1.5 pr-3 whitespace-nowrap">{Object.values(v.variantValues ?? {}).join(" · ")}</td>
+                    <td className="py-1.5 pr-3 font-mono">{v.sku}</td>
+                    <td className="py-1.5 pr-3">{v.price != null ? `S/ ${v.price.toFixed(2)}` : "—"}</td>
+                    <td className="py-1.5 pr-3">{v.stock}</td>
+                    <td className="py-1.5">{v.images.length}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {grupoCreado.ia?.ok === false ? (
+            <p className="text-xs text-amber-500">La IA no pudo completar el contenido ({grupoCreado.ia.motivo ?? "error desconocido"}). Puedes completarlo desde la Ficha de cada variante.</p>
+          ) : (
+            <p className="text-xs text-green-500">La IA preparó el contenido del grupo una sola vez y lo repartió entre las variantes.</p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Las variantes quedaron creadas en Synkro. La publicación automática de variantes en Falabella, Mercado Libre y Yavendio llega en la siguiente fase; mientras tanto puedes publicar cada variante desde Marketplaces.
+          </p>
+          <Button variant="outline" onClick={() => setGrupoCreado(null)}>Crear otro producto</Button>
+        </Card>
+      )}
 
       {/* Step 3: Generated Fields Preview */}
       {hasGeneratedContent && (
