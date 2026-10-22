@@ -8,6 +8,79 @@ export interface ApiResponse<T = unknown> {
   error?: string;
 }
 
+// ─────────────────────────────────────────────
+// Sesión: el token de acceso dura poco, así que se renueva solo
+// ─────────────────────────────────────────────
+
+/** Rutas donde un 401 es una respuesta normal (contraseña incorrecta…), no un token vencido. */
+const RUTAS_SIN_RENOVAR = /\/auth\/(login|register|refresh|forgot-password|reset-password)/;
+
+export const EVENTO_SESION_VENCIDA = 'synkro:sesion-vencida';
+
+type ResultadoDeRenovar = 'ok' | 'vencida' | 'temporal';
+let renovando: Promise<ResultadoDeRenovar> | null = null;
+
+async function pedirNuevosTokens(tokenUsado: string | null): Promise<ResultadoDeRenovar> {
+  // Otra petición u otra pestaña ya renovó mientras esperábamos: basta con usar el token nuevo.
+  const actual = localStorage.getItem('auth_token');
+  if (actual && tokenUsado && actual !== tokenUsado) return 'ok';
+
+  const refreshToken = localStorage.getItem('refresh_token');
+  if (!refreshToken) return 'vencida';
+  try {
+    const r = await fetch(`${API_BASE_URL}${API_PREFIX}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (r.status === 401 || r.status === 403) return 'vencida';
+    if (!r.ok) return 'temporal';
+    const json = await r.json();
+    const datos = json.data ?? json;
+    if (!datos?.accessToken || !datos?.refreshToken) return 'temporal';
+    localStorage.setItem('auth_token', datos.accessToken);
+    localStorage.setItem('refresh_token', datos.refreshToken);
+    return 'ok';
+  } catch {
+    return 'temporal';
+  }
+}
+
+/**
+ * Renueva la sesión con el token de refresco. Una sola renovación a la vez: el token de refresco es de un solo uso, así
+ * que dos renovaciones simultáneas (varias peticiones, o varias pestañas) cerrarían la sesión por error.
+ */
+function renovarSesion(tokenUsado: string | null): Promise<ResultadoDeRenovar> {
+  if (renovando) return renovando;
+  const bloqueos = (typeof navigator !== 'undefined' ? (navigator as any).locks : undefined) as
+    | { request: (nombre: string, fn: () => Promise<ResultadoDeRenovar>) => Promise<ResultadoDeRenovar> }
+    | undefined;
+  renovando = (async () => (bloqueos ? bloqueos.request('synkro-renovar-sesion', () => pedirNuevosTokens(tokenUsado)) : pedirNuevosTokens(tokenUsado)))()
+    .finally(() => { renovando = null; });
+  return renovando;
+}
+
+/**
+ * fetch con sesión: si el servidor responde 401 por token vencido, renueva la sesión y repite la petición una vez.
+ * Solo si la renovación también falla (sesión realmente vencida) avisa a la aplicación para volver al inicio de sesión.
+ */
+async function fetchConSesion(url: string, init: RequestInit): Promise<Response> {
+  const respuesta = await fetch(url, init);
+  if (respuesta.status !== 401 || RUTAS_SIN_RENOVAR.test(url)) return respuesta;
+
+  const cabeceras = (init.headers ?? {}) as Record<string, string>;
+  const tokenUsado = (cabeceras['Authorization'] ?? '').replace(/^Bearer /, '') || null;
+  const resultado = await renovarSesion(tokenUsado);
+  if (resultado === 'vencida') {
+    window.dispatchEvent(new Event(EVENTO_SESION_VENCIDA));
+    return respuesta;
+  }
+  if (resultado === 'temporal') return respuesta;
+
+  const nuevo = localStorage.getItem('auth_token');
+  return fetch(url, { ...init, headers: { ...cabeceras, ...(nuevo ? { Authorization: `Bearer ${nuevo}` } : {}) } });
+}
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -33,7 +106,7 @@ async function apiRequest<T>(
       } catch { /* sin almacenamiento: el servidor usa la tienda por defecto */ }
     }
 
-    const response = await fetch(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
+    const response = await fetchConSesion(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
       ...options,
       headers,
     });
@@ -86,7 +159,7 @@ async function apiRequestMultipart<T>(
       } catch { /* el servidor usa la tienda por defecto */ }
     }
 
-    const response = await fetch(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
+    const response = await fetchConSesion(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
       method,
       headers,
       body,
@@ -139,7 +212,7 @@ async function apiDownload(
     } catch { /* sin almacenamiento: el servidor usa la tienda por defecto */ }
   }
 
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
+  const response = await fetchConSesion(`${API_BASE_URL}${API_PREFIX}${endpoint}`, {
     ...options,
     headers,
   });
