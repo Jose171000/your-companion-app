@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +50,13 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
   const [tiene, setTiene] = useState<"si" | "no" | null>(null);
   const [sugerencia, setSugerencia] = useState<DeteccionDeVariantes | null>(null);
   const [detectando, setDetectando] = useState(false);
+  // El SKU que se asignaría si el usuario no escribe uno (formato de la tienda activa).
+  const [skuSugerido, setSkuSugerido] = useState("");
+  useEffect(() => {
+    let vivo = true;
+    variantsApi.nextSku().then((r) => { if (vivo && r.data?.skus?.[0]) setSkuSugerido(r.data.skus[0]); }).catch(() => undefined);
+    return () => { vivo = false; };
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addImages = useCallback((newFiles: File[]) => {
@@ -131,8 +138,8 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
     }
   };
 
-  // Con fotos y SKU alcanza: la IA completa nombre, descripción, categoría y atributos.
-  const isSingleDisabled = !sku || images.length === 0;
+  // Con fotos alcanza: el SKU se genera solo y la IA completa nombre, descripción, categoría y atributos.
+  const isSingleDisabled = images.length === 0;
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -162,11 +169,11 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
             <div className="space-y-1.5 md:space-y-2">
               <Label htmlFor="product-sku" className="text-xs md:text-sm text-[#111111] dark:text-[#F8F8F5] font-medium">
-                SKU <span className="text-red-500">*</span>
+                SKU <span className="text-muted-foreground font-normal">(opcional)</span>
               </Label>
               <Input
                 id="product-sku"
-                placeholder="Ej: APL-IP15PM-256"
+                placeholder={skuSugerido ? `Vacío = se asigna ${skuSugerido}` : "Vacío = se genera solo"}
                 value={sku}
                 onChange={(e) => setSku(e.target.value)}
                 className="bg-white dark:bg-[#1A1A1A] border-[#EAEAEA] dark:border-white/20 focus-visible:border-[#FCCB34] focus-visible:ring-[#FCCB34] h-10 md:h-12 text-sm px-4 shadow-sm dark:text-[#F8F8F5]"
@@ -328,12 +335,12 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
                 <VariantsWizard
                   photos={previews.map((src) => ({ src }))}
                   parentSku={sku}
-                  onParentSkuChange={setSku}
+                  codigoSugerido={skuSugerido}
                   basePrice={price}
                   baseStock={stock}
                   deteccion={sugerencia}
                   busy={isProcessing}
-                  onSubmit={(wizard) => onSubmitVariants?.({ sku, content: singleProduct, images, wizard })}
+                  onSubmit={(wizard) => onSubmitVariants?.({ sku: sku.trim(), content: singleProduct, images, wizard })}
                 />
               )}
             </div>
@@ -374,7 +381,7 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
                 <>
                   <p className="font-medium text-sm md:text-base">Sube tu archivo Excel</p>
                   <p className="text-xs md:text-sm text-muted-foreground mt-1">
-                    Columnas: sku, precio, stock, fotos (nombre y descripción son opcionales)
+                    Columnas: precio, stock, fotos (SKU, nombre y descripción son opcionales)
                   </p>
                 </>
               )}

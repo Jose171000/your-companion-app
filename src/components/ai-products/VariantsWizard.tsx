@@ -21,13 +21,15 @@ import {
 
 export interface ResultadoDelRecorrido {
   axes: EjeDeVariacion[];
-  variants: { values: Valores; sku: string; price: number | null; stock: number | null; photoIndexes: number[] }[];
+  variants: { values: Valores; price: number | null; stock: number | null; photoIndexes: number[] }[];
 }
 
 interface Props {
   photos: { src: string }[];
+  /** SKU que escribió el usuario para el grupo; vacío = se asigna uno solo. */
   parentSku: string;
-  onParentSkuChange: (s: string) => void;
+  /** El SKU que se asignaría (para mostrar los de las variantes antes de crear). */
+  codigoSugerido: string;
   basePrice: string;
   baseStock: string;
   /** Lo que la IA detectó antes de entrar: ejes, valores y a qué valor corresponde cada foto. */
@@ -103,7 +105,7 @@ function CampoConCheck({ placeholder, onAdd, ancho = "w-44" }: { placeholder: st
   );
 }
 
-export function VariantsWizard({ photos, parentSku, onParentSkuChange, basePrice, baseStock, deteccion, busy, onSubmit }: Props) {
+export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, baseStock, deteccion, busy, onSubmit }: Props) {
   const [axes, setAxes] = useState<string[]>(() => deteccion?.ejes.map((e) => e.name) ?? []);
   const [vals, setVals] = useState<Record<string, string[]>>(() => Object.fromEntries((deteccion?.ejes ?? []).map((e) => [e.name, e.values])));
   const [fotosModo, setFotosModo] = useState<"mismas" | "cambian" | null>(null);
@@ -114,7 +116,6 @@ export function VariantsWizard({ photos, parentSku, onParentSkuChange, basePrice
   const [stockModo, setStockModo] = useState<"igual" | "variante" | null>(null);
   const [stockIgual, setStockIgual] = useState(baseStock);
   const [stocks, setStocks] = useState<Record<string, string>>({});
-  const [skus, setSkus] = useState<Record<string, string>>({});
   const [excluidas, setExcluidas] = useState<string[]>([]);
 
   const ejes: EjeDeVariacion[] = useMemo(() => axes.map((name) => ({ name, values: vals[name] ?? [] })), [axes, vals]);
@@ -127,7 +128,7 @@ export function VariantsWizard({ photos, parentSku, onParentSkuChange, basePrice
 
   const reiniciarDesdeFotos = () => {
     setFotosModo(null); setAsign({}); setMarcadas([]); setPrecioEjes(null); setPrecios({});
-    setStockModo(null); setStocks({}); setSkus({}); setExcluidas([]);
+    setStockModo(null); setStocks({}); setExcluidas([]);
   };
 
   const alternarEje = (name: string) => {
@@ -175,10 +176,12 @@ export function VariantsWizard({ photos, parentSku, onParentSkuChange, basePrice
   };
   const precioTexto = (v: Valores) => precioDeVariante(v, precioEjes ?? [], precios, basePrice);
   const stockTexto = (k: string) => (stockModo === "igual" ? stockIgual : stocks[k] ?? stockIgual);
-  const skuDe = (v: Valores) => skus[claveDe(v, ejes)] ?? (parentSku.trim() ? skuSugerido(parentSku, v, ejes) : "");
+  // Los SKU se asignan solos al crear; aquí solo se muestran. Después se pueden corregir, hasta publicar.
+  const codigo = parentSku.trim() || codigoSugerido;
+  const skuDe = (v: Valores) => (codigo ? skuSugerido(codigo, v, ejes) : "se asigna solo");
 
   const sinFotos = modoFotos === "cambian" ? variantes.filter((v) => !fotosDe(claveDe(v, ejes)).length) : [];
-  const listoParaCrear = !!parentSku.trim() && variantes.length > 0 && variantes.length <= MAX_VARIANTES && sinFotos.length === 0 && !busy;
+  const listoParaCrear = variantes.length > 0 && variantes.length <= MAX_VARIANTES && sinFotos.length === 0 && !busy;
 
   const crear = () => {
     onSubmit({
@@ -189,7 +192,6 @@ export function VariantsWizard({ photos, parentSku, onParentSkuChange, basePrice
         const stock = parseInt(stockTexto(k), 10);
         return {
           values: v,
-          sku: skuDe(v),
           price: Number.isFinite(precio) ? precio : null,
           stock: Number.isFinite(stock) && stock >= 0 ? stock : 0,
           photoIndexes: fotosDe(k),
@@ -398,10 +400,9 @@ export function VariantsWizard({ photos, parentSku, onParentSkuChange, basePrice
       {hayCombos && pasoFotosListo && pasoPrecioListo && pasoStockListo && sinFotos.length === 0 && (
         <div className={tarjeta}>
           <p className="text-sm font-medium mb-2">Revisa tus {variantes.length} variantes</p>
-          <label className="block text-[11px] text-muted-foreground mb-3">
-            Código del grupo (SKU)
-            <Input className="h-8 text-xs mt-1 max-w-xs" value={parentSku} onChange={(e) => onParentSkuChange(e.target.value)} placeholder="Ej: MK-1" />
-          </label>
+          <p className="text-[11px] text-muted-foreground mb-3">
+            Los SKU se asignan solos{codigo ? ` (código del grupo: ${codigo})` : ""}. Cuando la IA termine podrás revisar y corregir todo: variantes, SKU, fotos, precios y stock.
+          </p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -420,7 +421,7 @@ export function VariantsWizard({ photos, parentSku, onParentSkuChange, basePrice
                   return (
                     <tr key={k} className="border-t border-border">
                       <td className="py-1.5 pr-2 whitespace-nowrap">{etiquetaDe(v, ejes)}</td>
-                      <td className="py-1.5 pr-2"><Input className="h-7 text-xs min-w-36" value={skuDe(v)} onChange={(e) => setSkus((s) => ({ ...s, [k]: e.target.value }))} /></td>
+                      <td className="py-1.5 pr-2 font-mono text-muted-foreground whitespace-nowrap">{skuDe(v)}</td>
                       {modoFotos === "cambian" && <td className="py-1.5 pr-2 text-muted-foreground whitespace-nowrap">{fotosDe(k).length} {fotosDe(k).length === 1 ? "foto" : "fotos"}</td>}
                       {(precioEjes?.length ?? 0) > 0 && (
                         <td className="py-1.5 pr-2">
@@ -442,7 +443,6 @@ export function VariantsWizard({ photos, parentSku, onParentSkuChange, basePrice
           {excluidas.length > 0 && (
             <button type="button" className="text-[11px] text-muted-foreground underline mt-2" onClick={() => setExcluidas([])}>Volver a incluir las {excluidas.length} variantes quitadas</button>
           )}
-          {!parentSku.trim() && <p className="text-[11px] text-red-400 mt-2">Escribe el código del grupo (SKU).</p>}
           <Button type="button" disabled={!listoParaCrear} onClick={crear} className="w-full h-11 mt-3 rounded-[12px] font-semibold bg-[#111111] dark:bg-[#FCCB34] text-white dark:text-[#111111] hover:bg-[#222222] dark:hover:bg-[#E6B620]">
             {busy ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando variantes…</> : <><Sparkles className="w-4 h-4 mr-2 text-[#FCCB34] dark:text-[#111111]" />Generar con IA</>}
           </Button>

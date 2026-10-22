@@ -166,7 +166,8 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
 
       const contenido = data.content.trim();
       const res = await variantsApi.createGroup({
-        parentSku: data.sku.trim(),
+        // Sin SKU escrito, el servidor asigna el del grupo y los de las variantes.
+        ...(data.sku.trim() ? { parentSku: data.sku.trim() } : {}),
         // Un texto corto es el nombre; uno largo es la descripción. Sin texto, la IA arma ambos desde las fotos.
         ...(contenido && contenido.length <= 120 ? { name: contenido } : {}),
         description: contenido || undefined,
@@ -175,7 +176,6 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
         axes: data.wizard.axes,
         variants: data.wizard.variants.map((v) => ({
           values: v.values,
-          sku: v.sku,
           price: v.price,
           stock: v.stock,
           images: v.photoIndexes.map((ix) => urlPorIndice[ix]),

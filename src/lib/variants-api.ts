@@ -24,7 +24,7 @@ export interface VarianteEntrada {
 }
 
 export interface CrearGrupoPayload {
-  parentSku: string;
+  parentSku?: string;
   name?: string;
   description?: string;
   targetMarketplaces?: string[];
@@ -67,6 +67,9 @@ export async function reducirParaDetector(file: File, maximo = 1280): Promise<Fi
 }
 
 export const variantsApi = {
+  /** El SKU que se asignaría ahora en la tienda activa (sigue el formato de la tienda). Solo informa: no lo reserva. */
+  nextSku: () => apiRequest<{ skus: string[] }>('/products/sku/next?count=1', { method: 'GET' }),
+
   /** Filtro previo: las fotos y el texto se mandan para revisarlos, no se guardan. */
   detect: async (files: File[], text: string) => {
     const form = new FormData();
