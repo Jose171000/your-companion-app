@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, Clock, FileText, LayoutGrid, List, Pencil, Search } from "lucide-react";
+import { AlertCircle, Clock, FileText, LayoutGrid, List, MoreVertical, Pause, Pencil, Play, Power, Search, Trash2 } from "lucide-react";
 import { Product } from "@/lib/products-api";
 import { ProductSheetDialog } from "@/components/products/ProductSheetDialog";
-import { ChangeRequest, UserListing } from "@/lib/sync-api";
+import { ChangeRequest, ChannelActionType, UserListing } from "@/lib/sync-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -13,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { channelName, money } from "./format";
 import { EditInventoryDialog, EditableProduct } from "./EditInventoryDialog";
 import { ProductThumb } from "./ProductThumb";
+import { ChannelActionDialog, PendingChannelAction, estadoVisible } from "./ChannelActionDialog";
 
 interface Props {
   listings: UserListing[];
@@ -42,12 +44,14 @@ const STATUS_STYLES: Record<string, string> = {
   pending: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30",
   paused: "bg-blue-500/10 text-blue-400 border-blue-500/30",
   error: "bg-red-500/10 text-red-400 border-red-500/30",
+  removed: "bg-zinc-500/10 text-zinc-400 border-zinc-500/30",
 };
 const STATUS_LABELS: Record<string, string> = {
   published: "Publicado",
   pending: "En proceso",
   paused: "Pausado",
   error: "Error",
+  removed: "Retirado",
 };
 
 /** Agrupa las publicaciones por producto: una fila por producto, una celda por canal. */
@@ -110,9 +114,66 @@ function WebPrice({ value }: { value?: number | null }) {
   );
 }
 
-function ChannelChip({ cell }: { cell: ChannelCell }) {
+type OnChannelAction = (action: ChannelActionType, listing?: UserListing) => void;
+
+/** Menú de un canal: pausar o reanudar, y quitar el producto de ese canal. */
+function ChannelMenu({ listing: l, onAction }: { listing: UserListing; onAction: OnChannelAction }) {
+  const estado = estadoVisible(l);
+  const puedePausar = estado === "published";
+  const puedeReanudar = estado === "paused";
+  const puedeQuitar = estado === "published" || estado === "paused" || estado === "error";
+  if (!puedePausar && !puedeReanudar && !puedeQuitar) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="rounded p-0.5 text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label={`Acciones en ${channelName(l.marketplace)}`}>
+          <MoreVertical className="w-3.5 h-3.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {puedePausar && <DropdownMenuItem onSelect={() => onAction("pause", l)}><Pause className="w-3.5 h-3.5 mr-2" /> Pausar en {channelName(l.marketplace)}</DropdownMenuItem>}
+        {puedeReanudar && <DropdownMenuItem onSelect={() => onAction("resume", l)}><Play className="w-3.5 h-3.5 mr-2" /> Reanudar en {channelName(l.marketplace)}</DropdownMenuItem>}
+        {puedeQuitar && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-red-400 focus:text-red-400" onSelect={() => onAction("remove", l)}><Trash2 className="w-3.5 h-3.5 mr-2" /> Quitar de {channelName(l.marketplace)}</DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+/** Botón general: la misma acción en todos los canales del producto a la vez. */
+function AllChannelsMenu({ channels, onAction }: { channels: ChannelCell[]; onAction: OnChannelAction }) {
+  const estados = channels.map((c) => estadoVisible(c.listing));
+  const hayActivas = estados.includes("published");
+  const hayPausadas = estados.includes("paused");
+  const hayQuitables = estados.some((e) => e === "published" || e === "paused" || e === "error");
+  if (!hayActivas && !hayPausadas && !hayQuitables) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-1.5"><Power className="w-3.5 h-3.5" /> Canales</Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {hayActivas && <DropdownMenuItem onSelect={() => onAction("pause")}><Pause className="w-3.5 h-3.5 mr-2" /> Pausar en todos los canales</DropdownMenuItem>}
+        {hayPausadas && <DropdownMenuItem onSelect={() => onAction("resume")}><Play className="w-3.5 h-3.5 mr-2" /> Reanudar en todos</DropdownMenuItem>}
+        {hayQuitables && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-red-400 focus:text-red-400" onSelect={() => onAction("remove")}><Trash2 className="w-3.5 h-3.5 mr-2" /> Quitar de todos los canales</DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ChannelChip({ cell, canEdit, onAction }: { cell: ChannelCell; canEdit: boolean; onAction: OnChannelAction }) {
   const { listing: l } = cell;
-  const drift = l.syncStatus === "published" && (cell.priceDrift || cell.stockDrift);
+  const estado = estadoVisible(l);
+  const drift = estado === "published" && (cell.priceDrift || cell.stockDrift);
   const chip = (
     <div
       className={cn(
@@ -125,10 +186,13 @@ function ChannelChip({ cell }: { cell: ChannelCell }) {
           {channelName(l.marketplace)}
           {l.accountLabel && <span className="font-normal text-muted-foreground"> · {l.accountLabel}</span>}
         </span>
-        <Badge className={cn("text-[10px] gap-1", STATUS_STYLES[l.syncStatus] ?? STATUS_STYLES.pending)}>
-          {l.syncStatus === "error" && <AlertCircle className="w-3 h-3" />}
-          {STATUS_LABELS[l.syncStatus] ?? l.syncStatus}
-        </Badge>
+        <div className="flex items-center gap-1">
+          <Badge className={cn("text-[10px] gap-1", STATUS_STYLES[estado] ?? STATUS_STYLES.pending)}>
+            {estado === "error" && <AlertCircle className="w-3 h-3" />}
+            {STATUS_LABELS[estado] ?? estado}
+          </Badge>
+          {canEdit && <ChannelMenu listing={l} onAction={onAction} />}
+        </div>
       </div>
       <div className="flex items-end justify-between gap-2 text-muted-foreground tabular-nums">
         <ChannelPrice listing={l} />
@@ -165,12 +229,16 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<EditableProduct | null>(null);
   const [sheetFor, setSheetFor] = useState<Product | null>(null);
+  const [channelAction, setChannelAction] = useState<PendingChannelAction | null>(null);
 
   const rows = useMemo(() => buildRows(listings, pending), [listings, pending]);
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     return q ? rows.filter((r) => r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q)) : rows;
   }, [rows, search]);
+
+  const askChannelAction = (r: Row): OnChannelAction => (action, listing) =>
+    setChannelAction({ productId: r.productId, productName: r.name, action, listing, listings: r.channels.map((c) => c.listing) });
 
   if (isLoading) {
     return (
@@ -265,7 +333,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
               </div>
               <div className="flex flex-wrap gap-2 flex-1">
                 {r.channels.map((c) => (
-                  <ChannelChip key={c.listing.id} cell={c} />
+                  <ChannelChip key={c.listing.id} cell={c} canEdit={canEdit} onAction={askChannelAction(r)} />
                 ))}
               </div>
               <div className="flex gap-2 shrink-0">
@@ -277,6 +345,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
                     <Pencil className="w-3.5 h-3.5" /> Editar
                   </Button>
                 )}
+                {canEdit && <AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} />}
               </div>
             </div>
           ))}
@@ -313,9 +382,10 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
               </div>
               <div className="flex flex-wrap gap-2">
                 {r.channels.map((c) => (
-                  <ChannelChip key={c.listing.id} cell={c} />
+                  <ChannelChip key={c.listing.id} cell={c} canEdit={canEdit} onAction={askChannelAction(r)} />
                 ))}
               </div>
+              {canEdit && <div className="flex justify-end"><AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} /></div>}
             </div>
           ))}
         </div>
@@ -323,6 +393,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
 
       <EditInventoryDialog product={editing} reviewMode={reviewMode} onClose={() => setEditing(null)} />
       <ProductSheetDialog product={sheetFor} onClose={() => setSheetFor(null)} />
+      <ChannelActionDialog pending={channelAction} onClose={() => setChannelAction(null)} />
     </div>
   );
 }

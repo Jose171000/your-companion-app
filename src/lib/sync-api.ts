@@ -21,11 +21,20 @@ export interface ListingInfo {
   marketplace: string;
   externalId: string;
   permalink?: string;
-  syncStatus: 'pending' | 'published' | 'paused' | 'error';
+  syncStatus: 'pending' | 'published' | 'paused' | 'error' | 'removed';
+  /** Pausada por el usuario desde Synkro (en Falabella el canal la sigue mostrando activa, con stock 0) */
+  pausedByUser?: boolean;
   lastStockSynced?: number;
   lastPriceSynced?: number;
   lastSyncedAt?: string;
   lastError?: string;
+}
+
+export type ChannelActionType = 'pause' | 'resume' | 'remove';
+
+export interface ChannelActionResult {
+  message: string;
+  results: { linkId: string; marketplace: string; account: string | null; ok: boolean; message: string }[];
 }
 
 export interface ProductSyncStatus {
@@ -400,6 +409,13 @@ export const syncApi = {
     apiRequest<{ message: string; pending?: number }>(`/sync/products/${productId}/inventory`, {
       method: 'PATCH',
       body: JSON.stringify(dto),
+    }),
+
+  /** Pausa, reanuda o quita un producto de uno o de todos sus canales (sin linkIds actúa sobre todos). */
+  channelAction: (productId: string, action: ChannelActionType, opts: { linkIds?: string[]; confirm?: boolean } = {}) =>
+    apiRequest<ChannelActionResult>(`/sync/products/${productId}/channels/${action}`, {
+      method: 'POST',
+      body: JSON.stringify(opts),
     }),
 
   /** Estado de sincronización de un producto en cada marketplace */
