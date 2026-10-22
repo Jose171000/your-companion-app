@@ -25,6 +25,7 @@ import {
   AlertCircle, Edit, FileWarning, ImagePlus, Loader2, Save, Sparkles, X } from "lucide-react";
 import { Product, productsApi } from "@/lib/products-api";
 import { toast } from "sonner";
+import { ACEPTAR_FOTOS, TEXTO_FORMATO_FOTOS, prepararFotos, resumenDeErrores } from "@/lib/fotos";
 import { cn } from "@/lib/utils";
 import { useFormDraft } from "@/contexts/FormDraftContext";
 
@@ -100,8 +101,10 @@ export function ProductFormDialog({
   }, [open, product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Image helpers ─────────────────────────────────────────────────────────
-  const addImages = useCallback((files: File[]) => {
-    const valid = files.filter((f) => f.type.startsWith("image/"));
+  const addImages = useCallback(async (files: File[]) => {
+    // Solo JPG; una foto más grande de lo permitido se ajusta sola.
+    const { validas: valid, errores } = await prepararFotos(files);
+    if (errores.length) toast.error(resumenDeErrores(errores));
     if (!valid.length) return;
     setImages((prev) => [...prev, ...valid]);
     valid.forEach((f) => {
@@ -449,7 +452,7 @@ export function ProductFormDialog({
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept="image/jpeg,image/png,image/webp"
+                      accept={ACEPTAR_FOTOS}
                       multiple
                       className="hidden"
                       onChange={(e) => {
@@ -467,7 +470,7 @@ export function ProductFormDialog({
                       {isDragOver ? "Suéltala aquí" : "Arrastra o haz clic para subir imágenes"}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      JPG, PNG, WEBP · múltiples imágenes
+                      {TEXTO_FORMATO_FOTOS} · varias fotos
                     </p>
                   </div>
 

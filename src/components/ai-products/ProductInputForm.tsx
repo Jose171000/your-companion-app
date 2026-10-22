@@ -10,6 +10,7 @@ import { useStores } from "@/contexts/StoreContext";
 import { VariantsWizard, type ResultadoDelRecorrido } from "./VariantsWizard";
 import { variantsApi, type DeteccionDeVariantes } from "@/lib/variants-api";
 import { toast } from "sonner";
+import { ACEPTAR_FOTOS, TEXTO_FORMATO_FOTOS, prepararFotos, resumenDeErrores } from "@/lib/fotos";
 import { cn } from "@/lib/utils";
 
 interface ProductInputFormProps {
@@ -59,8 +60,10 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
   }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const addImages = useCallback((newFiles: File[]) => {
-    const validFiles = newFiles.filter((f) => f.type.startsWith("image/"));
+  const addImages = useCallback(async (newFiles: File[]) => {
+    // Solo JPG; una foto más grande de lo permitido se ajusta sola.
+    const { validas: validFiles, errores } = await prepararFotos(newFiles);
+    if (errores.length) toast.error(resumenDeErrores(errores));
     if (!validFiles.length) return;
 
     setSugerencia(null);
@@ -253,7 +256,7 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp"
+                accept={ACEPTAR_FOTOS}
                 multiple
                 className="hidden"
                 onChange={handleImageInputChange}
@@ -266,7 +269,7 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
                 {isDragOver ? "Suéltala aquí" : "Arrastra imágenes o haz clic para seleccionar"}
               </p>
               <p className="text-[10px] md:text-xs text-[#666666] dark:text-[#A1A1AA] mt-1">
-                JPG, PNG, WEBP · Múltiples imágenes permitidas
+                {TEXTO_FORMATO_FOTOS} · Varias fotos permitidas
               </p>
             </div>
 
