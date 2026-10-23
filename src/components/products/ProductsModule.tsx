@@ -59,8 +59,9 @@ export function ProductsModule() {
 
   const paginatedData = queryResult?.data;         // PaginatedProducts
   const products      = paginatedData?.data ?? [];
-  const totalPages    = paginatedData?.totalPages ?? 1;
-  const total         = paginatedData?.total ?? 0;
+  // La paginación viene en `meta`; sin leerla, la lista parecía tener una sola página y no se mostraban los controles.
+  const totalPages    = paginatedData?.meta?.totalPages ?? paginatedData?.totalPages ?? 1;
+  const total         = paginatedData?.meta?.total ?? paginatedData?.total ?? products.length;
 
   // Lo que no viene en la lista: categoría real, estado de cada canal y qué falta (una consulta por página).
   // Un grupo de variantes es una fila, pero su estado se calcula con todas sus variantes.

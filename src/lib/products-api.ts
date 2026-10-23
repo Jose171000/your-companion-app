@@ -86,12 +86,15 @@ export interface ProductsSummary {
   incompletos: number;
 }
 
+/** Lo que responde el servidor: los productos y, aparte, los datos de la paginación (`meta`). */
 export interface PaginatedProducts {
   data: Product[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  meta?: { total: number; page: number; limit: number; totalPages: number; hasNextPage?: boolean; hasPreviousPage?: boolean };
+  /** Formato antiguo, por si algún servidor lo manda así */
+  total?: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
 }
 
 export interface CreateProductDto {
