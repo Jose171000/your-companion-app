@@ -281,6 +281,8 @@ export interface FalabellaImportSummary {
     ia?: { intentadas: number; resueltas: number; pendientes: number };
     /** Lectura de la página pública de Falabella para las familias que los atributos no resolvieron */
     paginaPublica?: { familias: number; leidas: number; resueltas: number; bloqueada: boolean; pendientes: number; sinDatos: { parentSku: string; motivo: string }[] };
+    /** Familias que ya estaban agrupadas en Synkro: no se vuelven a proponer */
+    yaAgrupadas?: number;
     aplicado: { gruposCreados: number; gruposActualizados: number; variantesAgrupadas: number; omitidos: { parentSku: string; motivo: string }[] } | null;
   };
 }

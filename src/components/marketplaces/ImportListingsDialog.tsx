@@ -171,7 +171,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
               )}
             </div>
 
-            {preview.variantes && (preview.variantes.grupos > 0 || preview.variantes.sinResolver.length > 0 || (preview.variantes.paginaPublica?.familias ?? 0) > 0) && (
+            {preview.variantes && (preview.variantes.grupos > 0 || preview.variantes.sinResolver.length > 0 || (preview.variantes.paginaPublica?.familias ?? 0) > 0 || (preview.variantes.yaAgrupadas ?? 0) > 0) && (
               <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2 text-xs max-h-[40vh] overflow-y-auto">
                 {preview.variantes.grupos > 0 && (
                   <>
@@ -190,6 +190,11 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
                       )}
                     </ul>
                   </>
+                )}
+                {(preview.variantes.yaAgrupadas ?? 0) > 0 && (
+                  <p className="text-muted-foreground">
+                    {preview.variantes.yaAgrupadas} {preview.variantes.yaAgrupadas === 1 ? "familia ya estaba agrupada" : "familias ya estaban agrupadas"} en Synkro: no se vuelven a proponer.
+                  </p>
                 )}
                 {preview.variantes.ia && preview.variantes.ia.intentadas > 0 && (
                   <p className="text-muted-foreground">
@@ -289,7 +294,12 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
         </DialogFooter>
       </DialogContent>
     </Dialog>
-    <ManualVariantsDialog familia={manual} onClose={() => setManual(null)} onDone={() => accountId && previewMutation.mutate(accountId)} />
+    <ManualVariantsDialog familia={manual} onClose={() => setManual(null)} onDone={() => {
+      // La familia ya quedó agrupada: sale de la lista al instante y la vista previa se vuelve a calcular en segundo plano.
+      const agrupada = manual?.parentSku;
+      setPreview((p) => (p?.variantes ? { ...p, variantes: { ...p.variantes, sinResolver: p.variantes.sinResolver.filter((g) => g.parentSku !== agrupada), yaAgrupadas: (p.variantes.yaAgrupadas ?? 0) + 1 } } : p));
+      if (accountId) previewMutation.mutate(accountId);
+    }} />
     </>
   );
 }
