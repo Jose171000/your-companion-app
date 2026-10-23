@@ -93,8 +93,9 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
   });
 
   // Al abrir se parte de la primera cuenta; con una sola no hay nada que elegir.
+  // Si la lista de cuentas se recarga mientras el diálogo está abierto, la cuenta elegida se conserva (solo cambia si ya no existe).
   useEffect(() => {
-    if (open) setAccountId(accounts[0]?.id ?? "");
+    if (open) setAccountId((actual) => (accounts.some((c) => c.id === actual) ? actual : accounts[0]?.id ?? ""));
   }, [open, accounts]);
 
   // Cada vez que cambia la cuenta (o se abre), se pide una vista previa nueva.
