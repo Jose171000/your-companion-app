@@ -254,6 +254,15 @@ export interface FalabellaImportSummary {
   porEstado: Record<string, number>;
   notaMedia: number | null;
   ejemplos: { sku: string; nombre: string; estado: string; nota: number | null; enCatalogo: boolean }[];
+  /** Mercado Libre: publicaciones repetidas (mismo SKU en la misma cuenta). No son variantes: solo la principal se enlaza. */
+  duplicadas?: number;
+  duplicados?: {
+    sku: string;
+    publicaciones: {
+      externalId: string; variationId: string | null; titulo: string; estado: string; precio: number | null; stock: number; vendidas: number;
+      permalink: string | null; imagen: string | null; tipo: string | null; sincronizadaCon: string | null; principal: boolean;
+    }[];
+  }[];
   /** Falabella: fichas que son variantes de un mismo producto (mismo ParentSku) y cómo quedan agrupadas */
   variantes?: {
     grupos: number;

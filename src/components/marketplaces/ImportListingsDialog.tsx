@@ -221,6 +221,33 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
               </div>
             )}
 
+            {(preview.duplicados?.length ?? 0) > 0 && (
+              <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2 text-xs max-h-[40vh] overflow-y-auto">
+                <p className="font-semibold">
+                  {preview.duplicadas} publicación(es) repetidas en {preview.duplicados!.length} SKU: no son variantes, son el mismo producto publicado más de una vez.
+                </p>
+                <p className="text-muted-foreground">Solo la principal (activa y con más ventas) se enlaza con el producto. Las demás no se importan; puedes pausarlas o cerrarlas en Mercado Libre.</p>
+                <ul className="space-y-2">
+                  {preview.duplicados!.slice(0, 30).map((d) => (
+                    <li key={d.sku} className="space-y-1">
+                      <code className="font-mono">{d.sku}</code>
+                      <ul className="space-y-0.5 pl-3">
+                        {d.publicaciones.map((p) => (
+                          <li key={p.externalId + (p.variationId ?? "")} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <Badge variant={p.principal ? "default" : "secondary"} className="text-[10px] py-0 px-1.5">{p.principal ? "Principal" : "Repetida"}</Badge>
+                            <span className="font-mono text-[11px]">#{p.externalId.replace(/^MPE/, "")}</span>
+                            <span className="text-muted-foreground">{p.estado === "published" ? "activa" : p.estado === "paused" ? "pausada" : p.estado} · {p.vendidas} vendidas · stock {p.stock}{p.precio != null ? ` · S/ ${p.precio}` : ""}{p.sincronizadaCon ? " · sincronizada" : ""}</span>
+                            {p.permalink && <a href={p.permalink} target="_blank" rel="noopener noreferrer" className="underline text-muted-foreground hover:text-foreground">Ver</a>}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                  {preview.duplicados!.length > 30 && <li className="text-muted-foreground">… y {preview.duplicados!.length - 30} SKU más</li>}
+                </ul>
+              </div>
+            )}
+
             {(preview.sinSku ?? 0) > 0 && (
               <p className="text-xs text-yellow-400">
                 {preview.sinSku} publicación(es) o variante(s) no tienen SKU y no se pueden enlazar. Ponles un SKU en {canal} y
