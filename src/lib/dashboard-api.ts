@@ -89,11 +89,22 @@ export interface PlanDelCliente extends ResumenDePlan {
   ultimoPago: { fecha: string; monto: number; concepto: string } | null;
 }
 
+export interface CanalDeVenta {
+  marketplace: string;
+  unidades: number;
+  importe: number;
+  /** Qué parte de lo que ingresó el producto viene de este canal (0 a 100) */
+  porcentaje: number;
+}
+
 export interface Ganadora {
   sku: string;
   nombre: string;
   unidades: number;
   importe: number;
+  /** El canal donde más ingresó este producto y todos los canales donde se vendió */
+  canal?: CanalDeVenta | null;
+  canales?: CanalDeVenta[];
   stock: number | null;
   diasDeStock: number | null;
   imagen: string | null;
