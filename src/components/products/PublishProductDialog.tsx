@@ -4,6 +4,7 @@ import { Product } from "@/lib/products-api";
 import { syncApi, FalabellaPrepReport } from "@/lib/sync-api";
 import { FalabellaBrandField } from "./FalabellaBrandField";
 import { PrepareFalabellaDialog } from "./PrepareFalabellaDialog";
+import { AccountChooser, CuentasPorCanal, useCuentasPorCanal } from "@/components/marketplaces/AccountChooser";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -38,6 +39,10 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
   }, [product]);
 
   const open = product !== null;
+
+  // Cuando la tienda tiene varias cuentas del canal, la persona elige en cuáles publicar.
+  const [cuentas, setCuentas] = useState<CuentasPorCanal>({});
+  const cuentasDelCanal = useCuentasPorCanal(open);
 
   // ── Falabella: la IA deja el producto listo (categoría, marca, medidas, datos obligatorios) ──
   const [prep, setPrep] = useState<FalabellaPrepReport | null>(null);
@@ -90,11 +95,23 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
 
   // ── Publicar ───────────────────────────────────────────────────────────────
   // Lo que ya está publicado no se vuelve a enviar: Falabella rechazaría el SKU repetido.
-  const publicados = new Set(listings.filter((l) => l.syncStatus === "published").map((l) => l.marketplace));
-  const porPublicar = selected.filter((id) => !publicados.has(id));
-  // Un canal que todavía procesa el envío anterior no recibe otro: se espera a que termine.
-  const enProceso = new Set(listings.filter((l) => l.syncStatus === "pending").map((l) => l.marketplace));
-  const enviando = porPublicar.length > 0 && porPublicar.every((mp) => enProceso.has(mp));
+  const estaEn = (mp: string, cuentaId: string, estado: string) =>
+    listings.some((l) => l.marketplace === mp && l.connectionId === cuentaId && l.syncStatus === estado);
+  // Un canal está publicado cuando lo está en todas sus cuentas activas.
+  const publicados = new Set(
+    PUBLISHABLE.map((p) => p.id).filter((mp) => (cuentasDelCanal[mp] ?? []).length > 0 && cuentasDelCanal[mp].every((c) => estaEn(mp, c.id, "published"))),
+  );
+  // Qué se va a enviar: cada canal marcado, en las cuentas elegidas (o en la única que hay) que todavía no lo tienen.
+  const objetivos = selected
+    .filter((mp) => !publicados.has(mp))
+    .flatMap((mp) => {
+      const activas = cuentasDelCanal[mp] ?? [];
+      const ids = activas.length > 1 ? (cuentas[mp] ?? []) : activas.map((c) => c.id);
+      return ids.filter((id) => !estaEn(mp, id, "published")).map((id) => ({ mp, id }));
+    });
+  const porPublicar = [...new Set(objetivos.map((o) => o.mp))];
+  // Una cuenta que todavía procesa el envío anterior no recibe otro: se espera a que termine.
+  const enviando = objetivos.length > 0 && objetivos.every((o) => estaEn(o.mp, o.id, "pending"));
 
   // Al publicarse un canal sale de la selección.
   useEffect(() => {
@@ -103,10 +120,19 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
   }, [listings]);
 
   const publishMutation = useMutation({
-    mutationFn: () => syncApi.publish(product!.id, porPublicar),
-    onSuccess: (res) => {
-      if (res.error) {
-        toast.error(res.error);
+    // Una orden por cuenta elegida: así cada publicación va a la cuenta que la persona marcó.
+    mutationFn: async () => {
+      const errores: string[] = [];
+      for (const o of objetivos.filter((x) => !estaEn(x.mp, x.id, "pending"))) {
+        const res = await syncApi.publish(product!.id, [o.mp], { [o.mp]: o.id });
+        if (res.error) errores.push(res.error);
+      }
+      return errores;
+    },
+    onSuccess: (errores) => {
+      if (errores.length) {
+        toast.error([...new Set(errores)].join(" · "));
+        queryClient.invalidateQueries({ queryKey: ["sync-status", product?.id] });
         return;
       }
       toast.success("Publicación encolada — el estado se actualiza en unos segundos");
@@ -148,7 +174,7 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
   }, [open, falabellaElegido, falabellaPublicado, product?.id, version, connections.length]);
 
   const canPublish =
-    porPublicar.length > 0 &&
+    objetivos.length > 0 &&
     !enviando &&
     !missingPrice &&
     porPublicar.every((mp) => isConnected(mp)) &&
@@ -168,10 +194,10 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
 
         <div className="space-y-3">
           {PUBLISHABLE.map((mp) => {
-            const listing   = listingFor(mp.id);
+            const listing   = listings.find((l) => l.marketplace === mp.id && l.syncStatus === "published") ?? listingFor(mp.id);
             const connected = isConnected(mp.id);
             const isSelected = selected.includes(mp.id);
-            const isPublished = listing?.syncStatus === "published";
+            const isPublished = publicados.has(mp.id);
 
             return (
               <div
@@ -234,6 +260,8 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
               </div>
             );
           })}
+
+          <AccountChooser canales={selected.filter((mp) => !publicados.has(mp))} value={cuentas} onChange={setCuentas} />
 
           {falabellaElegido && !falabellaPublicado && isConnected("falabella") && (
             <div className="rounded-xl border border-border p-3 space-y-3 min-w-0">

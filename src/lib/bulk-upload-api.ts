@@ -6,12 +6,21 @@ import { apiRequest, apiRequestMultipart, apiDownload } from './api';
 
 export interface BulkUploadResponse {
   jobId?: string;
+  /** Identificador de la carga: sirve para consultar su avance */
+  batchId?: string;
   message: string;
   accepted?: number;
   totalQueued?: number;
   totalSkipped?: number;
   /** Una línea por fila rechazada, con su motivo. */
   rejectedDetails?: string[];
+}
+
+export interface BulkProgress {
+  total: number;
+  processed: number;
+  failed: number;
+  terminado: boolean;
 }
 
 export interface BulkUploadStatus {
@@ -37,14 +46,20 @@ export const bulkUploadApi = {
    * Carga masiva de productos via Excel + ZIP opcional de imágenes.
    * Columnas Excel: sku | precio | stock | fotos | nombre | descripcion | canales (solo JPG)
    */
-  uploadProducts: (excelFile: File, zipFile?: File, canales: string[] = []) => {
+  uploadProducts: (excelFile: File, zipFile?: File, canales: string[] = [], cuentas: Record<string, string[]> = {}) => {
     const form = new FormData();
     form.append('excel', excelFile);
     if (zipFile) form.append('zip', zipFile);
     // Canales marcados en pantalla: valen para las filas sin columna `canales`.
     if (canales.length) form.append('canales', canales.join(','));
+    // Cuentas elegidas por canal (cuando la tienda tiene varias): { mercadolibre: [idCuenta] }.
+    if (Object.keys(cuentas).length) form.append('cuentas', JSON.stringify(cuentas));
     return apiRequestMultipart<BulkUploadResponse>('/bulk-upload/products', form);
   },
+
+  /** Avance de una carga masiva: cuántos productos van listos y cuántos fallaron. */
+  getProductsProgress: (batchId: string) =>
+    apiRequest<BulkProgress>(`/bulk-upload/products/progress/${batchId}`, { method: 'GET' }),
 
   /**
    * Edición masiva de productos via Excel.

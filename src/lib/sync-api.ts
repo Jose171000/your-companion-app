@@ -19,6 +19,9 @@ export interface MarketplaceConnection {
 
 export interface ListingInfo {
   marketplace: string;
+  /** Cuenta del canal en la que está publicada */
+  connectionId?: string | null;
+  accountLabel?: string | null;
   externalId: string;
   permalink?: string;
   syncStatus: 'pending' | 'published' | 'paused' | 'error' | 'removed';
@@ -380,10 +383,10 @@ export const syncApi = {
     ),
 
   /** Lanza el producto: deja listos los canales (categoría, marca, medidas, atributos, descripción HTML) y lo publica. */
-  launchProduct: (productId: string, marketplaces: string[]) =>
+  launchProduct: (productId: string, marketplaces: string[], connectionIds?: Record<string, string[]>) =>
     apiRequest<LaunchReport>(`/ai/products/${productId}/launch`, {
       method: 'POST',
-      body: JSON.stringify({ marketplaces }),
+      body: JSON.stringify({ marketplaces, ...(connectionIds && Object.keys(connectionIds).length ? { connectionIds } : {}) }),
     }),
 
   /** La ficha del producto: lo que se envía a cada canal donde está publicado. */

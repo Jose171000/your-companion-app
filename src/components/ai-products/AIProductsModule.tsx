@@ -1,3 +1,5 @@
+import { AccountChooser, CuentasPorCanal } from "@/components/marketplaces/AccountChooser";
+import { BulkProgressCard, LoteEnCurso } from "./BulkProgressCard";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -33,6 +35,10 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
   const [generatedProduct, setGeneratedProduct] = useState<any>(null);
   const [launch, setLaunch] = useState<LaunchReport | null>(null);
   const [launching, setLaunching] = useState(false);
+  // Cuentas elegidas por canal (si la tienda tiene varias) y la carga masiva que está en proceso.
+  const [cuentas, setCuentas] = useState<CuentasPorCanal>({});
+  const [lote, setLote] = useState<LoteEnCurso | null>(null);
+  const cuentasDe = (canales: string[]) => Object.fromEntries(canales.filter((c) => cuentas[c]?.length).map((c) => [c, cuentas[c]]));
   // Al cambiar, el formulario se vacía: queda listo para el siguiente producto.
   const [formKey, setFormKey] = useState(0);
   // Resultado de crear un producto con variantes.
@@ -55,7 +61,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
     }
     setLaunching(true);
     try {
-      const res = await syncApi.launchProduct(productId, canales);
+      const res = await syncApi.launchProduct(productId, canales, cuentasDe(canales));
       if (res.error || !res.data) {
         toast.error(res.error ?? "No se pudo publicar");
         return;
@@ -101,7 +107,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
           toast.error("No se encontró el archivo Excel.");
           return;
         }
-        const response = await bulkUploadApi.uploadProducts(data.bulkFile, data.zipFile, selectedMarketplaces);
+        const response = await bulkUploadApi.uploadProducts(data.bulkFile, data.zipFile, selectedMarketplaces, cuentasDe(selectedMarketplaces));
         if (response.error) {
           toast.error(response.error);
         } else {
@@ -110,7 +116,10 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
           if (rechazos.length) {
             toast.warning(`No se cargaron ${rechazos.length} fila(s):\n${rechazos.slice(0, 6).join("\n")}${rechazos.length > 6 ? "\n…" : ""}`, { duration: 20000 });
           }
-          console.log("Bulk upload response:", response.data);
+          // El formulario se limpia: así no se puede enviar el mismo archivo otra vez por error mientras se procesa.
+          setFormKey((k) => k + 1);
+          setDirty("ai-products", false);
+          if (response.data?.batchId) setLote({ batchId: response.data.batchId, total: response.data.totalQueued ?? 0, rechazos: rechazos });
         }
       } else {
         // ── Producto individual: genera contenido con IA ──
@@ -269,6 +278,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
           selected={selectedMarketplaces}
           onChange={setSelectedMarketplaces}
         />
+        <AccountChooser canales={selectedMarketplaces} value={cuentas} onChange={setCuentas} className="mt-4" />
       </Card>
 
       {/* Step 2: Product Input */}
@@ -287,6 +297,9 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
           isFormReady={selectedMarketplaces.length > 0}
         />
       </Card>
+
+      {/* Carga masiva en proceso: avance en vivo */}
+      {lote && <BulkProgressCard lote={lote} onClose={() => setLote(null)} />}
 
       {/* Resultado de un producto con variantes */}
       {grupoCreado && (
