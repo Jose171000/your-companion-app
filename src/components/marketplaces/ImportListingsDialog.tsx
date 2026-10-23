@@ -6,6 +6,7 @@ import { FalabellaImportSummary, MarketplaceConnection, syncApi } from "@/lib/sy
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { ManualVariantsDialog } from "./ManualVariantsDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Dialog,
@@ -58,6 +59,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
   const [accountId, setAccountId] = useState<string>("");
   const [preview, setPreview] = useState<FalabellaImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [manual, setManual] = useState<NonNullable<NonNullable<FalabellaImportSummary["variantes"]>["sinResolver"]>[number] | null>(null);
 
   const previewMutation = useMutation({
     mutationFn: (id: string) => llamar(true, id),
@@ -98,6 +100,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
   }, [open, accountId]);
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -181,6 +184,11 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
                     </ul>
                   </>
                 )}
+                {preview.variantes.ia && preview.variantes.ia.intentadas > 0 && (
+                  <p className="text-muted-foreground">
+                    La IA propuso los ejes de {preview.variantes.ia.intentadas} familias y se comprobaron contra los datos de cada ficha ({preview.variantes.ia.resueltas} aceptadas).
+                  </p>
+                )}
                 {preview.variantes.paginaPublica && preview.variantes.paginaPublica.familias > 0 && (
                   <p className="text-muted-foreground">
                     Se leyó la página pública de Falabella de {preview.variantes.paginaPublica.leidas} de {preview.variantes.paginaPublica.familias} familias
@@ -192,9 +200,15 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
                 {preview.variantes.sinResolver.length > 0 && (
                   <div className="text-yellow-400 space-y-0.5">
                     <p>{preview.variantes.sinResolver.length} grupo(s) no se pudieron armar y se importarán como productos sueltos:</p>
-                    {preview.variantes.sinResolver.slice(0, 5).map((g) => (
-                      <p key={g.parentSku}>· {g.parentSku} ({g.skus.length} fichas): {g.motivo}</p>
+                    {preview.variantes.sinResolver.slice(0, 8).map((g) => (
+                      <div key={g.parentSku} className="flex items-start justify-between gap-2">
+                        <p>· {g.parentSku} ({g.skus.length} fichas): {g.motivo}</p>
+                        {(g.fichas?.length ?? 0) > 1 && (
+                          <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] shrink-0 text-foreground" onClick={() => setManual(g)}>Estructurar</Button>
+                        )}
+                      </div>
                     ))}
+                    {preview.variantes.sinResolver.length > 8 && <p>… y {preview.variantes.sinResolver.length - 8} más</p>}
                   </div>
                 )}
               </div>
@@ -241,5 +255,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <ManualVariantsDialog familia={manual} onClose={() => setManual(null)} onDone={() => accountId && previewMutation.mutate(accountId)} />
+    </>
   );
 }

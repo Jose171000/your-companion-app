@@ -256,7 +256,17 @@ export interface FalabellaImportSummary {
     grupos: number;
     variantes: number;
     ejemplos: { parentSku: string; nombre: string; ejes: { name: string; values: string[] }[]; variantes: number }[];
-    sinResolver: { parentSku: string; skus: string[]; motivo: string }[];
+    sinResolver: {
+      parentSku: string;
+      skus: string[];
+      motivo: string;
+      /** Las fichas de la familia, para estructurarlas a mano */
+      fichas?: { sku: string; nombre: string }[];
+      /** Lo que propuso la IA y no se pudo comprobar: sirve de punto de partida */
+      sugerencia?: { ejes: string[]; valores: Record<string, Record<string, string>>; motivo: string };
+    }[];
+    /** Segundo recurso: la IA propone los ejes y se comprueban contra los datos de cada ficha */
+    ia?: { intentadas: number; resueltas: number; pendientes: number };
     /** Lectura de la página pública de Falabella para las familias que los atributos no resolvieron */
     paginaPublica?: { familias: number; leidas: number; resueltas: number; bloqueada: boolean; pendientes: number; sinDatos: { parentSku: string; motivo: string }[] };
     aplicado: { gruposCreados: number; gruposActualizados: number; variantesAgrupadas: number; omitidos: { parentSku: string; motivo: string }[] } | null;
@@ -302,6 +312,13 @@ export const syncApi = {
     apiRequest<FalabellaImportSummary>(
       `/sync/channels/${marketplace}/listings/import?dryRun=${dryRun}${connectionId ? `&connectionId=${connectionId}` : ''}`,
       { method: 'POST' },
+    ),
+
+  /** Agrupa a mano productos ya importados como variantes: nombre, ejes y valor de cada SKU. */
+  groupFalabellaVariants: (dto: { parentSku: string; name: string; axes: string[]; variants: { sellerSku: string; values: Record<string, string> }[] }) =>
+    apiRequest<{ gruposCreados: number; gruposActualizados: number; variantesAgrupadas: number; omitidos: { parentSku: string; motivo: string }[] }>(
+      '/sync/falabella/variants/group',
+      { method: 'POST', body: JSON.stringify(dto) },
     ),
 
   /** Trae las publicaciones que ya existen en Falabella. Con dryRun solo informa qué pasaría. */
