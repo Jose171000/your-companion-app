@@ -251,6 +251,14 @@ export interface FalabellaImportSummary {
   porEstado: Record<string, number>;
   notaMedia: number | null;
   ejemplos: { sku: string; nombre: string; estado: string; nota: number | null; enCatalogo: boolean }[];
+  /** Falabella: fichas que son variantes de un mismo producto (mismo ParentSku) y cómo quedan agrupadas */
+  variantes?: {
+    grupos: number;
+    variantes: number;
+    ejemplos: { parentSku: string; nombre: string; ejes: { name: string; values: string[] }[]; variantes: number }[];
+    sinResolver: { parentSku: string; skus: string[]; motivo: string }[];
+    aplicado: { gruposCreados: number; gruposActualizados: number; variantesAgrupadas: number; omitidos: { parentSku: string; motivo: string }[] } | null;
+  };
 }
 
 export const syncApi = {

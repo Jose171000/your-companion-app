@@ -161,6 +161,37 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
               )}
             </div>
 
+            {preview.variantes && (preview.variantes.grupos > 0 || preview.variantes.sinResolver.length > 0) && (
+              <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2 text-xs">
+                {preview.variantes.grupos > 0 && (
+                  <>
+                    <p className="font-semibold">
+                      {preview.variantes.grupos} producto(s) con variantes ({preview.variantes.variantes} fichas): se guardarán agrupados, cada variante con sus propias fotos.
+                    </p>
+                    <ul className="space-y-1">
+                      {preview.variantes.ejemplos.map((g) => (
+                        <li key={g.parentSku}>
+                          <span className="font-medium">{g.nombre}</span> <span className="text-muted-foreground">· {g.variantes} variantes · </span>
+                          {g.ejes.map((e) => `${e.name}: ${e.values.join(", ")}`).join(" — ")}
+                        </li>
+                      ))}
+                      {preview.variantes.grupos > preview.variantes.ejemplos.length && (
+                        <li className="text-muted-foreground">… y {preview.variantes.grupos - preview.variantes.ejemplos.length} más</li>
+                      )}
+                    </ul>
+                  </>
+                )}
+                {preview.variantes.sinResolver.length > 0 && (
+                  <div className="text-yellow-400 space-y-0.5">
+                    <p>{preview.variantes.sinResolver.length} grupo(s) no se pudieron armar y se importarán como productos sueltos:</p>
+                    {preview.variantes.sinResolver.slice(0, 5).map((g) => (
+                      <p key={g.parentSku}>· {g.parentSku} ({g.skus.length} fichas): {g.motivo}</p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {(preview.sinSku ?? 0) > 0 && (
               <p className="text-xs text-yellow-400">
                 {preview.sinSku} publicación(es) o variante(s) no tienen SKU y no se pueden enlazar. Ponles un SKU en {canal} y
