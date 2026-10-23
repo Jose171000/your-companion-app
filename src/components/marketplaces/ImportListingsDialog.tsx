@@ -109,7 +109,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
   return (
     <>
     <Dialog open={open && !manual} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Download className="w-4 h-4" /> Importar desde {canal}
@@ -172,7 +172,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
             </div>
 
             {preview.variantes && (preview.variantes.grupos > 0 || preview.variantes.sinResolver.length > 0 || (preview.variantes.paginaPublica?.familias ?? 0) > 0) && (
-              <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2 text-xs">
+              <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2 text-xs max-h-[40vh] overflow-y-auto">
                 {preview.variantes.grupos > 0 && (
                   <>
                     <p className="font-semibold">
