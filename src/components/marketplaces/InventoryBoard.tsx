@@ -509,20 +509,26 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
             if (!isGroup(item)) return renderCard(item);
             const abierto = abiertos.has(item.groupId);
             return (
-              <div key={item.groupId} className="glass rounded-2xl p-4 space-y-3 border border-border md:col-span-2 xl:col-span-3">
-                <button type="button" className="w-full flex items-center gap-3 text-left" onClick={() => alternar(item.groupId)} aria-expanded={abierto}>
-                  {abierto ? <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
+              // Cerrado es una tarjeta más de la cuadrícula; abierto ocupa todo el ancho para mostrar sus variantes.
+              <div key={item.groupId} className={cn("glass rounded-2xl p-4 space-y-3 border border-border", abierto && "md:col-span-2 xl:col-span-3")}>
+                <button type="button" className="w-full flex items-start gap-3 text-left" onClick={() => alternar(item.groupId)} aria-expanded={abierto}>
                   <ProductThumb src={item.imageUrl} alt={item.name} />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm truncate">{item.name}</p>
-                    <Badge variant="secondary" className="text-[10px] py-0 px-1.5">{item.children.length} variantes</Badge>
+                    <p className="font-medium text-sm truncate" title={item.name}>{item.name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <Badge variant="secondary" className="text-[10px] py-0 px-1.5">{item.children.length} variantes</Badge>
+                      {item.code && <code className="text-[10px] font-mono text-muted-foreground truncate">{item.code}</code>}
+                    </div>
                   </div>
-                  <span className="text-sm font-semibold tabular-nums whitespace-nowrap">{rangoDePrecio(item.children)}</span>
-                  <span className="text-sm text-muted-foreground tabular-nums">{item.children.reduce((n, c) => n + (c.stock ?? 0), 0)} u.</span>
+                  {abierto ? <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground mt-1" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground mt-1" />}
                 </button>
+                <div className="flex items-center gap-6 text-sm tabular-nums">
+                  <span className="font-semibold">{rangoDePrecio(item.children)}</span>
+                  <span className="text-muted-foreground">{item.children.reduce((n, c) => n + (c.stock ?? 0), 0)} u.</span>
+                </div>
                 <GroupChannels children={item.children} />
                 {abierto && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4 pt-1">
                     {item.children.map((c) => renderCard(c, true))}
                   </div>
                 )}
