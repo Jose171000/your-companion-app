@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useStores } from "@/contexts/StoreContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productsApi, Product, ProductsQueryParams } from "@/lib/products-api";
 import { ProductsToolbar } from "./ProductsToolbar";
@@ -14,13 +15,16 @@ import { ProductSheetDialog } from "./ProductSheetDialog";
 import { PrepareFalabellaDialog } from "./PrepareFalabellaDialog";
 import { toast } from "sonner";
 
-const PAGE_SIZE = 10;
+const TAMANOS_DE_PAGINA = [10, 25, 50, 100];
 
 export function ProductsModule() {
   const queryClient = useQueryClient();
+  const { activeStore } = useStores();
+  const storeId = activeStore?.id ?? "";
 
   // ── Filter state ──────────────────────────────────────────────────────────
   const [page, setPage]             = useState(1);
+  const [pageSize, setPageSize]     = useState(10);
   const [search, setSearch]         = useState("");
   const [marketplace, setMarketplace] = useState("");
   const [inStock, setInStock]       = useState(false);
@@ -38,7 +42,7 @@ export function ProductsModule() {
   // ── Query ─────────────────────────────────────────────────────────────────
   const filters: ProductsQueryParams = {
     page,
-    limit: PAGE_SIZE,
+    limit: pageSize,
     search:      search || undefined,
     marketplace: marketplace || undefined,
     inStock:     inStock || undefined,
@@ -48,7 +52,7 @@ export function ProductsModule() {
   };
 
   const { data: queryResult, isLoading, isError } = useQuery({
-    queryKey: ["products", filters],
+    queryKey: ["products", storeId, filters],
     queryFn:  () => productsApi.findAll(filters),
     staleTime: 30_000,
   });
@@ -62,16 +66,24 @@ export function ProductsModule() {
   // Un grupo de variantes es una fila, pero su estado se calcula con todas sus variantes.
   const ids = [...new Set(products.flatMap((p) => [p.id, ...(p.groupSummary?.variantIds ?? [])]))];
   const { data: overviewResult, isLoading: overviewLoading } = useQuery({
-    queryKey: ["products-overview", ids],
+    queryKey: ["products-overview", storeId, ids],
     queryFn: () => productsApi.overview(ids),
     enabled: ids.length > 0,
     staleTime: 30_000,
   });
   const { data: summaryResult } = useQuery({
-    queryKey: ["products-summary"],
+    queryKey: ["products-summary", storeId],
     queryFn: () => productsApi.summary(),
     staleTime: 30_000,
   });
+
+  // Al cambiar de tienda se empieza desde la primera página, sin filtros de la anterior.
+  useEffect(() => {
+    setPage(1);
+    setEstado("");
+    setSearch("");
+    setMarketplace("");
+  }, [storeId]);
 
   // ── Delete mutation ───────────────────────────────────────────────────────
   const deleteMutation = useMutation({
@@ -87,6 +99,7 @@ export function ProductsModule() {
   // ── Helpers ───────────────────────────────────────────────────────────────
   const handleSearchChange = (v: string) => { setSearch(v); setPage(1); };
   const handleMarketplaceChange = (v: string) => { setMarketplace(v); setPage(1); };
+  const handlePageSizeChange = (n: number) => { setPageSize(n); setPage(1); };
   const handleInStockChange = (v: boolean) => { setInStock(v); setPage(1); };
   const handleEstadoChange = (v: EstadoFiltro) => { setEstado(v); setPage(1); };
 
@@ -151,6 +164,9 @@ export function ProductsModule() {
           totalPages={totalPages}
           total={total}
           onPageChange={setPage}
+          pageSize={pageSize}
+          pageSizes={TAMANOS_DE_PAGINA}
+          onPageSizeChange={handlePageSizeChange}
         />
       )}
 

@@ -7,6 +7,10 @@ interface ProductsPaginationProps {
   totalPages: number;
   total: number;
   onPageChange: (page: number) => void;
+  /** Cuántos productos por página y las opciones a elegir */
+  pageSize?: number;
+  pageSizes?: number[];
+  onPageSizeChange?: (n: number) => void;
 }
 
 export function ProductsPagination({
@@ -14,8 +18,12 @@ export function ProductsPagination({
   totalPages,
   total,
   onPageChange,
+  pageSize,
+  pageSizes,
+  onPageSizeChange,
 }: ProductsPaginationProps) {
-  if (totalPages <= 1) return null;
+  // Con pocos productos no hay nada que paginar; con más, siempre se puede cambiar cuántos se ven por página.
+  if (totalPages <= 1 && !(pageSizes && total > Math.min(...pageSizes))) return null;
 
   /** Compute which page numbers to show (up to 5) */
   const getPageNumbers = (): number[] => {
@@ -47,6 +55,19 @@ export function ProductsPagination({
         <span className="font-semibold text-foreground">{total}</span>{" "}
         productos en total
       </p>
+
+      {pageSizes && onPageSizeChange && (
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          Por página
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            className="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground"
+          >
+            {pageSizes.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+      )}
 
       {/* Controls */}
       <div className="flex items-center gap-1">

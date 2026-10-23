@@ -4,6 +4,9 @@ import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { storesApi, StoreSummary } from '@/lib/stores-api';
 
+/** Datos que dependen de la tienda activa (además de los «sync-»): al cambiar de tienda no deben mostrarse los de la anterior. */
+const DE_LA_TIENDA = ['products', 'product', 'launch', 'falabella', 'bulk', 'dashboard', 'reports', 'sales', 'report'];
+
 const ACTIVE_KEY = 'active_store_id';
 /** Código de una invitación recibida antes de iniciar sesión; se acepta al entrar. */
 export const PENDING_INVITATION_KEY = 'pending_invitation';
@@ -56,7 +59,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem(ACTIVE_KEY, id); } catch { /* sin almacenamiento: solo esta sesión */ }
     // Los canales, publicaciones y revisiones son de cada tienda: se descarta lo
     // de la anterior para no mostrarlo ni un instante bajo el nombre de la nueva.
-    queryClient.removeQueries({ predicate: (q) => String(q.queryKey[0]).startsWith('sync-') });
+    queryClient.removeQueries({ predicate: (q) => {
+      const raiz = String(q.queryKey[0]);
+      return raiz.startsWith('sync-') || DE_LA_TIENDA.some((r) => raiz === r || raiz.startsWith(r + '-'));
+    } });
   }, [queryClient]);
 
   const refresh = useCallback(() => {

@@ -85,7 +85,7 @@ export function ProductRow({ product, overview, overviewLoading, variant, ...han
 
 function usarVariantes(groupId: string, abierto: boolean) {
   return useQuery({
-    queryKey: ["products", { groupId }],
+    queryKey: ["products", "grupo", { groupId }],
     queryFn: () => productsApi.findAll({ groupId, limit: 100, sortBy: "createdAt", order: "asc" }),
     enabled: abierto,
     staleTime: 30_000,
