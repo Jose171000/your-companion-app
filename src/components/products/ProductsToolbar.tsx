@@ -1,3 +1,4 @@
+import { useCuentasPorCanal } from "@/components/marketplaces/AccountChooser";
 import { useEffect, useState } from "react";
 import { Search, Plus, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -40,6 +41,16 @@ interface ProductsToolbarProps {
   onExport: (format: "csv" | "xlsx" | "json") => void;
 }
 
+/** Canales que tiene la tienda conectados o con publicaciones, más el que está elegido (para poder quitarlo). */
+function useCanalesDeLaTienda(elegido: string) {
+  const porCanal = useCuentasPorCanal();
+  const ids = new Set<string>(Object.keys(porCanal));
+  if (elegido) ids.add(elegido);
+  const conocidos = MARKETPLACES.filter((m) => ids.has(m.id));
+  const otros = [...ids].filter((id) => !MARKETPLACES.some((m) => m.id === id)).map((id) => ({ id, name: id }));
+  return [...conocidos, ...otros];
+}
+
 export function ProductsToolbar({
   search,
   onSearchChange,
@@ -51,6 +62,7 @@ export function ProductsToolbar({
   onExport,
 }: ProductsToolbarProps) {
   const [localSearch, setLocalSearch] = useState(search);
+  const canales = useCanalesDeLaTienda(marketplace);
 
   // Debounce search → notify parent after 400 ms
   useEffect(() => {
@@ -94,7 +106,7 @@ export function ProductsToolbar({
           </SelectTrigger>
           <SelectContent className="glass">
             <SelectItem value="__all__">Todos los canales</SelectItem>
-            {MARKETPLACES.map((mp) => (
+            {canales.map((mp) => (
               <SelectItem key={mp.id} value={mp.id}>
                 {mp.name}
               </SelectItem>
