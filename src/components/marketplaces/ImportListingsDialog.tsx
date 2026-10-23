@@ -214,7 +214,10 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
                     <p>{preview.variantes.sinResolver.length} grupo(s) no se pudieron armar y se importarán como productos sueltos:</p>
                     {preview.variantes.sinResolver.slice(0, 8).map((g) => (
                       <div key={g.parentSku} className="flex items-start justify-between gap-2">
-                        <p>· {g.parentSku} ({g.skus.length} fichas): {motivoCorto(g.motivo)}</p>
+                        <p>· {g.titulo ? `${g.titulo} (${g.parentSku})` : g.parentSku}{g.skus.length > 0 ? ` (${g.skus.length} fichas)` : ""}: {motivoCorto(g.motivo)}</p>
+                        {g.enlace && (g.fichas?.length ?? 0) < 2 && (
+                          <a href={g.enlace} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-foreground hover:border-primary/50">Abrir en {canal}</a>
+                        )}
                         {(g.fichas?.length ?? 0) > 1 && (
                           <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] shrink-0 text-foreground" onClick={() => setManual(g)}>Estructurar</Button>
                         )}

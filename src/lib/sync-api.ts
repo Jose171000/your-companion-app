@@ -272,6 +272,9 @@ export interface FalabellaImportSummary {
       parentSku: string;
       skus: string[];
       motivo: string;
+      /** Dirección de la publicación en el canal y su título, cuando no hay nada que estructurar aquí (por ejemplo, variaciones sin SKU) */
+      enlace?: string | null;
+      titulo?: string;
       /** Las fichas de la familia, para estructurarlas a mano */
       fichas?: { sku: string; nombre: string; imagen?: string | null }[];
       /** Lo que propuso la IA y no se pudo comprobar: sirve de punto de partida */
