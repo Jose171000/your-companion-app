@@ -261,7 +261,7 @@ export interface FalabellaImportSummary {
       skus: string[];
       motivo: string;
       /** Las fichas de la familia, para estructurarlas a mano */
-      fichas?: { sku: string; nombre: string }[];
+      fichas?: { sku: string; nombre: string; imagen?: string | null }[];
       /** Lo que propuso la IA y no se pudo comprobar: sirve de punto de partida */
       sugerencia?: { ejes: string[]; valores: Record<string, Record<string, string>>; motivo: string };
     }[];

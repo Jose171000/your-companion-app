@@ -23,7 +23,7 @@ export function ManualVariantsDialog({ familia, onClose, onDone }: Props) {
   const [ejes, setEjes] = useState<string[]>(["Color"]);
   const [valores, setValores] = useState<Record<string, Record<string, string>>>({});
 
-  const fichas = useMemo(() => familia?.fichas ?? familia?.skus.map((sku) => ({ sku, nombre: "" })) ?? [], [familia]);
+  const fichas = useMemo(() => familia?.fichas ?? familia?.skus.map((sku) => ({ sku, nombre: "", imagen: null as string | null })) ?? [], [familia]);
 
   useEffect(() => {
     if (!familia) return;
@@ -112,9 +112,18 @@ export function ManualVariantsDialog({ familia, onClose, onDone }: Props) {
             </div>
             {fichas.map((f) => (
               <div key={f.sku} className="grid gap-2 px-3 py-2 items-center" style={{ gridTemplateColumns: `minmax(0,1.6fr) repeat(${ejes.length}, minmax(0,1fr))` }}>
-                <div className="min-w-0">
-                  <code className="text-[11px] font-mono">{f.sku}</code>
-                  {f.nombre && <p className="text-[11px] text-muted-foreground truncate" title={f.nombre}>{f.nombre}</p>}
+                <div className="min-w-0 flex items-center gap-3">
+                  {f.imagen ? (
+                    <a href={f.imagen} target="_blank" rel="noreferrer" title="Ver la foto completa" className="shrink-0">
+                      <img src={f.imagen} alt={f.sku} loading="lazy" className="w-16 h-16 rounded-lg object-cover border border-border bg-secondary/40" />
+                    </a>
+                  ) : (
+                    <div className="w-16 h-16 rounded-lg border border-dashed border-border shrink-0 flex items-center justify-center text-[10px] text-muted-foreground">Sin foto</div>
+                  )}
+                  <div className="min-w-0">
+                    <code className="text-[11px] font-mono">{f.sku}</code>
+                    {f.nombre && <p className="text-[11px] text-muted-foreground line-clamp-2" title={f.nombre}>{f.nombre}</p>}
+                  </div>
                 </div>
                 {ejes.map((e, i) => (
                   <Input
