@@ -257,6 +257,8 @@ export interface FalabellaImportSummary {
     variantes: number;
     ejemplos: { parentSku: string; nombre: string; ejes: { name: string; values: string[] }[]; variantes: number }[];
     sinResolver: { parentSku: string; skus: string[]; motivo: string }[];
+    /** Lectura de la página pública de Falabella para las familias que los atributos no resolvieron */
+    paginaPublica?: { familias: number; leidas: number; resueltas: number; bloqueada: boolean; pendientes: number; sinDatos: { parentSku: string; motivo: string }[] };
     aplicado: { gruposCreados: number; gruposActualizados: number; variantesAgrupadas: number; omitidos: { parentSku: string; motivo: string }[] } | null;
   };
 }

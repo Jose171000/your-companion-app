@@ -161,7 +161,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
               )}
             </div>
 
-            {preview.variantes && (preview.variantes.grupos > 0 || preview.variantes.sinResolver.length > 0) && (
+            {preview.variantes && (preview.variantes.grupos > 0 || preview.variantes.sinResolver.length > 0 || (preview.variantes.paginaPublica?.familias ?? 0) > 0) && (
               <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2 text-xs">
                 {preview.variantes.grupos > 0 && (
                   <>
@@ -180,6 +180,14 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
                       )}
                     </ul>
                   </>
+                )}
+                {preview.variantes.paginaPublica && preview.variantes.paginaPublica.familias > 0 && (
+                  <p className="text-muted-foreground">
+                    Se leyó la página pública de Falabella de {preview.variantes.paginaPublica.leidas} de {preview.variantes.paginaPublica.familias} familias
+                    para confirmar el color y la talla de cada variante ({preview.variantes.paginaPublica.resueltas} resueltas).
+                    {preview.variantes.paginaPublica.bloqueada && " Falabella no permitió seguir leyendo: las demás quedan sin agrupar, nada se adivina."}
+                    {preview.variantes.paginaPublica.pendientes > 0 && !preview.variantes.paginaPublica.bloqueada && ` Quedan ${preview.variantes.paginaPublica.pendientes} por leer: vuelve a importar para continuar.`}
+                  </p>
                 )}
                 {preview.variantes.sinResolver.length > 0 && (
                   <div className="text-yellow-400 space-y-0.5">
