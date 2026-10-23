@@ -95,6 +95,8 @@ export interface CanalDeVenta {
   importe: number;
   /** Qué parte de lo que ingresó el producto viene de este canal (0 a 100) */
   porcentaje: number;
+  /** Dirección de la publicación del producto en este canal, si se conoce */
+  url?: string | null;
 }
 
 export interface Ganadora {

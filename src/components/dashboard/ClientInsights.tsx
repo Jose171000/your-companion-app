@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { channelName } from "@/components/marketplaces/format";
-import { AlertTriangle, CalendarClock, ClipboardCheck, Flame, Percent, Truck } from "lucide-react";
+import { AlertTriangle, CalendarClock, ClipboardCheck, ExternalLink, Flame, Percent, Truck } from "lucide-react";
 import {
   Card,
   DesgloseIgv,
@@ -147,39 +147,50 @@ export function PlanCard({ plan }: { plan: PlanDelCliente }) {
 
 function FilaGanadora({ g, posicion }: { g: Ganadora; posicion: number }) {
   return (
-    <div className="flex items-center gap-3 py-3">
-      <span className="w-5 text-center text-xs font-semibold text-muted-foreground shrink-0">{posicion}</span>
-      <div className="w-11 h-11 rounded-xl bg-secondary/40 overflow-hidden shrink-0">
-        {g.imagen && <img src={g.imagen} alt="" className="w-full h-full object-cover" loading="lazy" />}
+    <div className="py-3">
+      <div className="flex items-center gap-3">
+        <span className="w-5 text-center text-xs font-semibold text-muted-foreground shrink-0">{posicion}</span>
+        <div className="w-11 h-11 rounded-xl bg-secondary/40 overflow-hidden shrink-0">
+          {g.imagen && <img src={g.imagen} alt="" className="w-full h-full object-cover" loading="lazy" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium truncate">{g.nombre}</p>
+          <p className="text-[11px] font-mono text-muted-foreground truncate" title="SKU">{g.sku}</p>
+          <p className="text-xs text-muted-foreground">
+            {g.unidades} {g.unidades === 1 ? "unidad" : "unidades"} · {money(g.importe)}
+          </p>
+        </div>
+        <div className="text-right shrink-0">
+          {g.reponer ? (
+            <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-[10px]">
+              {g.stock === 0 ? "Sin stock" : `Repón: ${g.stock} u.`}
+            </Badge>
+          ) : (
+            <span className="text-xs text-muted-foreground">{g.stock != null ? `${g.stock} u. en stock` : ""}</span>
+          )}
+          {g.diasDeStock != null && (
+            <p className="text-[10px] text-muted-foreground mt-0.5">Stock para ~{g.diasDeStock} {g.diasDeStock === 1 ? "día" : "días"}</p>
+          )}
+        </div>
       </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium truncate">{g.nombre}</p>
-        <p className="text-[11px] font-mono text-muted-foreground truncate" title="SKU">{g.sku}</p>
-        <p className="text-xs text-muted-foreground">
-          {g.unidades} {g.unidades === 1 ? "unidad" : "unidades"} · {money(g.importe)}
-        </p>
-        {g.canal && (
-          <p
-            className="text-[11px] text-muted-foreground mt-0.5"
-            title={(g.canales ?? []).map((c) => `${channelName(c.marketplace)}: ${c.unidades} u. · ${money(c.importe)} (${c.porcentaje} %)`).join("\n")}
-          >
+      {g.canal && (
+        <div className="mt-2 ml-[3.75rem] flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-muted-foreground">
+          <span title={(g.canales ?? []).map((c) => `${channelName(c.marketplace)}: ${c.unidades} u. · ${money(c.importe)} (${c.porcentaje} %)`).join("\n")}>
             Más vendido en <span className="font-medium text-foreground">{channelName(g.canal.marketplace)}</span>
             {(g.canales?.length ?? 0) > 1 ? ` · ${g.canal.porcentaje} %` : ""}
-          </p>
-        )}
-      </div>
-      <div className="text-right shrink-0">
-        {g.reponer ? (
-          <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-[10px]">
-            {g.stock === 0 ? "Sin stock" : `Repón: ${g.stock} u.`}
-          </Badge>
-        ) : (
-          <span className="text-xs text-muted-foreground">{g.stock != null ? `${g.stock} u. en stock` : ""}</span>
-        )}
-        {g.diasDeStock != null && (
-          <p className="text-[10px] text-muted-foreground mt-0.5">Stock para ~{g.diasDeStock} {g.diasDeStock === 1 ? "día" : "días"}</p>
-        )}
-      </div>
+          </span>
+          {g.canal.url && (
+            <a
+              href={g.canal.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-0.5 hover:text-foreground hover:border-primary/50 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" /> Ver publicación
+            </a>
+          )}
+        </div>
+      )}
     </div>
   );
 }
