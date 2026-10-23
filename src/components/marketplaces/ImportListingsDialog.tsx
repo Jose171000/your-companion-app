@@ -47,6 +47,13 @@ const accountName = (c: MarketplaceConnection) => c.label || c.externalNickname 
  * muestra una vista previa que no escribe nada; solo al confirmar se traen los
  * productos. Si la tienda tiene varias cuentas, se elige de cuál.
  */
+/** El motivo completo puede ser largo (lo que dijo la IA): en la lista se muestra resumido. */
+const motivoCorto = (motivo: string) => {
+  const ia = motivo.split(". IA: ")[1];
+  const texto = ia ? `la IA no pudo asignar valores con certeza. ${ia}` : motivo;
+  return texto.length > 200 ? `${texto.slice(0, 200)}…` : texto;
+};
+
 export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts }: Props) {
   const canal = CANAL[marketplace];
   const llamar = (dryRun: boolean, id: string) =>
@@ -101,7 +108,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open && !manual} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -202,7 +209,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
                     <p>{preview.variantes.sinResolver.length} grupo(s) no se pudieron armar y se importarán como productos sueltos:</p>
                     {preview.variantes.sinResolver.slice(0, 8).map((g) => (
                       <div key={g.parentSku} className="flex items-start justify-between gap-2">
-                        <p>· {g.parentSku} ({g.skus.length} fichas): {g.motivo}</p>
+                        <p>· {g.parentSku} ({g.skus.length} fichas): {motivoCorto(g.motivo)}</p>
                         {(g.fichas?.length ?? 0) > 1 && (
                           <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] shrink-0 text-foreground" onClick={() => setManual(g)}>Estructurar</Button>
                         )}
