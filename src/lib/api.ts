@@ -254,12 +254,14 @@ export interface RegisterCredentials {
   password: string;
   name: string;
   lastName: string;
-  /** Nombre de su tienda */
-  nameCompany: string;
-  /** Razón social */
-  businessName: string;
-  /** RUC (11 dígitos) */
-  ruc: string;
+  /** Nombre de su tienda (no se pide a una persona invitada) */
+  nameCompany?: string;
+  /** Razón social (no se pide a una persona invitada) */
+  businessName?: string;
+  /** RUC (11 dígitos) (no se pide a una persona invitada) */
+  ruc?: string;
+  /** Código de la invitación a una tienda: registro corto, sin datos de empresa */
+  invitationToken?: string;
   url?: string;
   cellPhone?: string;
 }
@@ -295,6 +297,8 @@ export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
   expiresIn: number;
+  /** Si se registró con una invitación: la tienda a la que ya entró */
+  invitedStore?: { storeId: string; name: string; role: string };
 }
 
 export interface TokenResponse {

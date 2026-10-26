@@ -15,6 +15,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import PublicStore from "./pages/PublicStore";
 import AcceptInvitation from "./pages/AcceptInvitation";
+import RegisterInvited from "./pages/RegisterInvited";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/t/:token" element={<PublicStore />} />
               {/* Destino del enlace del correo de invitación */}
               <Route path="/invitacion" element={<AcceptInvitation />} />
+              <Route path="/invitacion/registro" element={<RegisterInvited />} />
               <Route
                 path="/"
                 element={

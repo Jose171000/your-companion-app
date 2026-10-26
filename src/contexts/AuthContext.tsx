@@ -121,6 +121,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const sesion = data as AuthResponse;
     localStorage.setItem('auth_token', sesion.accessToken);
     localStorage.setItem('refresh_token', sesion.refreshToken);
+    // Quien se registró con una invitación entra ya con esa tienda activa (la misma clave que usa StoreContext).
+    if (sesion.invitedStore) {
+      try { localStorage.setItem('active_store_id', sesion.invitedStore.storeId); } catch { /* sin almacenamiento */ }
+    }
     setUser(sesion.user);
     return { success: true };
   };

@@ -39,6 +39,14 @@ export interface StoreList {
   canCreateStores: boolean;
 }
 
+export interface InvitationInfo {
+  storeName: string;
+  role: 'editor' | 'viewer';
+  inviterName: string | null;
+  email: string;
+  expiresAt: string;
+}
+
 export const ROLE_LABELS: Record<StoreRole, string> = {
   owner: 'Dueño',
   editor: 'Editor',
@@ -98,6 +106,10 @@ export const storesApi = {
       method: 'PATCH',
       body: JSON.stringify({ enabled, regenerate }),
     }),
+
+  /** A qué tienda lo invitan, con qué rol, quién y con qué correo (no requiere sesión; el código es el secreto) */
+  invitationInfo: (token: string) =>
+    apiRequest<InvitationInfo>(`/public/stores/invitations/${encodeURIComponent(token)}`, { method: 'GET' }),
 
   /** Información general pública de una tienda por su enlace (no requiere sesión) */
   publicSummary: (token: string) =>

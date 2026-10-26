@@ -74,13 +74,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (!isAuthenticated) return;
     const token = read(PENDING_INVITATION_KEY);
     if (!token) return;
-    try { localStorage.removeItem(PENDING_INVITATION_KEY); } catch { /* nada */ }
-
     storesApi.acceptInvitation(token).then((res) => {
       if (res.error || !res.data) {
         toast.error(res.error ?? 'No se pudo aceptar la invitación');
+        // El código solo se descarta si la invitación ya no sirve (inválida, usada o de otro correo); si falló por la red, se conserva.
+        if (/invitaci[oó]n/i.test(res.error ?? '')) {
+          try { localStorage.removeItem(PENDING_INVITATION_KEY); } catch { /* nada */ }
+        }
         return;
       }
+      try { localStorage.removeItem(PENDING_INVITATION_KEY); } catch { /* nada */ }
       toast.success(`Ahora tienes acceso a ${res.data.name}`);
       setActiveStore(res.data.storeId);
       refresh();
