@@ -28,7 +28,9 @@ export function Kpi({
           <p className="text-xs text-muted-foreground">{label}</p>
           <p
             className={cn(
-              "text-2xl md:text-3xl font-bold tracking-tight mt-1 truncate",
+              // El valor se muestra completo (nunca con «…»): si es largo baja de tamaño y, de ser necesario, pasa a otra línea.
+              "font-bold tracking-tight mt-1 break-words leading-tight",
+              value.length > 12 ? "text-lg md:text-xl" : value.length > 9 ? "text-xl md:text-2xl" : "text-2xl md:text-3xl",
               tone === "warning" && "text-amber-500",
               tone === "danger" && "text-destructive",
               tone === "success" && "text-green-500"
