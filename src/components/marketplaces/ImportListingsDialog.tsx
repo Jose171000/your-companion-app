@@ -6,6 +6,8 @@ import { FalabellaImportSummary, MarketplaceConnection, syncApi } from "@/lib/sy
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ManualVariantsDialog } from "./ManualVariantsDialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -56,20 +58,38 @@ const motivoCorto = (motivo: string) => {
 
 export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts }: Props) {
   const canal = CANAL[marketplace];
-  const llamar = (dryRun: boolean, id: string) =>
+  const llamar = (dryRun: boolean, id: string, generar = false) =>
     marketplace === "falabella"
       ? syncApi.importFalabellaListings(dryRun, id)
       : marketplace === "mercadolibre"
-        ? syncApi.importMeliListings(dryRun, id)
+        ? syncApi.importMeliListings(dryRun, id, generar)
         : syncApi.importChannelListings(marketplace, dryRun, id);
   const queryClient = useQueryClient();
   const [accountId, setAccountId] = useState<string>("");
+  // Mercado Libre: lo que no tiene SKU no se importa; solo si la persona lo pide, Synkro le da uno propio.
+  const [generarSku, setGenerarSku] = useState(false);
+  // Pausar o cerrar publicaciones repetidas de Mercado Libre: lo pedido, lo ya hecho y la confirmación pendiente.
+  const [confirmarDup, setConfirmarDup] = useState<{ action: "pause" | "close"; externalId: string; titulo: string } | null>(null);
+  const [duplicadasHechas, setDuplicadasHechas] = useState<Record<string, "pausada" | "cerrada">>({});
+  const duplicadaMutation = useMutation({
+    mutationFn: ({ action, externalId }: { action: "pause" | "close"; externalId: string }) => syncApi.duplicatesAction(action, [externalId], accountId || undefined),
+    onSuccess: (res, vars) => {
+      const r = res.data?.results?.[0];
+      if (res.error || !r?.ok) {
+        toast.error(r?.message ?? res.error ?? "No se pudo completar la acción en Mercado Libre");
+        return;
+      }
+      setDuplicadasHechas((h) => ({ ...h, [vars.externalId]: vars.action === "pause" ? "pausada" : "cerrada" }));
+      toast.success(vars.action === "pause" ? "Publicación pausada en Mercado Libre" : "Publicación cerrada en Mercado Libre");
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
   const [preview, setPreview] = useState<FalabellaImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState<NonNullable<NonNullable<FalabellaImportSummary["variantes"]>["sinResolver"]>[number] | null>(null);
 
   const previewMutation = useMutation({
-    mutationFn: (id: string) => llamar(true, id),
+    mutationFn: ({ id, generar }: { id: string; generar: boolean }) => llamar(true, id, generar),
     onSuccess: (res) => {
       if (res.error || !res.data) setError(res.error ?? "No se pudo leer " + canal);
       else setPreview(res.data);
@@ -78,7 +98,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
   });
 
   const importMutation = useMutation({
-    mutationFn: () => llamar(false, accountId),
+    mutationFn: () => llamar(false, accountId, generarSku),
     onSuccess: (res) => {
       if (res.error || !res.data) {
         toast.error(res.error ?? "No se pudo importar");
@@ -103,7 +123,9 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
     if (!open || !accountId) return;
     setPreview(null);
     setError(null);
-    previewMutation.mutate(accountId);
+    setGenerarSku(false);
+    setDuplicadasHechas({});
+    previewMutation.mutate({ id: accountId, generar: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, accountId]);
 
@@ -245,8 +267,18 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
                           <li key={p.externalId + (p.variationId ?? "")} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                             <Badge variant={p.principal ? "default" : "secondary"} className="text-[10px] py-0 px-1.5">{p.principal ? "Principal" : "Repetida"}</Badge>
                             <span className="font-mono text-[11px]">#{p.externalId.replace(/^MPE/, "")}</span>
-                            <span className="text-muted-foreground">{p.estado === "published" ? "activa" : p.estado === "paused" ? "pausada" : p.estado} · {p.vendidas} vendidas · stock {p.stock}{p.precio != null ? ` · S/ ${p.precio}` : ""}{p.sincronizadaCon ? " · sincronizada" : ""}</span>
+                            <span className="text-muted-foreground">{duplicadasHechas[p.externalId] ?? (p.estado === "published" ? "activa" : p.estado === "paused" ? "pausada" : p.estado)} · {p.vendidas} vendidas · stock {p.stock}{p.precio != null ? ` · S/ ${p.precio}` : ""}{p.sincronizadaCon ? " · sincronizada" : ""}</span>
                             {p.permalink && <a href={p.permalink} target="_blank" rel="noopener noreferrer" className="underline text-muted-foreground hover:text-foreground">Ver</a>}
+                            {marketplace === "mercadolibre" && !p.principal && !p.variationId && !duplicadasHechas[p.externalId] && (
+                              <span className="ml-auto flex gap-1">
+                                {p.estado === "published" && (
+                                  <Button variant="outline" size="sm" className="h-6 px-2 text-[11px]" disabled={duplicadaMutation.isPending}
+                                    onClick={() => setConfirmarDup({ action: "pause", externalId: p.externalId, titulo: p.titulo })}>Pausar</Button>
+                                )}
+                                <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] text-destructive" disabled={duplicadaMutation.isPending}
+                                  onClick={() => setConfirmarDup({ action: "close", externalId: p.externalId, titulo: p.titulo })}>Cerrar</Button>
+                              </span>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -257,12 +289,59 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
               </div>
             )}
 
-            {(preview.sinSku ?? 0) > 0 && (
+            {marketplace === "mercadolibre" && ((preview.sinSku ?? 0) > 0 || generarSku) ? (
+              <div className="rounded-lg border border-border bg-secondary/20 p-3 space-y-2 text-xs">
+                {(preview.sinSku ?? 0) > 0 && (
+                  <>
+                    <p className="font-semibold text-yellow-400">
+                      {preview.sinSku} publicación(es) o variante(s) no tienen SKU y no se importarán.
+                    </p>
+                    <p className="text-muted-foreground">
+                      Ponles un SKU en {canal} y se traerán en la próxima importación, o deja que Synkro les genere uno.
+                    </p>
+                    {(preview.sinSkuDetalle?.length ?? 0) > 0 && (
+                      <ul className="space-y-0.5 max-h-32 overflow-y-auto">
+                        {preview.sinSkuDetalle!.slice(0, 30).map((p) => (
+                          <li key={p.externalId} className="flex items-start justify-between gap-2">
+                            <span>
+                              {p.titulo} <span className="text-muted-foreground">· {p.total > 1 ? `${p.sinSku} de ${p.total} variaciones` : "sin SKU"}</span>
+                            </span>
+                            {p.enlace && (
+                              <a href={p.enlace} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-foreground hover:border-primary/50">Abrir en {canal}</a>
+                            )}
+                          </li>
+                        ))}
+                        {preview.sinSkuDetalle!.length > 30 && <li className="text-muted-foreground">… y {preview.sinSkuDetalle!.length - 30} más</li>}
+                      </ul>
+                    )}
+                  </>
+                )}
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <Checkbox
+                    checked={generarSku}
+                    disabled={previewMutation.isPending || importMutation.isPending}
+                    onCheckedChange={(v) => {
+                      const generar = v === true;
+                      setGenerarSku(generar);
+                      previewMutation.mutate({ id: accountId, generar });
+                    }}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="font-medium">Que Synkro genere el SKU de lo que no lo tiene</span>
+                    <span className="block text-muted-foreground">
+                      El SKU se arma con el código de la publicación (y de la variación). Solo se guarda en Synkro: en {canal} no cambia nada.
+                      {generarSku && (preview.skuGenerados ?? 0) > 0 && ` Se generarán ${preview.skuGenerados}.`}
+                    </span>
+                  </span>
+                </label>
+              </div>
+            ) : (preview.sinSku ?? 0) > 0 ? (
               <p className="text-xs text-yellow-400">
-                {preview.sinSku} publicación(es) o variante(s) no tienen SKU y no se pueden enlazar. Ponles un SKU en {canal} y
+                {preview.sinSku} publicación(es) o variante(s) no tienen SKU y no se importarán. Ponles un SKU en {canal} y
                 se traerán en la próxima importación.
               </p>
-            )}
+            ) : null}
 
             {(preview.enOtraTienda ?? 0) > 0 && (
               <p className="text-xs text-yellow-400">
@@ -298,11 +377,30 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <AlertDialog open={!!confirmarDup} onOpenChange={(o) => { if (!o) setConfirmarDup(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{confirmarDup?.action === "close" ? "¿Cerrar esta publicación repetida?" : "¿Pausar esta publicación repetida?"}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {confirmarDup?.titulo} ({confirmarDup?.externalId}). Es una publicación repetida: la principal de este SKU no se toca.
+            {confirmarDup?.action === "close"
+              ? " Cerrar es definitivo en Mercado Libre: no se puede volver a activar."
+              : " Podrás reactivarla desde Mercado Libre cuando quieras."}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+          <AlertDialogAction onClick={() => { if (confirmarDup) duplicadaMutation.mutate({ action: confirmarDup.action, externalId: confirmarDup.externalId }); setConfirmarDup(null); }}>
+            {confirmarDup?.action === "close" ? "Cerrar publicación" : "Pausar publicación"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
     <ManualVariantsDialog familia={manual} onClose={() => setManual(null)} onDone={() => {
       // La familia ya quedó agrupada: sale de la lista al instante y la vista previa se vuelve a calcular en segundo plano.
       const agrupada = manual?.parentSku;
       setPreview((p) => (p?.variantes ? { ...p, variantes: { ...p.variantes, sinResolver: p.variantes.sinResolver.filter((g) => g.parentSku !== agrupada), yaAgrupadas: (p.variantes.yaAgrupadas ?? 0) + 1 } } : p));
-      if (accountId) previewMutation.mutate(accountId);
+      if (accountId) previewMutation.mutate({ id: accountId, generar: generarSku });
     }} />
     </>
   );

@@ -244,6 +244,10 @@ export interface FalabellaImportSummary {
   publicaciones?: number;
   /** Mercado Libre: publicaciones o variantes sin SKU, que no se pueden enlazar */
   sinSku?: number;
+  /** Mercado Libre: qué publicaciones tienen algo sin SKU (para corregirlo allá) */
+  sinSkuDetalle?: { externalId: string; titulo: string; enlace: string | null; sinSku: number; total: number }[];
+  /** Mercado Libre: cuántos SKU generó Synkro (si se pidió) */
+  skuGenerados?: number;
   total: number;
   yaEnCatalogo: number;
   nuevas: number;
@@ -346,10 +350,17 @@ export const syncApi = {
     ),
 
   /** Importa (o previsualiza) las publicaciones de una cuenta de Mercado Libre, enlazadas por SKU. */
-  importMeliListings: (dryRun: boolean, connectionId?: string) =>
+  importMeliListings: (dryRun: boolean, connectionId?: string, generarSku = false) =>
     apiRequest<FalabellaImportSummary>(
-      `/sync/mercadolibre/listings/import?dryRun=${dryRun}${connectionId ? `&connectionId=${connectionId}` : ""}`,
+      `/sync/mercadolibre/listings/import?dryRun=${dryRun}${connectionId ? `&connectionId=${connectionId}` : ""}${generarSku ? "&generarSku=true" : ""}`,
       { method: "POST" },
+    ),
+
+  /** Pausa o cierra publicaciones repetidas de Mercado Libre. Cerrar es definitivo; el servidor rechaza la principal de un SKU. */
+  duplicatesAction: (action: "pause" | "close", externalIds: string[], connectionId?: string) =>
+    apiRequest<{ results: { externalId: string; ok: boolean; message: string }[]; message: string }>(
+      `/sync/mercadolibre/duplicates/${action}`,
+      { method: "POST", body: JSON.stringify({ externalIds, ...(connectionId ? { connectionId } : {}) }) },
     ),
 
   /** Vuelve a leer ahora el estado de las publicaciones de la tienda. */
