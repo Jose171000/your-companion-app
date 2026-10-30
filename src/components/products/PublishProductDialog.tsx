@@ -40,6 +40,14 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
 
   const open = product !== null;
 
+  // Mercado Libre: cuando no puede elegir la categoría solo, ofrece las recomendadas para que la persona elija.
+  const [meliOpciones, setMeliOpciones] = useState<{ id: string; path: string }[] | null>(null);
+  const [meliElegida, setMeliElegida] = useState<string | null>(null);
+  useEffect(() => {
+    setMeliOpciones(null);
+    setMeliElegida(null);
+  }, [product?.id]);
+
   // Cuando la tienda tiene varias cuentas del canal, la persona elige en cuáles publicar.
   const [cuentas, setCuentas] = useState<CuentasPorCanal>({});
   const cuentasDelCanal = useCuentasPorCanal(open);
@@ -124,6 +132,25 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
     mutationFn: async () => {
       const errores: string[] = [];
       for (const o of objetivos.filter((x) => !estaEn(x.mp, x.id, "pending"))) {
+        if (o.mp === "mercadolibre") {
+          // Mercado Libre pasa por el lanzamiento: elige la categoría y completa sus atributos antes de publicar.
+          const res = await syncApi.launchProduct(product!.id, [o.mp], { [o.mp]: [o.id] }, meliElegida ?? undefined);
+          if (res.error || !res.data) {
+            errores.push(res.error ?? "No se pudo publicar en Mercado Libre");
+            continue;
+          }
+          const categoria = res.data.meliCategory;
+          if (categoria && !categoria.id && categoria.options?.length) {
+            // No pudo elegir la categoría sola: se muestran las recomendadas para que la persona elija.
+            setMeliOpciones(categoria.options);
+            setMeliElegida(null);
+          } else {
+            setMeliOpciones(null);
+          }
+          const canal = res.data.channels.find((c) => c.marketplace === o.mp);
+          if (canal?.status === "error") errores.push(canal.message);
+          continue;
+        }
         const res = await syncApi.publish(product!.id, [o.mp], { [o.mp]: o.id });
         if (res.error) errores.push(res.error);
       }
@@ -179,6 +206,7 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
     !missingPrice &&
     porPublicar.every((mp) => isConnected(mp)) &&
     (!porPublicar.includes("falabella") || !!prep?.listo) &&
+    !(porPublicar.includes("mercadolibre") && meliOpciones && !meliElegida) &&
     !publishMutation.isPending;
 
   return (
@@ -189,7 +217,7 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
             <Rocket className="w-5 h-5 text-primary" />
             Publicar en marketplaces
           </DialogTitle>
-          <DialogDescription className="line-clamp-2 break-words">{product?.name}</DialogDescription>
+          <DialogDescription className="line-clamp-2 break-words">{product?.name}{product?.alGrupo ? ` · se publican las ${product.groupSummary?.variantCount} variantes` : ""}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
@@ -261,9 +289,33 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
             );
           })}
 
+          {meliOpciones && (
+            <div className="rounded-xl border border-border p-3 space-y-2 min-w-0">
+              <p className="text-sm font-medium">Categoría de Mercado Libre</p>
+              <p className="text-xs text-muted-foreground">
+                No se pudo elegir sola. Estas son las más cercanas a tu producto: marca la correcta y vuelve a pulsar Publicar.
+              </p>
+              <div className="space-y-1.5">
+                {meliOpciones.map((op) => (
+                  <label
+                    key={op.id}
+                    className={cn(
+                      "flex items-start gap-2 rounded-lg border p-2 text-xs cursor-pointer min-w-0",
+                      meliElegida === op.id ? "border-primary bg-primary/10" : "border-border hover:border-primary/50",
+                    )}
+                  >
+                    <input type="radio" name="meli-categoria" className="mt-0.5" checked={meliElegida === op.id} onChange={() => setMeliElegida(op.id)} />
+                    <span className="break-words">{op.path}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           <AccountChooser canales={selected.filter((mp) => !publicados.has(mp))} value={cuentas} onChange={setCuentas} />
 
-          {falabellaElegido && !falabellaPublicado && isConnected("falabella") && (
+          {/* Al cerrar, `product` pasa a null un render antes de que se limpie `prep`: sin esta guarda la pantalla quedaba en negro. */}
+          {product && falabellaElegido && !falabellaPublicado && isConnected("falabella") && (
             <div className="rounded-xl border border-border p-3 space-y-3 min-w-0">
               <p className="text-sm font-medium flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-primary" /> Datos para Falabella
@@ -290,7 +342,7 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
                   </div>
 
                   <FalabellaBrandField
-                    productId={product!.id}
+                    productId={product.id}
                     value={prep.brand.value}
                     onSaved={(brand) => setPrep((p) => (p ? { ...p, brand: { value: brand, replaced: false } } : p))}
                   />

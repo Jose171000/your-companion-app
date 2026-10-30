@@ -8,7 +8,7 @@ const NOMBRE: Record<string, string> = { falabella: "Falabella", mercadolibre: "
  * El estado real de la publicación en cada canal. «Publicando» solo significa que el envío salió: el canal
  * lo revisa después y puede tardar. Aquí se ve cuándo queda publicado o con qué motivo lo rechazan.
  */
-export function LaunchStatus({ productId }: { productId: string }) {
+export function LaunchStatus({ productId, etiqueta }: { productId: string; /** En un grupo, a qué variante corresponde (Negro, Celeste…). */ etiqueta?: string }) {
   const { data } = useQuery({
     queryKey: ["launch-status", productId],
     queryFn: () => syncApi.getProductStatus(productId),
@@ -23,7 +23,7 @@ export function LaunchStatus({ productId }: { productId: string }) {
 
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium">Estado en cada canal</p>
+      <p className="text-sm font-medium">{etiqueta ? `Estado en cada canal · ${etiqueta}` : "Estado en cada canal"}</p>
       {listings.map((l) => (
         <div key={`${l.marketplace}-${l.externalId}`} className="text-sm break-words">
           {l.syncStatus === "published" ? (

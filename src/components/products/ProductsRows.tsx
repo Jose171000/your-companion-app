@@ -5,6 +5,7 @@ import { Product, ProductOverview, productsApi } from "@/lib/products-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { ProductCard } from "./ProductCard";
 import { CategoryCell, ChannelsCell, CompletenessCell, GroupChannelsCell, GroupCompletenessCell } from "./ProductStatusCells";
@@ -54,6 +55,46 @@ function RowActions({ product, onSheet, onPublish, onPrepareFalabella, onRegener
       <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-accent hover:bg-accent/10" onClick={() => onRegenerate(product)} title="Regenerar con IA"><Sparkles className="w-4 h-4" /></Button>
       <Button variant="ghost" size="icon" className={btn} onClick={() => onEdit(product)} title="Editar"><Edit className="w-4 h-4" /></Button>
       <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(product)} title="Eliminar"><Trash2 className="w-4 h-4" /></Button>
+    </div>
+  );
+}
+
+/**
+ * Acciones de la fila de un grupo: valen para TODAS sus variantes juntas. Publicar, preparar Falabella, regenerar con IA y
+ * eliminar actúan sobre el grupo entero; la ficha deja elegir variante dentro de su ventana, y editar pide elegir cuál.
+ */
+function GroupActions({ product, ...handlers }: RowHandlers & { product: Product }) {
+  const grupo = product.group!;
+  const resumen = product.groupSummary!;
+  const [eligiendo, setEligiendo] = useState(false);
+  const { data, isLoading } = usarVariantes(grupo.id, eligiendo);
+  const variantes = data?.data?.data ?? [];
+  // Un producto «de grupo»: lleva el nombre del grupo y la marca para que cada ventana sepa que vale para todas las variantes.
+  const delGrupo: Product = { ...product, name: grupo.name, alGrupo: true };
+  const btn = "h-8 w-8 hover:text-primary hover:bg-primary/10";
+  const todas = `las ${resumen.variantCount} variantes`;
+  return (
+    <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+      <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onSheet(delGrupo)} title="Ficha: lo que se envía a cada canal (elige la variante dentro)"><FileText className="w-4 h-4" /></Button>
+      <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPublish(delGrupo)} title={`Publicar ${todas} en marketplaces`}><Rocket className="w-4 h-4" /></Button>
+      <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPrepareFalabella(delGrupo)} title={`Preparar ${todas} para Falabella (categoría, medidas y atributos)`}><PackageCheck className="w-4 h-4" /></Button>
+      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-accent hover:bg-accent/10" onClick={() => handlers.onRegenerate(delGrupo)} title={`Regenerar con IA ${todas}`}><Sparkles className="w-4 h-4" /></Button>
+      <Popover open={eligiendo} onOpenChange={setEligiendo}>
+        <PopoverTrigger asChild>
+          <Button variant="ghost" size="icon" className={btn} title="Editar: elige la variante"><Edit className="w-4 h-4" /></Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-64 p-2 space-y-1">
+          <p className="text-xs text-muted-foreground px-1 pb-1">¿Qué variante quieres editar?</p>
+          {isLoading && <Skeleton className="h-8 w-full" />}
+          {variantes.map((v) => (
+            <button key={v.id} type="button" className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-secondary/60 flex items-center justify-between gap-2" onClick={() => { setEligiendo(false); handlers.onEdit(v); }}>
+              <span className="truncate">{etiquetaDeVariante(v)}</span>
+              <code className="text-[10px] font-mono text-muted-foreground">{v.sku}</code>
+            </button>
+          ))}
+        </PopoverContent>
+      </Popover>
+      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => handlers.onDelete(delGrupo)} title={`Eliminar ${todas}`}><Trash2 className="w-4 h-4" /></Button>
     </div>
   );
 }
@@ -125,7 +166,10 @@ export function GroupRows({ product, overview, overviewLoading, ...handlers }: C
         <td className="px-4 py-3"><StockBadge stock={resumen.stockTotal} /></td>
         <td className="px-4 py-3"><GroupChannelsCell overviews={overviews} total={resumen.variantCount} loading={overviewLoading} /></td>
         <td className="px-4 py-3"><GroupCompletenessCell overviews={overviews} total={resumen.variantCount} loading={overviewLoading} /></td>
-        <td className="px-4 py-3 text-right text-xs text-muted-foreground">{abierto ? "Ocultar" : "Ver variantes"}</td>
+        <td className="px-4 py-3">
+          <GroupActions product={product} {...handlers} />
+          <p className="text-right text-[10px] text-muted-foreground mt-0.5">{abierto ? "Ocultar variantes" : "Ver variantes"}</p>
+        </td>
       </tr>
       {abierto && isLoading && (
         <tr><td colSpan={8} className="px-4 py-3 pl-12"><Skeleton className="h-8 w-full" /></td></tr>
@@ -164,6 +208,7 @@ export function GroupCard({ product, overview, overviewLoading, ...handlers }: C
           <GroupCompletenessCell overviews={overviews} total={resumen.variantCount} loading={overviewLoading} />
         </div>
       </button>
+      <div className="px-4 pb-3"><GroupActions product={product} {...handlers} /></div>
       {abierto && (
         <div className="border-l-2 border-border ml-6 divide-y divide-border/50">
           {isLoading && <Skeleton className="h-16 w-full m-3" />}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, ExternalLink, FileText, Loader2, Rocket, Save } from "lucide-react";
-import { Product } from "@/lib/products-api";
+import { Product, productsApi } from "@/lib/products-api";
 import { SheetChannel, SheetData, syncApi } from "@/lib/sync-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-const NOMBRE_CANAL: Record<string, string> = { falabella: "Falabella", mercadolibre: "Mercado Libre" };
+const NOMBRE_CANAL: Record<string, string> = { falabella: "Falabella", mercadolibre: "Mercado Libre", woocommerce: "WooCommerce", shopify: "Shopify" };
 
 const ESTADO: Record<string, { texto: string; clase: string }> = {
   published: { texto: "Publicado", clase: "bg-green-500/10 text-green-500" },
@@ -101,7 +101,26 @@ function CampoDeAtributo({
   );
 }
 
+/**
+ * Desde la fila de un grupo la ficha se abre con todas sus variantes a la vista: se elige cuál se está viendo y, al guardar,
+ * los cambios van a esa variante. Un producto simple se muestra como siempre.
+ */
 export function ProductSheetDialog({ product, onClose }: { product: Product | null; onClose: () => void }) {
+  const [elegida, setElegida] = useState<string | null>(null);
+  const grupoId = product?.alGrupo ? product.group?.id : undefined;
+  useEffect(() => setElegida(null), [product?.id, product?.alGrupo]);
+  const { data } = useQuery({
+    queryKey: ["products", "grupo", { groupId: grupoId }],
+    queryFn: () => productsApi.findAll({ groupId: grupoId, limit: 100, sortBy: "createdAt", order: "asc" }),
+    enabled: !!grupoId,
+    staleTime: 30_000,
+  });
+  const variantes = grupoId ? data?.data?.data ?? [] : [];
+  const actual = product && variantes.length ? (variantes.find((v) => v.id === elegida) ?? variantes[0]) : product;
+  return <FichaDeProducto product={actual} onClose={onClose} variantes={variantes} variantId={actual?.id} onElegir={setElegida} />;
+}
+
+function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir }: { product: Product | null; onClose: () => void; variantes?: Product[]; variantId?: string; onElegir?: (id: string) => void }) {
   const queryClient = useQueryClient();
   const open = product !== null;
   const [borrador, setBorrador] = useState<Borrador | null>(null);
@@ -186,6 +205,23 @@ export function ProductSheetDialog({ product, onClose }: { product: Product | nu
             {hoja ? `${hoja.product.name} · SKU ${hoja.product.sku}` : product?.name}. Esto es lo que se envía a cada canal; al guardar, los cambios se envían solos a donde está publicado.
           </DialogDescription>
         </DialogHeader>
+
+        {hoja?.product.importedFrom && (
+          <p className="text-xs text-muted-foreground">
+            Producto importado desde {NOMBRE_CANAL[hoja.product.importedFrom] ?? hoja.product.importedFrom}.
+          </p>
+        )}
+
+        {variantes.length > 1 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground mr-1">Variante:</span>
+            {variantes.map((v) => (
+              <button key={v.id} type="button" onClick={() => onElegir?.(v.id)} className={`text-xs rounded-full border px-2.5 py-1 transition-colors ${v.id === variantId ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}>
+                {v.variantValues ? Object.values(v.variantValues).join(" / ") : v.sku} <span className="font-mono opacity-70">{v.sku}</span>
+              </button>
+            ))}
+          </div>
+        )}
 
         {isLoading || !borrador ? (
           <div className="space-y-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-40 w-full" /></div>

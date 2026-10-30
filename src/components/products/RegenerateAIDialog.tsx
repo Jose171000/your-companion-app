@@ -76,14 +76,20 @@ export function RegenerateAIDialog({
     }
     setIsLoading(true);
     try {
-      const response = await productsApi.generateAI(product.id, {
-        targetMarketplaces: selectedMarketplaces,
-        tone,
-      });
-      if (response.error) {
+      // Desde la fila de un grupo se regenera el contenido de todas sus variantes.
+      const ids = product.alGrupo ? (product.groupSummary?.variantIds ?? [product.id]) : [product.id];
+      let response: Awaited<ReturnType<typeof productsApi.generateAI>> | null = null;
+      for (const id of ids) {
+        response = await productsApi.generateAI(id, {
+          targetMarketplaces: selectedMarketplaces,
+          tone,
+        });
+        if (response.error) break;
+      }
+      if (response?.error) {
         toast.error(response.error);
       } else {
-        toast.success("Contenido IA regenerado exitosamente ✨");
+        toast.success(ids.length > 1 ? `Contenido IA regenerado en las ${ids.length} variantes ✨` : "Contenido IA regenerado exitosamente ✨");
         onSuccess();
         onClose();
       }
@@ -105,7 +111,7 @@ export function RegenerateAIDialog({
             <div className="min-w-0">
               <DialogTitle className="text-base">Regenerar con IA</DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                {product?.name}
+                {product?.name}{product?.alGrupo ? ` · ${product.groupSummary?.variantCount} variantes` : ""}
               </p>
             </div>
           </div>

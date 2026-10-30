@@ -117,15 +117,24 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
   }, [open, product?.id, categoria?.id]);
 
   const guardar = useMutation({
-    mutationFn: () =>
-      syncApi.prepareFalabella(product!.id, {
-        categoryId: categoria!.id,
-        packageWidth: Number(medidas.ancho),
-        packageLength: Number(medidas.largo),
-        packageHeight: Number(medidas.alto),
-        packageWeight: Number(medidas.peso),
-        attributes: atributos,
-      }),
+    mutationFn: async () => {
+      // Desde la fila de un grupo, la categoría, las medidas y los datos comunes se guardan en TODAS las variantes
+      // (el color o la talla de cada una se pone al enviar).
+      const ids = product!.alGrupo ? (product!.groupSummary?.variantIds ?? [product!.id]) : [product!.id];
+      let ultima: Awaited<ReturnType<typeof syncApi.prepareFalabella>> | null = null;
+      for (const id of ids) {
+        ultima = await syncApi.prepareFalabella(id, {
+          categoryId: categoria!.id,
+          packageWidth: Number(medidas.ancho),
+          packageLength: Number(medidas.largo),
+          packageHeight: Number(medidas.alto),
+          packageWeight: Number(medidas.peso),
+          attributes: atributos,
+        });
+        if (ultima.error) break;
+      }
+      return ultima!;
+    },
     onSuccess: (res) => {
       if (res.error) {
         toast.error(res.error);
@@ -163,7 +172,7 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
             Preparar para Falabella
           </DialogTitle>
           <DialogDescription>
-            {product?.name}. Falabella pide una categoría de su catálogo, las medidas del
+            {product?.name}{product?.alGrupo ? ` (las ${product.groupSummary?.variantCount} variantes)` : ""}. Falabella pide una categoría de su catálogo, las medidas del
             paquete y los datos propios de esa categoría.
           </DialogDescription>
         </DialogHeader>

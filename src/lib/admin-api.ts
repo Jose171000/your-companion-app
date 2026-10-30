@@ -55,6 +55,10 @@ export interface AdminClient {
   /** null o vacío = acceso completo */
   allowedSections?: string[] | null;
   createdAt: string;
+  /** Tiendas ajenas a las que pertenece como editor o visor */
+  teamOf?: { storeId: string; storeName: string; role: string }[];
+  /** Solo es parte del equipo de tiendas de otros: no es un cliente */
+  teamOnly?: boolean;
   profile: ClientProfile | null;
   stats: ClientStats;
 }

@@ -88,13 +88,22 @@ export function ProductsModule() {
 
   // ── Delete mutation ───────────────────────────────────────────────────────
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => productsApi.remove(id),
-    onSuccess: () => {
-      toast.success("Producto eliminado");
+    // apiRequest no lanza en un error del servidor: lo devuelve; sin esto se avisaba «eliminado» aunque no se hubiera borrado.
+    mutationFn: async (p: Product) => {
+      // Desde la fila de un grupo se eliminan todas sus variantes.
+      const ids = p.alGrupo ? (p.groupSummary?.variantIds ?? [p.id]) : [p.id];
+      for (const id of ids) {
+        const res = await productsApi.remove(id);
+        if (res.error) throw new Error(res.error);
+      }
+      return ids.length;
+    },
+    onSuccess: (n) => {
+      toast.success(n > 1 ? `Producto eliminado con sus ${n} variantes` : "Producto eliminado");
       queryClient.invalidateQueries({ queryKey: ["products"] });
       setDeleteTarget(null);
     },
-    onError: () => toast.error("Error al eliminar el producto"),
+    onError: (error: Error) => toast.error(error.message || "Error al eliminar el producto"),
   });
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -185,7 +194,7 @@ export function ProductsModule() {
       <DeleteProductDialog
         product={deleteTarget}
         isDeleting={deleteMutation.isPending}
-        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+        onConfirm={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
       />
 

@@ -21,7 +21,7 @@ import {
 
 export interface ResultadoDelRecorrido {
   axes: EjeDeVariacion[];
-  variants: { values: Valores; price: number | null; stock: number | null; photoIndexes: number[] }[];
+  variants: { values: Valores; /** Solo si la persona lo escribió; vacío = lo asigna el servidor. */ sku?: string; price: number | null; stock: number | null; photoIndexes: number[] }[];
 }
 
 interface Props {
@@ -117,6 +117,8 @@ export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, b
   const [stockIgual, setStockIgual] = useState(baseStock);
   const [stocks, setStocks] = useState<Record<string, string>>({});
   const [excluidas, setExcluidas] = useState<string[]>([]);
+  /** SKU que la persona escribió a mano, por variante; sin entrada = el sugerido. */
+  const [skusEditados, setSkusEditados] = useState<Record<string, string>>({});
 
   const ejes: EjeDeVariacion[] = useMemo(() => axes.map((name) => ({ name, values: vals[name] ?? [] })), [axes, vals]);
   const todas = useMemo(() => combinaciones(ejes), [ejes]);
@@ -128,7 +130,7 @@ export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, b
 
   const reiniciarDesdeFotos = () => {
     setFotosModo(null); setAsign({}); setMarcadas([]); setPrecioEjes(null); setPrecios({});
-    setStockModo(null); setStocks({}); setExcluidas([]);
+    setStockModo(null); setStocks({}); setExcluidas([]); setSkusEditados({});
   };
 
   const alternarEje = (name: string) => {
@@ -176,12 +178,18 @@ export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, b
   };
   const precioTexto = (v: Valores) => precioDeVariante(v, precioEjes ?? [], precios, basePrice);
   const stockTexto = (k: string) => (stockModo === "igual" ? stockIgual : stocks[k] ?? stockIgual);
-  // Los SKU se asignan solos al crear; aquí solo se muestran. Después se pueden corregir, hasta publicar.
+  // El SKU de cada variante se propone solo, pero se puede escribir otro. Vacío = el servidor asigna el sugerido.
   const codigo = parentSku.trim() || codigoSugerido;
-  const skuDe = (v: Valores) => (codigo ? skuSugerido(codigo, v, ejes) : "se asigna solo");
+  const skuSugeridoDe = (v: Valores) => (codigo ? skuSugerido(codigo, v, ejes) : "");
+  const skuDe = (v: Valores) => (skusEditados[claveDe(v, ejes)] ?? skuSugeridoDe(v)).trim();
+  const skusRepetidos = (() => {
+    const vistos = new Map<string, number>();
+    for (const v of variantes) { const s = skuDe(v).toLowerCase(); if (s) vistos.set(s, (vistos.get(s) ?? 0) + 1); }
+    return new Set([...vistos].filter(([, n]) => n > 1).map(([s]) => s));
+  })();
 
   const sinFotos = modoFotos === "cambian" ? variantes.filter((v) => !fotosDe(claveDe(v, ejes)).length) : [];
-  const listoParaCrear = variantes.length > 0 && variantes.length <= MAX_VARIANTES && sinFotos.length === 0 && !busy;
+  const listoParaCrear = variantes.length > 0 && variantes.length <= MAX_VARIANTES && sinFotos.length === 0 && skusRepetidos.size === 0 && !busy;
 
   const crear = () => {
     onSubmit({
@@ -190,8 +198,10 @@ export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, b
         const k = claveDe(v, ejes);
         const precio = parseFloat(precioTexto(v));
         const stock = parseInt(stockTexto(k), 10);
+        const sku = skusEditados[k]?.trim();
         return {
           values: v,
+          ...(sku && sku !== skuSugeridoDe(v) ? { sku } : {}),
           price: Number.isFinite(precio) ? precio : null,
           stock: Number.isFinite(stock) && stock >= 0 ? stock : 0,
           photoIndexes: fotosDe(k),
@@ -401,7 +411,7 @@ export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, b
         <div className={tarjeta}>
           <p className="text-sm font-medium mb-2">Revisa tus {variantes.length} variantes</p>
           <p className="text-[11px] text-muted-foreground mb-3">
-            Los SKU se asignan solos{codigo ? ` (código del grupo: ${codigo})` : ""}. Cuando la IA termine podrás revisar y corregir todo: variantes, SKU, fotos, precios y stock.
+            Los SKU se proponen solos{codigo ? ` (código del grupo: ${codigo})` : ""}, pero puedes escribir el que quieras en cada variante. Cuando la IA termine podrás revisar y corregir todo: variantes, SKU, fotos, precios y stock.
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -421,7 +431,16 @@ export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, b
                   return (
                     <tr key={k} className="border-t border-border">
                       <td className="py-1.5 pr-2 whitespace-nowrap">{etiquetaDe(v, ejes)}</td>
-                      <td className="py-1.5 pr-2 font-mono text-muted-foreground whitespace-nowrap">{skuDe(v)}</td>
+                      <td className="py-1.5 pr-2">
+                        <Input
+                          value={skusEditados[k] ?? skuSugeridoDe(v)}
+                          placeholder="se asigna solo"
+                          maxLength={60}
+                          aria-label={`SKU de ${etiquetaDe(v, ejes)}`}
+                          onChange={(e) => setSkusEditados((s) => ({ ...s, [k]: e.target.value }))}
+                          className={cn("h-7 w-44 font-mono text-xs", skusRepetidos.has(skuDe(v).toLowerCase()) && "border-red-400")}
+                        />
+                      </td>
                       {modoFotos === "cambian" && <td className="py-1.5 pr-2 text-muted-foreground whitespace-nowrap">{fotosDe(k).length} {fotosDe(k).length === 1 ? "foto" : "fotos"}</td>}
                       {(precioEjes?.length ?? 0) > 0 && (
                         <td className="py-1.5 pr-2">
@@ -440,6 +459,7 @@ export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, b
               </tbody>
             </table>
           </div>
+          {skusRepetidos.size > 0 && <p className="text-[11px] text-red-400 mt-2">Hay SKU repetidos: cada variante necesita uno distinto.</p>}
           {excluidas.length > 0 && (
             <button type="button" className="text-[11px] text-muted-foreground underline mt-2" onClick={() => setExcluidas([])}>Volver a incluir las {excluidas.length} variantes quitadas</button>
           )}

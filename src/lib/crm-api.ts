@@ -73,6 +73,14 @@ export interface YavendioImportResult {
   sample: { name: string; stage: LeadStage; action: string }[];
 }
 
+export interface YavendioContactsResult {
+  total: number;
+  created: number;
+  existing: number;
+  skipped: number;
+  sample: string[];
+}
+
 export const crmApi = {
   getLeads: (search?: string, stage?: string) => {
     const params = new URLSearchParams();
@@ -107,5 +115,12 @@ export const crmApi = {
     apiRequest<YavendioImportResult>('/crm/import/yavendio', {
       method: 'POST',
       body: JSON.stringify({ dryRun, skipEmpty }),
+    }),
+
+  /** Contactos de Yavendió como prospectos nuevos. Quien ya está en el CRM no se toca. */
+  importYavendioContacts: (dryRun: boolean) =>
+    apiRequest<YavendioContactsResult>('/crm/import/yavendio/contacts', {
+      method: 'POST',
+      body: JSON.stringify({ dryRun }),
     }),
 };

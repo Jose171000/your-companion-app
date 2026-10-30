@@ -32,18 +32,26 @@ export function DeleteProductDialog({
             <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
               <Trash2 className="w-5 h-5 text-destructive" />
             </div>
-            <AlertDialogTitle>¿Eliminar producto?</AlertDialogTitle>
+            <AlertDialogTitle>{product?.alGrupo ? "¿Eliminar el producto con todas sus variantes?" : "¿Eliminar producto?"}</AlertDialogTitle>
           </div>
           <AlertDialogDescription className="text-sm leading-relaxed">
             Estás a punto de eliminar{" "}
             <span className="font-semibold text-foreground">
               &ldquo;{product?.name}&rdquo;
             </span>{" "}
-            (SKU:{" "}
-            <code className="text-xs bg-secondary px-1.5 py-0.5 rounded font-mono">
-              {product?.sku}
-            </code>
-            ).
+            {product?.alGrupo ? (
+              <>
+                {" "}y sus <span className="font-semibold text-foreground">{product.groupSummary?.variantCount ?? 0} variantes</span>.
+              </>
+            ) : (
+              <>
+                (SKU:{" "}
+                <code className="text-xs bg-secondary px-1.5 py-0.5 rounded font-mono">
+                  {product?.sku}
+                </code>
+                ).
+              </>
+            )}
             <br />
             <span className="text-destructive/80 font-medium">
               Esta acción no se puede deshacer.

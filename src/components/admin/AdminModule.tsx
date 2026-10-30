@@ -48,7 +48,11 @@ export function AdminModule() {
   });
   const pendientes = signupsResult?.data?.conteo?.pendientes ?? 0;
 
-  const clients = clientsResult?.data ?? [];
+  const todas = clientsResult?.data ?? [];
+  // Quien solo es editor o visor de la tienda de otro es parte de su equipo, no un cliente: se ve aparte.
+  const equipo = todas.filter((c) => c.teamOnly);
+  const [verEquipo, setVerEquipo] = useState(false);
+  const clients = verEquipo ? todas : todas.filter((c) => !c.teamOnly);
   const term = search.trim().toLowerCase();
   const filtered = term
     ? clients.filter((c) =>
@@ -95,6 +99,12 @@ export function AdminModule() {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
+            {equipo.length > 0 && (
+              <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+                <input type="checkbox" checked={verEquipo} onChange={(e) => setVerEquipo(e.target.checked)} />
+                Incluir miembros de equipo ({equipo.length})
+              </label>
+            )}
             <Button onClick={() => setCreateOpen(true)} className="shrink-0">
               <UserPlus className="w-4 h-4 mr-2" />
               Nueva cuenta

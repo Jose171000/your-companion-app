@@ -33,11 +33,14 @@ interface ProductInputFormProps {
   }) => void;
   isProcessing: boolean;
   isFormReady?: boolean;
+  /** Avisa si se está en producto individual o en carga masiva (también al montarse). */
+  onModeChange?: (mode: "single" | "bulk") => void;
 }
 
-export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isFormReady = true }: ProductInputFormProps) {
+export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isFormReady = true, onModeChange }: ProductInputFormProps) {
   const { activeStore } = useStores();
   const [mode, setMode] = useState<"single" | "bulk">("single");
+  useEffect(() => { onModeChange?.(mode); }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
   const [singleProduct, setSingleProduct] = useState("");
   const [sku, setSku] = useState("");
   const [price, setPrice] = useState("");
@@ -141,8 +144,8 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
     }
   };
 
-  // Con fotos alcanza: el SKU se genera solo y la IA completa nombre, descripción, categoría y atributos.
-  const isSingleDisabled = images.length === 0;
+  // Con fotos y precio alcanza: el SKU se genera solo y la IA completa nombre, descripción, categoría y atributos. Los canales exigen precio.
+  const isSingleDisabled = images.length === 0 || !(parseFloat(price) > 0);
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -183,13 +186,13 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
               />
             </div>
             <div className="space-y-1.5 md:space-y-2">
-              <Label htmlFor="product-price" className="text-xs md:text-sm text-[#111111] dark:text-[#F8F8F5] font-medium">Precio (opcional)</Label>
+              <Label htmlFor="product-price" className="text-xs md:text-sm text-[#111111] dark:text-[#F8F8F5] font-medium">Precio <span className="text-red-500">*</span></Label>
               <Input
                 id="product-price"
                 type="number"
                 min="0"
                 step="0.01"
-                placeholder="Ej: 1299.99"
+                placeholder="Ej: 1299.99 (obligatorio)"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 className="bg-white dark:bg-[#1A1A1A] border-[#EAEAEA] dark:border-white/20 focus-visible:border-[#FCCB34] focus-visible:ring-[#FCCB34] h-10 md:h-12 text-sm px-4 shadow-sm dark:text-[#F8F8F5]"

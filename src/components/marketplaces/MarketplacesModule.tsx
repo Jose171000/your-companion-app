@@ -9,6 +9,7 @@ import { ConnectShopifyDialog } from "./ConnectShopifyDialog";
 import { ListingsTable } from "./ListingsTable";
 import { InventoryBoard } from "./InventoryBoard";
 import { ImportListingsDialog } from "./ImportListingsDialog";
+import { ImportYavendioDialog } from "./ImportYavendioDialog";
 import { Button } from "@/components/ui/button";
 import { Download, Loader2, RefreshCw } from "lucide-react";
 import { ReviewQueue } from "./ReviewQueue";
@@ -63,6 +64,7 @@ export function MarketplacesModule() {
   const canEdit = activeStore?.role === "owner" || activeStore?.role === "editor";
   const [disconnectTarget, setDisconnectTarget] = useState<MarketplaceConnection | null>(null);
   const [yavendioOpen, setYavendioOpen] = useState(false);
+  const [yavendioImportOpen, setYavendioImportOpen] = useState(false);
   const [falabellaOpen, setFalabellaOpen] = useState(false);
   const [wooOpen, setWooOpen] = useState(false);
   const [shopifyOpen, setShopifyOpen] = useState(false);
@@ -132,6 +134,7 @@ export function MarketplacesModule() {
   const meliAccounts = connections.filter((c) => c.marketplace === "mercadolibre" && c.status === "active");
   const wooAccounts = connections.filter((c) => c.marketplace === "woocommerce" && c.status === "active");
   const shopifyAccounts = connections.filter((c) => c.marketplace === "shopify" && c.status === "active");
+  const yavendioAccounts = connections.filter((c) => c.marketplace === "yavendio" && c.status === "active");
   const importAccounts = { falabella: falabellaAccounts, mercadolibre: meliAccounts, woocommerce: wooAccounts, shopify: shopifyAccounts };
   // Hasta que el servidor responda se asume revisión: es el valor por defecto.
   const reviewMode  = settingsResult?.data?.reviewMode ?? true;
@@ -268,7 +271,7 @@ export function MarketplacesModule() {
               Productos publicados en tus canales y su estado de sincronización
             </p>
           </div>
-          {isOwner && (falabellaAccounts.length > 0 || meliAccounts.length > 0 || wooAccounts.length > 0 || shopifyAccounts.length > 0) && (
+          {isOwner && (falabellaAccounts.length > 0 || meliAccounts.length > 0 || wooAccounts.length > 0 || shopifyAccounts.length > 0 || yavendioAccounts.length > 0) && (
             <div className="flex flex-wrap gap-2 shrink-0">
               <Button variant="outline" size="sm" className="gap-1.5" disabled={refreshMutation.isPending} onClick={() => refreshMutation.mutate()}>
                 {refreshMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Actualizar ahora
@@ -291,6 +294,11 @@ export function MarketplacesModule() {
               {shopifyAccounts.length > 0 && (
                 <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setImportFrom("shopify")}>
                   <Download className="w-3.5 h-3.5" /> Importar desde Shopify
+                </Button>
+              )}
+              {yavendioAccounts.length > 0 && (
+                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setYavendioImportOpen(true)}>
+                  <Download className="w-3.5 h-3.5" /> Importar desde Yavendió
                 </Button>
               )}
             </div>
@@ -341,6 +349,7 @@ export function MarketplacesModule() {
       <ConnectFalabellaDialog open={falabellaOpen} onOpenChange={setFalabellaOpen} />
       <ConnectWooCommerceDialog open={wooOpen} onOpenChange={setWooOpen} />
       <ConnectShopifyDialog open={shopifyOpen} onOpenChange={setShopifyOpen} />
+      <ImportYavendioDialog open={yavendioImportOpen} onOpenChange={setYavendioImportOpen} accounts={yavendioAccounts} />
       <ImportListingsDialog
         open={importFrom !== null}
         onOpenChange={(o) => { if (!o) setImportFrom(null); }}

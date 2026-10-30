@@ -186,6 +186,8 @@ export interface SheetData {
     sku: string;
     name: string;
     description: string;
+    /** Canal del que se importó el producto; nulo si se creó en Synkro. */
+    importedFrom: string | null;
     aiTitle: string | null;
     aiDescription: string | null;
     descriptionHtml: string | null;
@@ -210,9 +212,13 @@ export interface FalabellaField {
 }
 
 export interface LaunchReport {
-  channels: { marketplace: string; accounts: number; status: 'encolado' | 'omitido' | 'error'; message: string }[];
+  channels: { marketplace: string; accounts: number; status: 'encolado' | 'preparado' | 'omitido' | 'error'; message: string }[];
   falabella?: FalabellaPrepReport;
+  /** Las variantes (o el producto) tal como saldrían, con su título en cada canal: para revisarlo antes de confirmar. */
+  variants?: { id: string; sku: string; etiqueta: string | null; price: number | null; stock: number | null; titulos: { mercadolibre?: string; falabella?: string } }[];
   estimatedMeli: string[];
+  /** Categoría de Mercado Libre con la que sale el producto; sin `id`, `options` son las recomendadas para elegir. */
+  meliCategory?: { id?: string; path?: string; options?: { id: string; path: string }[] };
 }
 
 export interface FalabellaPrepReport {
@@ -294,7 +300,63 @@ export interface FalabellaImportSummary {
   };
 }
 
+/** Una variante de Yavendió y el producto de Synkro con el que parece corresponder. */
+export interface YavendioSugerencia {
+  yavendioProductId: string;
+  yavendioProductName: string;
+  variantId: string;
+  variantName: string;
+  price: number | null;
+  available: boolean;
+  /** SKU del producto de Synkro al que ya está vinculada, si lo está. */
+  vinculadaA: string | null;
+  confianza: 'alta' | 'posible' | 'ninguna';
+  sugerido: { productId: string; sku: string; name: string; motivo: string } | null;
+  otras: { productId: string; sku: string; name: string; motivo: string }[];
+  avisos: string[];
+}
+
+export interface YavendioVistaPrevia {
+  totalVariantes: number;
+  yaVinculadas: number;
+  coincidenciasSeguras: number;
+  coincidenciasPosibles: number;
+  sinCoincidencia: number;
+  variantes: YavendioSugerencia[];
+}
+
+export interface YavendioPedidosResultado {
+  revisados: number;
+  nuevos: number;
+  actualizados: number;
+  anulados: number;
+  omitidos: number;
+  pendientesPorTraer: number;
+  lineasSinVincular: { pedido: string; producto: string; variantId: string | null }[];
+}
+
 export const syncApi = {
+  /** Qué hay en Yavendió y con qué producto de Synkro parece corresponder cada variante. Solo lee. */
+  yavendioPreviewProducts: (connectionId?: string) =>
+    apiRequest<YavendioVistaPrevia>(
+      `/sync/yavendio/import/products${connectionId ? `?connectionId=${encodeURIComponent(connectionId)}` : ''}`,
+      { method: 'GET' },
+    ),
+
+  /** Vincula los pares que la persona confirmó. No escribe nada en Yavendió. */
+  yavendioLinkProducts: (links: { productId: string; variantId: string }[], connectionId?: string) =>
+    apiRequest<{ vinculadas: number; rechazadas: { variantId: string; motivo: string }[]; ventasCompletadas: number }>(
+      '/sync/yavendio/import/products/link',
+      { method: 'POST', body: JSON.stringify({ links, ...(connectionId ? { connectionId } : {}) }) },
+    ),
+
+  /** Trae los pedidos confirmados de Yavendió a las ventas. dryRun=true solo cuenta. */
+  yavendioImportOrders: (dryRun: boolean, connectionId?: string) =>
+    apiRequest<YavendioPedidosResultado>('/sync/yavendio/import/orders', {
+      method: 'POST',
+      body: JSON.stringify({ dryRun, ...(connectionId ? { connectionId } : {}) }),
+    }),
+
   /** Cuentas de marketplaces conectadas del usuario */
   getConnections: () =>
     apiRequest<MarketplaceConnection[]>('/sync/connections', { method: 'GET' }),
@@ -408,10 +470,15 @@ export const syncApi = {
     ),
 
   /** Lanza el producto: deja listos los canales (categoría, marca, medidas, atributos, descripción HTML) y lo publica. */
-  launchProduct: (productId: string, marketplaces: string[], connectionIds?: Record<string, string[]>) =>
+  launchProduct: (productId: string, marketplaces: string[], connectionIds?: Record<string, string[]>, meliCategoryId?: string, soloPreparar?: boolean) =>
     apiRequest<LaunchReport>(`/ai/products/${productId}/launch`, {
       method: 'POST',
-      body: JSON.stringify({ marketplaces, ...(connectionIds && Object.keys(connectionIds).length ? { connectionIds } : {}) }),
+      body: JSON.stringify({
+        marketplaces,
+        ...(connectionIds && Object.keys(connectionIds).length ? { connectionIds } : {}),
+        ...(meliCategoryId ? { meliCategoryId } : {}),
+        ...(soloPreparar ? { soloPreparar: true } : {}),
+      }),
     }),
 
   /** La ficha del producto: lo que se envía a cada canal donde está publicado. */

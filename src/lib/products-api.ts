@@ -52,6 +52,8 @@ export interface Product {
   variantValues?: Record<string, string> | null;
   /** Solo en la lista: resumen de todas las variantes del grupo (la lista muestra un grupo como una sola fila) */
   groupSummary?: { variantCount: number; priceMin: number | null; priceMax: number | null; stockTotal: number; variantIds: string[] } | null;
+  /** Solo en el cliente: la acción se pidió desde la fila del grupo y vale para TODAS sus variantes (`id` es el de una de ellas). */
+  alGrupo?: boolean;
   id: string;
   sku: string;
   name: string;

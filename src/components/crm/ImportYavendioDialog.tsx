@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { crmApi, LEAD_STAGES, YavendioImportResult } from "@/lib/crm-api";
+import { crmApi, LEAD_STAGES, YavendioContactsResult, YavendioImportResult } from "@/lib/crm-api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,31 +37,42 @@ const stageColor = (id: string) =>
 export function ImportYavendioDialog({ open, onClose }: Props) {
   const [skipEmpty, setSkipEmpty] = useState(true);
   const [preview, setPreview] = useState<YavendioImportResult | null>(null);
+  const [includeContacts, setIncludeContacts] = useState(true);
+  const [contactsPreview, setContactsPreview] = useState<YavendioContactsResult | null>(null);
   const queryClient = useQueryClient();
 
   const simulate = useMutation({
-    mutationFn: (skip: boolean) => crmApi.importYavendio(true, skip),
-    onSuccess: (res) => {
+    mutationFn: async (skip: boolean) => ({
+      conversations: await crmApi.importYavendio(true, skip),
+      // Los contactos son un extra: si fallan, las conversaciones siguen.
+      contacts: await crmApi.importYavendioContacts(true).catch(() => null),
+    }),
+    onSuccess: ({ conversations: res, contacts }) => {
       if (res.error) {
         toast.error(res.error);
         setPreview(null);
         return;
       }
       setPreview(res.data ?? null);
+      setContactsPreview(contacts?.data ?? null);
     },
     onError: () => toast.error("Error al consultar Yavendió"),
   });
 
   const confirm = useMutation({
-    mutationFn: () => crmApi.importYavendio(false, skipEmpty),
-    onSuccess: (res) => {
+    mutationFn: async () => ({
+      conversations: await crmApi.importYavendio(false, skipEmpty),
+      contacts: includeContacts ? await crmApi.importYavendioContacts(false).catch(() => null) : null,
+    }),
+    onSuccess: ({ conversations: res, contacts }) => {
       if (res.error) {
         toast.error(res.error);
         return;
       }
       const r = res.data!;
       toast.success(
-        `Importación terminada: ${r.created} nuevos y ${r.updated} actualizados.`
+        `Importación terminada: ${r.created} nuevos y ${r.updated} actualizados` +
+          (contacts?.data ? `, más ${contacts.data.created} contactos nuevos.` : ".")
       );
       queryClient.invalidateQueries({ queryKey: ["crm-leads"] });
       queryClient.invalidateQueries({ queryKey: ["crm-summary"] });
@@ -77,7 +88,10 @@ export function ImportYavendioDialog({ open, onClose }: Props) {
   }, [open, skipEmpty]);
 
   useEffect(() => {
-    if (!open) setPreview(null);
+    if (!open) {
+      setPreview(null);
+      setContactsPreview(null);
+    }
   }, [open]);
 
   const entran = preview ? preview.total - preview.skipped : 0;
@@ -107,6 +121,20 @@ export function ImportYavendioDialog({ open, onClose }: Props) {
             </p>
           </div>
           <Switch id="skip-empty" checked={skipEmpty} onCheckedChange={setSkipEmpty} />
+        </div>
+
+        <div className="flex items-center justify-between rounded-lg border border-border p-3">
+          <div className="space-y-0.5 pr-4">
+            <Label htmlFor="include-contacts" className="text-sm">
+              Incluir los contactos de Yavendió
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {contactsPreview
+                ? `${contactsPreview.created} nuevos como prospecto; ${contactsPreview.existing} ya están en tu CRM y no se tocan.`
+                : "Quienes no hayan escrito aún también entran como prospectos nuevos."}
+            </p>
+          </div>
+          <Switch id="include-contacts" checked={includeContacts} onCheckedChange={setIncludeContacts} />
         </div>
 
         {simulate.isPending ? (
