@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertCircle, CheckCircle2, ExternalLink, FileText, Loader2, Rocket, Save } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, ExternalLink, FileText, Loader2, Rocket, Save, Sparkles } from "lucide-react";
 import { Product, productsApi } from "@/lib/products-api";
 import { SheetChannel, SheetData, syncApi } from "@/lib/sync-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -73,13 +74,38 @@ function EstadoDelCanal({ canal }: { canal: SheetChannel }) {
   );
 }
 
+type Origen = "ia" | "canal" | null | undefined;
+
+/**
+ * Una etiqueta pequeña que dice de dónde salió un dato: lo escribió la IA (conviene revisarlo) o lo trajo el canal al importar.
+ * Un dato sin etiqueta lo puso una persona. Al editar un dato y guardar, la etiqueta desaparece.
+ */
+function EtiquetaDeOrigen({ origen }: { origen: Origen }) {
+  if (!origen) return null;
+  const esIA = origen === "ia";
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn("ml-1.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium align-middle cursor-default", esIA ? "bg-violet-500/15 text-violet-400" : "bg-sky-500/15 text-sky-400")}>
+          {esIA ? <Sparkles className="w-2.5 h-2.5" /> : <Download className="w-2.5 h-2.5" />}
+          {esIA ? "IA" : "Canal"}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[240px] text-xs">
+        {esIA ? "Generado con IA. Revísalo antes de enviarlo; si lo editas y guardas, deja de marcarse." : "Importado del canal tal como lo tenía. Si lo editas y guardas, deja de marcarse."}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function CampoDeAtributo({
-  etiqueta, descripcion, obligatorio, opciones, valor, onChange,
-}: { etiqueta: string; descripcion?: string; obligatorio?: boolean; opciones?: string[]; valor: string; onChange: (v: string) => void }) {
+  etiqueta, descripcion, obligatorio, opciones, valor, onChange, origen,
+}: { etiqueta: string; descripcion?: string; obligatorio?: boolean; opciones?: string[]; valor: string; onChange: (v: string) => void; origen?: Origen }) {
   return (
     <div className="space-y-1 min-w-0">
       <Label className="text-xs">
         {etiqueta}
+        <EtiquetaDeOrigen origen={origen} />
         {obligatorio !== undefined && (
           <span className={cn("ml-1 text-[10px] font-normal", obligatorio ? "text-destructive" : "text-muted-foreground")}>
             {obligatorio ? "obligatorio" : "sube la calidad"}
@@ -245,7 +271,7 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
             <TabsContent value="general" className="pt-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1 sm:col-span-2">
-                  <Label className="text-xs">Título que se envía a los canales</Label>
+                  <Label className="text-xs">Título que se envía a los canales<EtiquetaDeOrigen origen={hoja.product.origin?.aiTitle} /></Label>
                   <Input value={borrador.aiTitle} onChange={(e) => cambia("aiTitle", e.target.value)} placeholder={borrador.name} />
                   <p className="text-[11px] text-muted-foreground">
                     {borrador.aiTitle.length || borrador.name.length} caracteres. Falabella pide entre 20 y 100; Mercado Libre recorta a 60. Si lo dejas vacío se usa el nombre.
@@ -256,20 +282,20 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
                   <Input value={borrador.name} onChange={(e) => cambia("name", e.target.value)} />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Marca</Label>
+                  <Label className="text-xs">Marca<EtiquetaDeOrigen origen={hoja.product.origin?.brand} /></Label>
                   <Input value={borrador.brand} onChange={(e) => cambia("brand", e.target.value)} placeholder="GENERICO" />
                   <p className="text-[11px] text-muted-foreground">En Falabella solo vale una marca de su catálogo (se cambia desde Publicar).</p>
                 </div>
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs">Descripción en texto (Mercado Libre y canales sin HTML)</Label>
+                <Label className="text-xs">Descripción en texto (Mercado Libre y canales sin HTML)<EtiquetaDeOrigen origen={hoja.product.origin?.aiDescription} /></Label>
                 <Textarea rows={5} value={borrador.aiDescription} onChange={(e) => cambia("aiDescription", e.target.value)} />
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-2">
-                  <Label className="text-xs">Descripción HTML (Falabella y canales con HTML)</Label>
+                  <Label className="text-xs">Descripción HTML (Falabella y canales con HTML)<EtiquetaDeOrigen origen={hoja.product.origin?.descriptionHtml} /></Label>
                   <Button type="button" variant="ghost" size="sm" onClick={() => setVerHtml((v) => !v)}>{verHtml ? "Ver código" : "Ver vista previa"}</Button>
                 </div>
                 {verHtml && borrador.descriptionHtml ? (
@@ -335,6 +361,7 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
                         etiqueta={a.label}
                         descripcion={a.description}
                         obligatorio={a.required}
+                        origen={a.origin}
                         opciones={a.options}
                         valor={borrador.atributos[a.name] ?? ""}
                         onChange={(v) => cambia("atributos", { ...borrador.atributos, [a.name]: v })}
@@ -357,7 +384,7 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
                 <p className="text-xs text-muted-foreground">La descripción de texto se edita en la pestaña General. Aquí van los atributos que recibe Mercado Libre:</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {(meli.sent.attributes as any[]).map((a) => (
-                    <CampoDeAtributo key={a.id} etiqueta={a.id} valor={borrador.atributosMeli[a.id] ?? ""} onChange={(v) => cambia("atributosMeli", { ...borrador.atributosMeli, [a.id]: v })} />
+                    <CampoDeAtributo key={a.id} etiqueta={a.id} origen={a.origin} valor={borrador.atributosMeli[a.id] ?? ""} onChange={(v) => cambia("atributosMeli", { ...borrador.atributosMeli, [a.id]: v })} />
                   ))}
                 </div>
               </TabsContent>

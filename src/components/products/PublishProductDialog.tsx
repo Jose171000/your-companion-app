@@ -169,19 +169,21 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
     onError: () => toast.error("Error al conectar con el servidor"),
   });
 
-  // Cambiar datos de una ficha que ya está en Falabella (nombre, descripción, atributos…).
+  // Cambiar datos de una ficha que ya está en Falabella (nombre, descripción, atributos…): primero la IA prepara y se
+  // revisa en la ficha; solo después se envía. Lo que el canal ya tenía puede ser información precisa y no se pisa sin ver.
   const [regenerar, setRegenerar] = useState(false);
   const actualizarFalabella = useMutation({
-    mutationFn: () => syncApi.updateFalabellaContent(product!.id, regenerar),
-    onSuccess: (res) => {
+    mutationFn: (enviar: boolean) => syncApi.updateFalabellaContent(product!.id, { regenerar: enviar ? false : regenerar, enviar }),
+    onSuccess: (res, enviar) => {
       if (res.error || !res.data) {
-        toast.error(res.error ?? "No se pudo actualizar la ficha en Falabella");
+        toast.error(res.error ?? (enviar ? "No se pudo enviar la ficha a Falabella" : "No se pudo preparar la ficha"));
         return;
       }
-      const a = res.data.report.attributes;
+      const a = res.data.report?.attributes;
       toast.success(`${res.data.message}${a ? ` Atributos con valor: ${a.filled} de ${a.total}.` : ""}`);
       setRegenerar(false);
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["product-sheet"] });
     },
     onError: () => toast.error("Error al conectar con el servidor"),
   });
@@ -394,16 +396,24 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
             <div className="rounded-xl border border-border p-3 space-y-2 min-w-0">
               <p className="text-sm font-medium">Actualizar la ficha en Falabella</p>
               <p className="text-xs text-muted-foreground">
-                Envía a Falabella el nombre, la descripción, la marca y todos los atributos actuales del producto. La IA completa los que falten.
+                1) La IA completa lo que falte y lo guarda en Synkro: <span className="font-medium">no se envía nada a Falabella</span>.
+                2) Revisa el resultado en la Ficha del producto. 3) Cuando esté bien, envíalo a Falabella.
               </p>
               <label className="flex items-start gap-2 text-xs cursor-pointer">
                 <input type="checkbox" className="mt-0.5" checked={regenerar} onChange={(e) => setRegenerar(e.target.checked)} />
                 <span>Volver a redactar el nombre y la descripción con la IA (úsalo si cambiaste el texto del producto)</span>
               </label>
-              <Button size="sm" variant="outline" onClick={() => actualizarFalabella.mutate()} disabled={actualizarFalabella.isPending}>
-                {actualizarFalabella.isPending ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Rocket className="w-3.5 h-3.5 mr-2" />}
-                Actualizar en Falabella
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => actualizarFalabella.mutate(false)} disabled={actualizarFalabella.isPending}>
+                  {actualizarFalabella.isPending && !actualizarFalabella.variables ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 mr-2" />}
+                  Preparar con IA
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => actualizarFalabella.mutate(true)} disabled={actualizarFalabella.isPending}>
+                  {actualizarFalabella.isPending && actualizarFalabella.variables ? <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" /> : <Rocket className="w-3.5 h-3.5 mr-2" />}
+                  Enviar a Falabella
+                </Button>
+              </div>
+              <p className="text-[11px] text-muted-foreground">«Enviar a Falabella» manda lo que el producto tiene ahora, sin usar la IA.</p>
             </div>
           )}
 

@@ -191,6 +191,8 @@ export interface SheetData {
     aiTitle: string | null;
     aiDescription: string | null;
     descriptionHtml: string | null;
+    /** Quién escribió cada campo: la IA o el canal del que se importó. Sin etiqueta, una persona. */
+    origin?: Partial<Record<'aiTitle' | 'aiDescription' | 'descriptionHtml' | 'brand', 'ia' | 'canal'>>;
     brand: string | null;
     color: string | null;
     price: number | null;
@@ -496,11 +498,14 @@ export const syncApi = {
   syncProductSheetNow: (productId: string) =>
     apiRequest<{ results: { marketplace: string; ok: boolean; message: string }[] }>(`/sync/products/${productId}/sheet/sync`, { method: 'POST' }),
 
-  /** Pone al día en Falabella una ficha ya publicada (nombre, descripción, marca y atributos). */
-  updateFalabellaContent: (productId: string, regenerar = false) =>
-    apiRequest<{ message: string; report: FalabellaPrepReport }>(`/ai/products/${productId}/update-falabella`, {
+  /**
+   * Ficha ya publicada en Falabella, en dos pasos: sin `enviar` la IA solo prepara y guarda en Synkro (no se envía nada
+   * al canal); con `enviar` se manda a Falabella lo que el producto tiene ahora, sin pasar por la IA.
+   */
+  updateFalabellaContent: (productId: string, opciones: { regenerar?: boolean; enviar?: boolean } = {}) =>
+    apiRequest<{ message: string; sent: boolean; report?: FalabellaPrepReport }>(`/ai/products/${productId}/update-falabella`, {
       method: 'POST',
-      body: JSON.stringify({ regenerar }),
+      body: JSON.stringify({ regenerar: opciones.regenerar ?? false, enviar: opciones.enviar ?? false }),
     }),
 
   /** Datos obligatorios que hay que pedirle a la persona para esa categoría. */
