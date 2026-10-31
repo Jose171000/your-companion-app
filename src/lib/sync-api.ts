@@ -180,6 +180,23 @@ export interface SheetChannel {
   motivo?: string;
 }
 
+/** Precio y descuento de un producto en una cuenta de un canal. */
+export interface SheetPrice {
+  marketplace: string;
+  connectionId: string;
+  account: string;
+  productPrice: number | null;
+  productSalePrice: number | null;
+  /** Lo que se envía a ese canal y de dónde sale: propio del canal, del producto, o lo que el canal ya tiene. */
+  sent: { price: number; salePrice: number | null; saleStart: string | null; saleEnd: string | null; origin: { price: 'propio' | 'producto' | 'canal'; promo: 'propio' | 'producto' | 'canal' | null } };
+  /** Lo fijado solo para este canal; vacío usa el del producto. */
+  own: { price: number | null; salePrice: number | null; saleStart: string | null; saleEnd: string | null };
+  /** Lo que el canal muestra hoy. */
+  channel: { price: number | null; salePrice: number | null; stock: number | null };
+  stock: number;
+  canSetSale: boolean;
+}
+
 export interface SheetData {
   product: {
     id: string;
@@ -201,6 +218,7 @@ export interface SheetData {
     measures: { width: number | null; length: number | null; height: number | null; weight: number | null; estimated: boolean };
   };
   channels: SheetChannel[];
+  prices: SheetPrice[];
 }
 
 export interface FalabellaField {
@@ -489,7 +507,7 @@ export const syncApi = {
 
   /** Guarda cambios de la ficha; se envían solos a los canales donde está publicado. */
   saveProductSheet: (productId: string, cambios: Record<string, any>) =>
-    apiRequest<{ saved: boolean; willUpdate: string[] }>(`/sync/products/${productId}/sheet`, {
+    apiRequest<{ saved: boolean; willUpdate: string[]; pricesSent?: string[] }>(`/sync/products/${productId}/sheet`, {
       method: 'PATCH',
       body: JSON.stringify(cambios),
     }),

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AlertCircle, CheckCircle2, Download, ExternalLink, FileText, Loader2, Rocket, Save, Sparkles } from "lucide-react";
 import { Product, productsApi } from "@/lib/products-api";
-import { SheetChannel, SheetData, syncApi } from "@/lib/sync-api";
+import { SheetChannel, SheetData, SheetPrice, syncApi } from "@/lib/sync-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -36,7 +36,13 @@ interface Borrador {
   atributos: Record<string, string>;
   /** Atributos de Mercado Libre (id → valor). */
   atributosMeli: Record<string, string>;
+  /** Precio y descuento propios de cada cuenta (connectionId → valores); vacío usa el del producto. */
+  precios: Record<string, PrecioPropio>;
 }
+
+interface PrecioPropio { price: string; salePrice: string; saleStart: string; saleEnd: string }
+
+const ORIGEN_PRECIO: Record<string, string> = { propio: "fijado para este canal", producto: "el del producto", canal: "el que el canal ya tenía" };
 
 function borradorDe(hoja: SheetData): Borrador {
   const fal = hoja.channels.find((c) => c.marketplace === "falabella");
@@ -56,7 +62,76 @@ function borradorDe(hoja: SheetData): Borrador {
     },
     atributos: Object.fromEntries((fal?.sent.attributes ?? []).map((a: any) => [a.name, a.value ?? ""])),
     atributosMeli: Object.fromEntries((meli?.sent.attributes ?? []).map((a: any) => [a.id, a.value ?? ""])),
+    precios: Object.fromEntries((hoja.prices ?? []).map((x) => [x.connectionId, {
+      price: x.own.price != null ? String(x.own.price) : "",
+      salePrice: x.own.salePrice != null ? String(x.own.salePrice) : "",
+      saleStart: x.own.saleStart ? String(x.own.saleStart).slice(0, 10) : "",
+      saleEnd: x.own.saleEnd ? String(x.own.saleEnd).slice(0, 10) : "",
+    }])),
   };
+}
+
+const dinero = (n: number | null | undefined) => (n === null || n === undefined ? "—" : Number(n).toFixed(2));
+
+/** Precio y descuento por cuenta: lo que se envía, de dónde sale y lo que el canal muestra hoy. */
+function PrecioDeCanal({ precio, valor, onChange }: { precio: SheetPrice; valor: PrecioPropio; onChange: (v: PrecioPropio) => void }) {
+  const s = precio.sent;
+  const set = (k: keyof PrecioPropio, v: string) => onChange({ ...valor, [k]: v });
+  const desfase = precio.channel.price != null && Math.abs(precio.channel.price - s.price) > 0.009;
+  return (
+    <div className="rounded-lg border border-border p-3 space-y-3">
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="font-medium">{NOMBRE_CANAL[precio.marketplace] ?? precio.marketplace}</span>
+        <span className="text-xs text-muted-foreground">{precio.account}</span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+        <div className="rounded-md bg-secondary/40 p-2">
+          <p className="text-muted-foreground">Se envía</p>
+          <p className="text-sm font-medium">{dinero(s.price)}{s.salePrice != null && <span className="text-green-500"> · desc. {dinero(s.salePrice)}</span>}</p>
+          <p className="text-[11px] text-muted-foreground">Precio: {ORIGEN_PRECIO[s.origin.price]}{s.origin.promo ? ` · descuento: ${ORIGEN_PRECIO[s.origin.promo]}` : ""}</p>
+        </div>
+        <div className="rounded-md bg-secondary/40 p-2">
+          <p className="text-muted-foreground">El canal muestra hoy</p>
+          <p className="text-sm font-medium">{dinero(precio.channel.price)}{precio.channel.salePrice != null && <span className="text-green-500"> · desc. {dinero(precio.channel.salePrice)}</span>}</p>
+          {desfase && <p className="text-[11px] text-amber-500">Distinto de lo que se envía: se corrige al guardar.</p>}
+        </div>
+        <div className="rounded-md bg-secondary/40 p-2">
+          <p className="text-muted-foreground">Del producto</p>
+          <p className="text-sm font-medium">{dinero(precio.productPrice)}{precio.productSalePrice != null && <span className="text-green-500"> · desc. {dinero(precio.productSalePrice)}</span>}</p>
+          <p className="text-[11px] text-muted-foreground">Stock en Synkro: {precio.stock}{precio.channel.stock != null ? ` · en el canal: ${precio.channel.stock}` : ""}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="space-y-1">
+          <Label className="text-[11px] font-normal text-muted-foreground">Precio solo en este canal</Label>
+          <Input type="number" min="0" step="0.01" value={valor.price} placeholder={precio.productPrice != null ? String(precio.productPrice) : ""} onChange={(e) => set("price", e.target.value)} />
+        </div>
+        {precio.canSetSale && (
+          <>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-normal text-muted-foreground">Precio con descuento</Label>
+              <Input type="number" min="0" step="0.01" value={valor.salePrice} placeholder={precio.productSalePrice != null ? String(precio.productSalePrice) : "Sin descuento"} onChange={(e) => set("salePrice", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-normal text-muted-foreground">Descuento desde</Label>
+              <Input type="date" value={valor.saleStart} onChange={(e) => set("saleStart", e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] font-normal text-muted-foreground">Descuento hasta</Label>
+              <Input type="date" value={valor.saleEnd} onChange={(e) => set("saleEnd", e.target.value)} />
+            </div>
+          </>
+        )}
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        {precio.canSetSale
+          ? "Déjalos vacíos para usar los del producto. Quitar un descuento ya enviado se hace desde el Seller Center de Falabella."
+          : "Déjalo vacío para usar el precio del producto. Los descuentos de Mercado Libre se manejan en su propia herramienta de promociones."}
+      </p>
+    </div>
+  );
 }
 
 function EstadoDelCanal({ canal }: { canal: SheetChannel }) {
@@ -184,6 +259,12 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
     if (JSON.stringify(med) !== JSON.stringify(original.medidas) && [med.width, med.length, med.height, med.weight].every((x) => Number(x) > 0)) {
       c.measures = { width: Number(med.width), length: Number(med.length), height: Number(med.height), weight: Number(med.weight) };
     }
+    // Precios: se envía el estado completo de cada cuenta cuyo precio o descuento cambió.
+    const numero = (v: string) => (v.trim() === "" ? null : Number(v));
+    const p = Object.entries(borrador.precios)
+      .filter(([id, v]) => JSON.stringify(v) !== JSON.stringify(original.precios[id]))
+      .map(([id, v]) => ({ connectionId: id, price: numero(v.price), salePrice: numero(v.salePrice), saleStart: v.saleStart || null, saleEnd: v.saleEnd || null }));
+    if (p.length) c.prices = p;
     return Object.keys(c).length ? c : null;
   }, [borrador, original]);
 
@@ -198,10 +279,13 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
     onSuccess: (res) => {
       if (res.error || !res.data) return toast.error(res.error ?? "No se pudo guardar");
       const destinos = res.data.willUpdate.map((m) => NOMBRE_CANAL[m] ?? m);
+      const precios = (res.data.pricesSent ?? []).map((m) => NOMBRE_CANAL[m] ?? m);
       toast.success(
         destinos.length
           ? `Guardado. Se enviará solo a ${destinos.join(" y ")} en menos de un minuto.`
-          : "Guardado. Este producto aún no está publicado en ningún canal, así que no hay nada que enviar.",
+          : precios.length
+            ? `Guardado. Los precios se enviarán a ${precios.join(" y ")} en unos minutos.`
+            : "Guardado. Este producto aún no está publicado en ningún canal, así que no hay nada que enviar.",
       );
       refrescar();
     },
@@ -257,6 +341,7 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
           <Tabs defaultValue="general">
             <TabsList className="flex-wrap h-auto">
               <TabsTrigger value="general">General</TabsTrigger>
+              {hoja.prices.length > 0 && <TabsTrigger value="precios">Precios</TabsTrigger>}
               {fal && <TabsTrigger value="falabella">Falabella</TabsTrigger>}
               {meli && <TabsTrigger value="mercadolibre">Mercado Libre</TabsTrigger>}
             </TabsList>
@@ -329,6 +414,23 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
                 </div>
               )}
             </TabsContent>
+
+            {/* ── Precios por canal ── */}
+            {hoja.prices.length > 0 && (
+              <TabsContent value="precios" className="pt-4 space-y-4">
+                <p className="text-xs text-muted-foreground">
+                  Cada canal usa el precio del producto salvo que fijes uno propio aquí. Actualizar el contenido con la IA nunca quita un descuento: se conserva el que el canal ya tiene.
+                </p>
+                {hoja.prices.map((x) => (
+                  <PrecioDeCanal
+                    key={x.connectionId}
+                    precio={x}
+                    valor={borrador.precios[x.connectionId] ?? { price: "", salePrice: "", saleStart: "", saleEnd: "" }}
+                    onChange={(v) => cambia("precios", { ...borrador.precios, [x.connectionId]: v })}
+                  />
+                ))}
+              </TabsContent>
+            )}
 
             {/* ── Falabella ── */}
             {fal && (
