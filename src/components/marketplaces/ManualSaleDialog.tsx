@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Download, FileSpreadsheet, Loader2, Plus, Trash2 } from "lucide-react";
-import { ManualSalesResult, syncApi } from "@/lib/sync-api";
+import { ManualSaleProduct, ManualSalesResult, syncApi } from "@/lib/sync-api";
+import { SkuPicker } from "./SkuPicker";
 import { SALE_STATES } from "@/lib/sale-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,14 +13,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { aIso } from "@/components/common/DateRangeFilter";
 
 /** Canales que se ofrecen; «otro» deja escribir el nombre que se quiera. */
 const CANALES = ["Ripley", "Juntoz", "Amazon", "WhatsApp", "Tienda física", "Web propia"];
 const OTRO = "__otro__";
 
-interface Linea { sku: string; producto: string; cantidad: string; precio: string; descontar: boolean }
-const lineaVacia = (): Linea => ({ sku: "", producto: "", cantidad: "1", precio: "", descontar: true });
-const hoy = () => new Date().toISOString().slice(0, 10);
+interface Linea { producto: ManualSaleProduct | null; cantidad: string; precio: string; descontar: boolean }
+const lineaVacia = (): Linea => ({ producto: null, cantidad: "1", precio: "", descontar: true });
+/** Hoy en fecha local (igual que el filtro de fechas): de noche en Lima la fecha universal ya es mañana. */
+const hoy = () => aIso(new Date());
 
 /**
  * Registra ventas de canales que la tienda NO tiene conectados (Ripley, Juntoz, WhatsApp, tienda física…), una por una
@@ -45,7 +48,8 @@ export function ManualSaleDialog({ open, onOpenChange }: { open: boolean; onOpen
 
   const cambiar = (i: number, parte: Partial<Linea>) => setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, ...parte } : l)));
   const canalFinal = canal === OTRO ? canalOtro.trim() : canal;
-  const total = lineas.reduce((s, l) => s + (Number(l.cantidad) || 0) * (Number(l.precio) || 0), 0);
+  // Sin precio escrito se usa el del catálogo (el servidor hace lo mismo).
+  const total = lineas.reduce((s, l) => s + (Number(l.cantidad) || 0) * (Number(l.precio) || (l.producto?.price ?? 0)), 0);
 
   const alTerminar = (r: ManualSalesResult) => {
     setResultado(r);
@@ -57,11 +61,11 @@ export function ManualSaleDialog({ open, onOpenChange }: { open: boolean; onOpen
 
   const registrar = async () => {
     if (!canalFinal) { toast.error("Elige o escribe el canal de la venta."); return; }
+    if (lineas.some((l) => !l.producto)) { toast.error("Elige el producto de cada línea (busca por SKU o nombre)."); return; }
     const filas = lineas.map((l, i) => ({
       numero_pedido: numero.trim() || undefined,
       ...(i === 0 ? { fecha, canal: canalFinal, estado, envio, cliente, telefono, documento, direccion, notas } : {}),
-      sku: l.sku.trim(),
-      producto: l.producto.trim(),
+      sku: l.producto!.sku,
       cantidad: l.cantidad,
       precio_unitario: l.precio,
       descontar_stock: l.descontar ? "SI" : "NO",
@@ -144,11 +148,20 @@ export function ManualSaleDialog({ open, onOpenChange }: { open: boolean; onOpen
               <Label>Productos</Label>
               {lineas.map((l, i) => (
                 <div key={i} className="rounded-xl border border-border p-3 space-y-2">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <Input placeholder="SKU" value={l.sku} onChange={(e) => cambiar(i, { sku: e.target.value })} />
-                    <Input placeholder="Nombre (si no tiene SKU)" className="col-span-1 sm:col-span-1" value={l.producto} onChange={(e) => cambiar(i, { producto: e.target.value })} />
-                    <Input type="number" min={1} step={1} placeholder="Cantidad" value={l.cantidad} onChange={(e) => cambiar(i, { cantidad: e.target.value })} />
-                    <Input type="number" min={0} step="0.01" placeholder="Precio por unidad" value={l.precio} onChange={(e) => cambiar(i, { precio: e.target.value })} />
+                  <SkuPicker
+                    value={l.producto}
+                    onPick={(p) => cambiar(i, { producto: p, precio: l.precio || (p.price != null ? String(p.price) : "") })}
+                    onClear={() => cambiar(i, { producto: null })}
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Cantidad</Label>
+                      <Input type="number" min={1} step={1} value={l.cantidad} onChange={(e) => cambiar(i, { cantidad: e.target.value })} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Precio por unidad</Label>
+                      <Input type="number" min={0} step="0.01" placeholder="Precio del catálogo" value={l.precio} onChange={(e) => cambiar(i, { precio: e.target.value })} />
+                    </div>
                   </div>
                   <div className="flex items-center justify-between">
                     <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
@@ -166,7 +179,7 @@ export function ManualSaleDialog({ open, onOpenChange }: { open: boolean; onOpen
               <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setLineas((ls) => [...ls, lineaVacia()])}>
                 <Plus className="w-3.5 h-3.5" /> Agregar producto
               </Button>
-              <p className="text-xs text-muted-foreground">El precio es lo que pagó el cliente por una unidad, sin el envío.</p>
+              <p className="text-xs text-muted-foreground">Busca por SKU o por nombre y elige el producto. El precio es lo que pagó el cliente por una unidad, sin el envío; vacío usa el del catálogo.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -191,7 +204,7 @@ export function ManualSaleDialog({ open, onOpenChange }: { open: boolean; onOpen
 
           <TabsContent value="excel" className="space-y-4 pt-3">
             <ol className="text-sm text-muted-foreground list-decimal pl-5 space-y-1">
-              <li>Descarga la plantilla y llena una fila por producto (varias filas con el mismo n.º de pedido son una sola venta).</li>
+              <li>Descarga la plantilla y llena una fila por producto, identificado solo por su SKU del catálogo (varias filas con el mismo n.º de pedido son una sola venta). Con el precio vacío se usa el del catálogo.</li>
               <li>Borra las filas de ejemplo y sube el archivo.</li>
             </ol>
             <div className="flex flex-wrap gap-2">

@@ -137,6 +137,16 @@ export interface Sale {
   details?: SaleDetails | null;
 }
 
+/** Un producto del catálogo para elegir en una venta manual */
+export interface ManualSaleProduct {
+  sku: string;
+  name: string;
+  variant: string | null;
+  price: number | null;
+  stock: number;
+  imageUrl: string | null;
+}
+
 export interface ManualSalesResult {
   registradas: number;
   /** Una línea por venta o fila que no se registró, con el motivo */
@@ -641,6 +651,10 @@ export const syncApi = {
     form.append('excel', file);
     return apiRequestMultipart<ManualSalesResult>('/sync/orders/manual/import', form);
   },
+
+  /** Busca productos del catálogo por SKU o nombre para elegir el de una venta manual */
+  searchManualSaleProducts: (search: string) =>
+    apiRequest<ManualSaleProduct[]>(`/sync/orders/manual/products?search=${encodeURIComponent(search)}`, { method: 'GET' }),
 
   /** Descarga en Excel las ventas que coinciden con los filtros (una fila por producto vendido) */
   downloadSales: (q: SalesQuery = {}) => {
