@@ -100,6 +100,8 @@ export interface SaleLine {
   currentStock: number | null;
   imageUrl: string | null;
   productName: string | null;
+  /** Qué variante se vendió: «Color: Rojo · Talla: M» */
+  variant?: string | null;
 }
 
 export interface SaleDetails {

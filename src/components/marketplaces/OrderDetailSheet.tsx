@@ -85,6 +85,7 @@ export function OrderDetailSheet({ sale, onClose }: Props) {
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-sm">{l.productName || l.title}</p>
                       <code className="text-[11px] font-mono text-muted-foreground">{l.sku ?? "sin SKU"}</code>
+                      {l.variant && <p className="text-xs text-foreground/80 mt-0.5">{l.variant}</p>}
                     </div>
                     <div className="text-right shrink-0">
                       <p className="font-semibold text-sm tabular-nums">{money(l.unitPrice * l.quantity, s.currency)}</p>

@@ -200,6 +200,7 @@ export function SalesList({ accounts, canImport }: Props) {
                         <div className="min-w-0">
                           <p className="font-medium text-sm truncate max-w-[220px]">{line.productName || line.title}</p>
                           <code className="text-[10px] font-mono text-muted-foreground">{line.sku ?? "sin SKU"}</code>
+                          {line.variant && <p className="text-[11px] text-foreground/80 truncate max-w-[220px]" title={line.variant}>{line.variant}</p>}
                           {line.quantity > 1 && <span className="text-[10px] text-muted-foreground"> · x{line.quantity}</span>}
                         </div>
                       </div>
@@ -245,6 +246,7 @@ export function SalesList({ accounts, canImport }: Props) {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm truncate">{line.productName || line.title}</p>
                     <code className="text-[10px] font-mono text-muted-foreground">{line.sku ?? "sin SKU"}</code>
+                    {line.variant && <p className="text-[11px] text-foreground/80 truncate">{line.variant}</p>}
                   </div>
                   <p className="font-semibold text-sm tabular-nums shrink-0">{money(line.unitPrice * line.quantity, sale.currency)}</p>
                 </div>
