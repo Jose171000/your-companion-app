@@ -21,6 +21,21 @@ export interface BulkProgress {
   processed: number;
   failed: number;
   terminado: boolean;
+  /** Productos que no se pudieron crear y por qué */
+  fallidos?: { sku: string; error: string }[];
+  /** Cómo va el envío a Falabella */
+  falabella?: { pendientes: number; enviados: number; rechazados: number };
+  falabellaRechazados?: { sku: string; error: string }[];
+  /** Fallidos que ya se volvieron a mandar en otra carga */
+  reintentados?: number;
+}
+
+export interface BulkRetryResponse {
+  message: string;
+  /** Carga nueva con los productos fallidos (si había) */
+  batchId?: string;
+  reintentados: number;
+  falabellaReenviados: number;
 }
 
 export interface BulkUploadStatus {
@@ -60,6 +75,10 @@ export const bulkUploadApi = {
   /** Avance de una carga masiva: cuántos productos van listos y cuántos fallaron. */
   getProductsProgress: (batchId: string) =>
     apiRequest<BulkProgress>(`/bulk-upload/products/progress/${batchId}`, { method: 'GET' }),
+
+  /** Vuelve a mandar los productos fallidos de una carga terminada y reenvía a Falabella los que quedaron sin enviar. */
+  retryProducts: (batchId: string) =>
+    apiRequest<BulkRetryResponse>(`/bulk-upload/products/retry/${batchId}`, { method: 'POST' }),
 
   /**
    * Edición masiva de productos via Excel.

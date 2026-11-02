@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { bulkUploadApi } from "@/lib/bulk-upload-api";
 import { Button } from "@/components/ui/button";
@@ -17,8 +18,9 @@ export interface LoteEnCurso {
  * Avance de una carga masiva: cuántos productos van listos y cuántos fallaron. Se actualiza solo y avisa cuando termina;
  * mientras tanto el formulario ya está limpio, así que no se puede volver a enviar el mismo archivo por error.
  */
-export function BulkProgressCard({ lote, onClose }: { lote: LoteEnCurso; onClose: () => void }) {
+export function BulkProgressCard({ lote, onClose, onNuevoLote }: { lote: LoteEnCurso; onClose: () => void; onNuevoLote: (lote: LoteEnCurso) => void }) {
   const queryClient = useQueryClient();
+  const [reintentando, setReintentando] = useState(false);
   const { data, isError } = useQuery({
     queryKey: ["bulk-progress", lote.batchId],
     queryFn: () => bulkUploadApi.getProductsProgress(lote.batchId),
@@ -37,6 +39,22 @@ export function BulkProgressCard({ lote, onClose }: { lote: LoteEnCurso; onClose
       queryClient.invalidateQueries({ queryKey: ["products-summary"] });
     }
   }, [p?.terminado, queryClient]);
+
+  const fallidos = p?.fallidos ?? [];
+  const rechazadosF = p?.falabellaRechazados ?? [];
+  const sinEnviar = p?.falabella?.pendientes ?? 0;
+  const hayQueReintentar = !!p?.terminado && (fallidos.length > 0 || sinEnviar > 0);
+
+  const reintentar = async () => {
+    setReintentando(true);
+    const res = await bulkUploadApi.retryProducts(lote.batchId);
+    setReintentando(false);
+    if (res.error || !res.data) { toast.error(res.error ?? "No se pudo reintentar la carga"); return; }
+    toast.success(res.data.message);
+    queryClient.invalidateQueries({ queryKey: ["bulk-progress", lote.batchId] });
+    // Los fallidos salen en una carga nueva: la tarjeta pasa a seguir esa.
+    if (res.data.batchId) onNuevoLote({ batchId: res.data.batchId, total: res.data.reintentados, rechazos: [] });
+  };
 
   return (
     <Card className="p-4 md:p-6 rounded-[16px] space-y-3 animate-in fade-in duration-300">
@@ -75,8 +93,41 @@ export function BulkProgressCard({ lote, onClose }: { lote: LoteEnCurso; onClose
         </details>
       )}
 
+      {p?.falabella && p.falabella.enviados + p.falabella.pendientes + p.falabella.rechazados > 0 && (
+        <p className="text-xs text-muted-foreground tabular-nums">
+          Falabella: {p.falabella.enviados} enviados
+          {p.falabella.pendientes ? ` · ${p.falabella.pendientes} esperando envío` : ""}
+          {p.falabella.rechazados ? ` · ${p.falabella.rechazados} rechazados` : ""}
+        </p>
+      )}
+
+      {fallidos.length > 0 && (
+        <details className="text-xs text-red-500">
+          <summary className="cursor-pointer">{fallidos.length} producto(s) no se pudieron crear</summary>
+          <ul className="mt-1 space-y-0.5 list-disc pl-4 break-words">
+            {fallidos.slice(0, 20).map((f) => <li key={f.sku}>{f.sku}: {f.error}</li>)}
+            {fallidos.length > 20 && <li>… y {fallidos.length - 20} más</li>}
+          </ul>
+        </details>
+      )}
+
+      {rechazadosF.length > 0 && (
+        <details className="text-xs text-amber-500">
+          <summary className="cursor-pointer">{rechazadosF.length} producto(s) rechazados por Falabella</summary>
+          <ul className="mt-1 space-y-0.5 list-disc pl-4 break-words">
+            {rechazadosF.slice(0, 20).map((f) => <li key={f.sku}>{f.sku}: {f.error}</li>)}
+            {rechazadosF.length > 20 && <li>… y {rechazadosF.length - 20} más</li>}
+          </ul>
+        </details>
+      )}
+
       {p?.terminado && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {hayQueReintentar && (
+            <Button size="sm" onClick={reintentar} disabled={reintentando}>
+              {reintentando ? "Reintentando…" : "Reintentar fallidos"}
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={onClose}>Cerrar</Button>
         </div>
       )}

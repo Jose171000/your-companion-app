@@ -436,7 +436,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
       </Card>
 
       {/* Carga masiva en proceso: avance en vivo */}
-      {lote && <BulkProgressCard lote={lote} onClose={() => setLote(null)} />}
+      {lote && <BulkProgressCard lote={lote} onClose={() => setLote(null)} onNuevoLote={setLote} />}
 
       {/* Resultado de un producto con variantes */}
       {grupoCreado && (
