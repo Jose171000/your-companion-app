@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { Sale } from "@/lib/sync-api";
+import { saleStateInfo } from "@/lib/sale-status";
 
 /** Estados en los que ya no hay nada que despachar: no se marca como urgente. */
 const DONE = /shipped|delivered|canceled|cancelled|returned|failed|entregad|enviad|cancelad/i;
@@ -18,11 +19,20 @@ export const fmtDate = (iso: string | null | undefined, withTime = true) => {
 };
 
 /** Fecha máxima de envío con su urgencia: vencida, hoy, o los días que faltan. */
-export function ShipByBadge({ sale }: { sale: Pick<Sale, "shipByDate" | "status" | "shipping"> }) {
+/** Estado de la venta en palabras comunes a todos los canales; el texto del canal queda como ayuda al pasar el cursor. */
+export function EstadoDeLaVenta({ sale }: { sale: Pick<Sale, "saleState" | "status" | "shipping"> }) {
+  const info = saleStateInfo(sale.saleState);
+  const delCanal = sale.shipping?.status || sale.status;
+  if (!info) return <Badge variant="secondary" className="text-[10px] capitalize">{delCanal}</Badge>;
+  return <Badge className={cn("text-[10px]", info.clase)} title={delCanal ? `Estado en el canal: ${delCanal}` : undefined}>{info.singular}</Badge>;
+}
+
+export function ShipByBadge({ sale }: { sale: Pick<Sale, "shipByDate" | "status" | "shipping" | "saleState"> }) {
   if (!sale.shipByDate) return <span className="text-muted-foreground">—</span>;
   const limite = new Date(sale.shipByDate).getTime();
   const horas = (limite - Date.now()) / 3_600_000;
-  const cerrada = DONE.test(`${sale.status} ${sale.shipping?.status ?? ""}`);
+  // Con el estado común del servidor basta: ya salió, llegó o se canceló = nada que despachar.
+  const cerrada = sale.saleState ? sale.saleState !== "pendiente" : DONE.test(`${sale.status} ${sale.shipping?.status ?? ""}`);
 
   let clase = "bg-secondary text-muted-foreground border-border";
   let texto = fmtDate(sale.shipByDate, false);

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { History, Loader2, Search, ShoppingBag } from "lucide-react";
 import { MarketplaceConnection, Sale, SaleLine, syncApi } from "@/lib/sync-api";
 import { useStores } from "@/contexts/StoreContext";
@@ -13,7 +13,9 @@ import { ProductThumb } from "./ProductThumb";
 import { OrderDetailSheet } from "./OrderDetailSheet";
 import { ImportHistoryDialog } from "./ImportHistoryDialog";
 import { DateRangeFilter, useRangoDeFechas } from "@/components/common/DateRangeFilter";
-import { ShipByBadge, StockCell, fmtDate } from "./SaleParts";
+import { SaleStatusFilter } from "@/components/common/SaleStatusFilter";
+import type { SaleState } from "@/lib/sale-status";
+import { EstadoDeLaVenta, ShipByBadge, StockCell, fmtDate } from "./SaleParts";
 
 const PAGE = 50;
 /** Canales de los que se leen ventas. */
@@ -42,6 +44,7 @@ export function SalesList({ accounts, canImport }: Props) {
   const [connectionId, setConnectionId] = useState("all");
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [estados, setEstados] = useState<SaleState[]>([]);
   const [selected, setSelected] = useState<Sale | null>(null);
 
   // La búsqueda espera a que se deje de escribir: una consulta por tecla sobra.
@@ -53,7 +56,8 @@ export function SalesList({ accounts, canImport }: Props) {
   const { from, to } = rango;
 
   const query = useInfiniteQuery({
-    queryKey: ["sync-orders", storeId, from, to, marketplace, connectionId, search],
+    queryKey: ["sync-orders", storeId, from, to, marketplace, connectionId, search, estados.join(",")],
+    placeholderData: keepPreviousData,
     enabled: !!storeId,
     initialPageParam: 0,
     queryFn: async ({ pageParam }) => {
@@ -63,6 +67,7 @@ export function SalesList({ accounts, canImport }: Props) {
         marketplace: marketplace === "all" ? undefined : marketplace,
         connectionId: connectionId === "all" ? undefined : connectionId,
         search: search || undefined,
+        status: estados.join(",") || undefined,
         limit: PAGE,
         offset: pageParam,
       });
@@ -76,6 +81,7 @@ export function SalesList({ accounts, canImport }: Props) {
 
   const sales = useMemo(() => query.data?.pages.flatMap((p) => p.items) ?? [], [query.data]);
   const total = query.data?.pages[0]?.total ?? 0;
+  const porEstado = query.data?.pages[0]?.porEstado;
   const rows: Row[] = useMemo(
     () =>
       sales.flatMap((sale) =>
@@ -129,6 +135,9 @@ export function SalesList({ accounts, canImport }: Props) {
           />
         </div>
       </div>
+
+      {/* Estado de la venta: pendientes, enviadas, entregadas, canceladas o devueltas */}
+      <SaleStatusFilter value={estados} onChange={setEstados} counts={porEstado} />
 
       {query.isLoading ? (
         <div className="glass rounded-2xl divide-y divide-border/50 overflow-hidden">
@@ -204,7 +213,7 @@ export function SalesList({ accounts, canImport }: Props) {
                     </td>
                     <td className="px-3 py-3 text-xs text-muted-foreground whitespace-nowrap">{fmtDate(sale.orderDate)}</td>
                     <td className="px-3 py-3 text-xs">
-                      <Badge variant="secondary" className="text-[10px] capitalize">{sale.shipping?.status || sale.status}</Badge>
+                      <EstadoDeLaVenta sale={sale} />
                     </td>
                   </tr>
                 ))}

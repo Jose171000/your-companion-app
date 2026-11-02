@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { channelName, money } from "./format";
 import { ProductThumb } from "./ProductThumb";
-import { ShipByBadge, StockCell, fmtDate } from "./SaleParts";
+import { ShipByBadge, EstadoDeLaVenta, StockCell, fmtDate } from "./SaleParts";
 
 interface Props {
   sale: Sale | null;
@@ -66,7 +66,7 @@ export function OrderDetailSheet({ sale, onClose }: Props) {
             </SheetHeader>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary" className="capitalize">{s.shipping?.status || s.status}</Badge>
+              <EstadoDeLaVenta sale={s} />
               <span className="text-xs text-muted-foreground">Enviar antes de</span>
               <ShipByBadge sale={s} />
             </div>

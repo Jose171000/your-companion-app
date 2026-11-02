@@ -1,4 +1,5 @@
 import { apiRequest } from './api';
+import type { SaleState } from './sale-status';
 
 // ─────────────────────────────────────────────
 // Types
@@ -121,6 +122,8 @@ export interface Sale {
   account: { id: string; label: string } | null;
   orderDate: string;
   status: string;
+  /** Estado común a todos los canales */
+  saleState?: SaleState;
   customerName: string | null;
   /** Fecha máxima para despachar */
   shipByDate: string | null;
@@ -138,6 +141,8 @@ export interface SalesQuery {
   marketplace?: string;
   connectionId?: string;
   search?: string;
+  /** Estados separados por coma: pendiente,enviado,entregado,cancelado,devuelto */
+  status?: string;
   limit?: number;
   offset?: number;
 }
@@ -615,7 +620,7 @@ export const syncApi = {
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== '') params.set(k, String(v));
     const qs = params.toString();
-    return apiRequest<{ total: number; limit: number; offset: number; items: Sale[] }>(`/sync/orders${qs ? `?${qs}` : ''}`, { method: 'GET' });
+    return apiRequest<{ total: number; limit: number; offset: number; porEstado?: Partial<Record<SaleState, number>>; items: Sale[] }>(`/sync/orders${qs ? `?${qs}` : ''}`, { method: 'GET' });
   },
 
   getSale: (id: string) => apiRequest<Sale>(`/sync/orders/${id}`, { method: 'GET' }),

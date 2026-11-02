@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useStores } from "@/contexts/StoreContext";
 import { syncApi } from "@/lib/sync-api";
 import { reportsApi } from "@/lib/admin-api";
 import { EmbeddedReport } from "./EmbeddedReport";
 import { DateRangeFilter, useRangoDeFechas } from "@/components/common/DateRangeFilter";
+import { SaleStatusFilter } from "@/components/common/SaleStatusFilter";
+import type { SaleState } from "@/lib/sale-status";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
