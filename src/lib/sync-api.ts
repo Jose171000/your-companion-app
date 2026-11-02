@@ -642,6 +642,14 @@ export const syncApi = {
     return apiRequestMultipart<ManualSalesResult>('/sync/orders/manual/import', form);
   },
 
+  /** Descarga en Excel las ventas que coinciden con los filtros (una fila por producto vendido) */
+  downloadSales: (q: SalesQuery = {}) => {
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== '' && k !== 'limit' && k !== 'offset') params.set(k, String(v));
+    const qs = params.toString();
+    return apiDownload(`/sync/orders/export${qs ? `?${qs}` : ''}`, `ventas-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  },
+
   downloadManualSalesTemplate: () => apiDownload('/sync/orders/manual/template', 'plantilla-ventas.xlsx'),
 
   getSale: (id: string) => apiRequest<Sale>(`/sync/orders/${id}`, { method: 'GET' }),

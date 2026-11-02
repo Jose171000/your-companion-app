@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
-import { History, Loader2, Plus, Search, ShoppingBag } from "lucide-react";
+import { toast } from "sonner";
+import { Download, History, Loader2, Plus, Search, ShoppingBag } from "lucide-react";
 import { MarketplaceConnection, Sale, SaleLine, syncApi } from "@/lib/sync-api";
 import { useStores } from "@/contexts/StoreContext";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +39,7 @@ interface Props {
 export function SalesList({ accounts, canImport }: Props) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [descargando, setDescargando] = useState(false);
   const { activeStore } = useStores();
   const storeId = activeStore?.id;
 
@@ -94,6 +96,25 @@ export function SalesList({ accounts, canImport }: Props) {
     [sales],
   );
 
+  // Baja lo que se ve con los filtros puestos (fechas, canal, cuenta, estado y búsqueda), no solo la página cargada.
+  const descargar = async () => {
+    if (total > 5000) toast.info("Hay más de 5000 ventas con estos filtros: se descargan las 5000 más recientes. Acota las fechas para el resto.");
+    setDescargando(true);
+    try {
+      await syncApi.downloadSales({
+        from, to,
+        marketplace: marketplace === "all" ? undefined : marketplace,
+        connectionId: connectionId === "all" ? undefined : connectionId,
+        search: search || undefined,
+        status: estados.join(",") || undefined,
+      });
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo descargar las ventas");
+    } finally {
+      setDescargando(false);
+    }
+  };
+
   const accountsOfChannel = accounts.filter((a) => marketplace === "all" || a.marketplace === marketplace);
   const conectados = [...new Set(accounts.map((a) => a.marketplace))].filter((m) => VENTA_CHANNELS.includes(m));
   // Canales registrados a mano (Ripley, WhatsApp…): no tienen cuenta conectada, así que salen de las ventas mismas.
@@ -125,16 +146,21 @@ export function SalesList({ accounts, canImport }: Props) {
             </Select>
           )}
         </div>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <Button size="sm" variant="outline" className="gap-1.5" disabled={descargando || total === 0} onClick={descargar}>
+            {descargando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Descargar
+          </Button>
         {canImport && (
-          <div className="flex items-center gap-2 shrink-0">
+          <>
             <Button size="sm" className="gap-1.5" onClick={() => setManualOpen(true)}>
               <Plus className="w-3.5 h-3.5" /> Registrar ventas
             </Button>
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setHistoryOpen(true)}>
               <History className="w-3.5 h-3.5" /> Importar historial
             </Button>
-          </div>
+          </>
         )}
+        </div>
         <div className="relative w-full lg:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
