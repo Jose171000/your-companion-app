@@ -49,7 +49,7 @@ const CHANNEL_NAMES: Record<string, string> = {
 
 /** Canales que llegan desde la hoja de cálculo pueden traer cualquier nombre */
 const channelLabel = (id: string) =>
-  CHANNEL_NAMES[id] ?? id.charAt(0).toUpperCase() + id.slice(1);
+  CHANNEL_NAMES[id] ?? id.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 function KpiCard({
   icon: Icon,

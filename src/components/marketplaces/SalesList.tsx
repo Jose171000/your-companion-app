@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
-import { History, Loader2, Search, ShoppingBag } from "lucide-react";
+import { History, Loader2, Plus, Search, ShoppingBag } from "lucide-react";
 import { MarketplaceConnection, Sale, SaleLine, syncApi } from "@/lib/sync-api";
 import { useStores } from "@/contexts/StoreContext";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,7 @@ import { channelName, money } from "./format";
 import { ProductThumb } from "./ProductThumb";
 import { OrderDetailSheet } from "./OrderDetailSheet";
 import { ImportHistoryDialog } from "./ImportHistoryDialog";
+import { ManualSaleDialog } from "./ManualSaleDialog";
 import { DateRangeFilter, useRangoDeFechas } from "@/components/common/DateRangeFilter";
 import { SaleStatusFilter } from "@/components/common/SaleStatusFilter";
 import type { SaleState } from "@/lib/sale-status";
@@ -36,6 +37,7 @@ interface Props {
 /** Todas las ventas de la tienda en una sola lista, una fila por producto vendido. */
 export function SalesList({ accounts, canImport }: Props) {
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
   const { activeStore } = useStores();
   const storeId = activeStore?.id;
 
@@ -93,7 +95,10 @@ export function SalesList({ accounts, canImport }: Props) {
   );
 
   const accountsOfChannel = accounts.filter((a) => marketplace === "all" || a.marketplace === marketplace);
-  const channels = [...new Set(accounts.map((a) => a.marketplace))].filter((m) => VENTA_CHANNELS.includes(m));
+  const conectados = [...new Set(accounts.map((a) => a.marketplace))].filter((m) => VENTA_CHANNELS.includes(m));
+  // Canales registrados a mano (Ripley, WhatsApp…): no tienen cuenta conectada, así que salen de las ventas mismas.
+  const manuales = [...new Set([...sales.map((s) => s.marketplace), ...(marketplace !== "all" ? [marketplace] : [])])].filter((m) => !conectados.includes(m) && !VENTA_CHANNELS.includes(m));
+  const channels = [...conectados, ...manuales];
 
   return (
     <div className="space-y-4">
@@ -121,9 +126,14 @@ export function SalesList({ accounts, canImport }: Props) {
           )}
         </div>
         {canImport && (
-          <Button size="sm" variant="outline" className="gap-1.5 shrink-0" onClick={() => setHistoryOpen(true)}>
-            <History className="w-3.5 h-3.5" /> Importar historial
-          </Button>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" className="gap-1.5" onClick={() => setManualOpen(true)}>
+              <Plus className="w-3.5 h-3.5" /> Registrar ventas
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setHistoryOpen(true)}>
+              <History className="w-3.5 h-3.5" /> Importar historial
+            </Button>
+          </div>
         )}
         <div className="relative w-full lg:max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -264,6 +274,7 @@ export function SalesList({ accounts, canImport }: Props) {
       )}
 
       <OrderDetailSheet sale={selected} onClose={() => setSelected(null)} />
+      {canImport && <ManualSaleDialog open={manualOpen} onOpenChange={setManualOpen} />}
       {canImport && (
         <ImportHistoryDialog
           open={historyOpen}

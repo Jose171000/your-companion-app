@@ -1,0 +1,223 @@
+import { useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Download, FileSpreadsheet, Loader2, Plus, Trash2 } from "lucide-react";
+import { ManualSalesResult, syncApi } from "@/lib/sync-api";
+import { SALE_STATES } from "@/lib/sale-status";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+/** Canales que se ofrecen; «otro» deja escribir el nombre que se quiera. */
+const CANALES = ["Ripley", "Juntoz", "Amazon", "WhatsApp", "Tienda física", "Web propia"];
+const OTRO = "__otro__";
+
+interface Linea { sku: string; producto: string; cantidad: string; precio: string; descontar: boolean }
+const lineaVacia = (): Linea => ({ sku: "", producto: "", cantidad: "1", precio: "", descontar: true });
+const hoy = () => new Date().toISOString().slice(0, 10);
+
+/**
+ * Registra ventas de canales que la tienda NO tiene conectados (Ripley, Juntoz, WhatsApp, tienda física…), una por una
+ * o con un Excel. Cuentan en Ventas, Analíticas y el cobro como cualquier otra venta.
+ */
+export function ManualSaleDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const queryClient = useQueryClient();
+  const [canal, setCanal] = useState("Ripley");
+  const [canalOtro, setCanalOtro] = useState("");
+  const [fecha, setFecha] = useState(hoy());
+  const [numero, setNumero] = useState("");
+  const [estado, setEstado] = useState("entregado");
+  const [cliente, setCliente] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [documento, setDocumento] = useState("");
+  const [direccion, setDireccion] = useState("");
+  const [envio, setEnvio] = useState("");
+  const [notas, setNotas] = useState("");
+  const [lineas, setLineas] = useState<Linea[]>([lineaVacia()]);
+  const [enviando, setEnviando] = useState(false);
+  const [resultado, setResultado] = useState<ManualSalesResult | null>(null);
+  const archivo = useRef<HTMLInputElement>(null);
+
+  const cambiar = (i: number, parte: Partial<Linea>) => setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, ...parte } : l)));
+  const canalFinal = canal === OTRO ? canalOtro.trim() : canal;
+  const total = lineas.reduce((s, l) => s + (Number(l.cantidad) || 0) * (Number(l.precio) || 0), 0);
+
+  const alTerminar = (r: ManualSalesResult) => {
+    setResultado(r);
+    if (r.registradas) {
+      toast.success(`${r.registradas} ${r.registradas === 1 ? "venta registrada" : "ventas registradas"}`);
+      for (const k of ["sync-orders", "sales-report", "dashboard-summary", "products"]) queryClient.invalidateQueries({ queryKey: [k] });
+    }
+  };
+
+  const registrar = async () => {
+    if (!canalFinal) { toast.error("Elige o escribe el canal de la venta."); return; }
+    const filas = lineas.map((l, i) => ({
+      numero_pedido: numero.trim() || undefined,
+      ...(i === 0 ? { fecha, canal: canalFinal, estado, envio, cliente, telefono, documento, direccion, notas } : {}),
+      sku: l.sku.trim(),
+      producto: l.producto.trim(),
+      cantidad: l.cantidad,
+      precio_unitario: l.precio,
+      descontar_stock: l.descontar ? "SI" : "NO",
+    }));
+    // Con varias líneas hace falta un número para que sean una sola venta.
+    const conNumero = lineas.length > 1 && !numero.trim() ? filas.map((f) => ({ ...f, numero_pedido: `V-${Date.now().toString(36)}` })) : filas;
+    setEnviando(true);
+    const res = await syncApi.registerManualSale(conNumero as any);
+    setEnviando(false);
+    if (res.error || !res.data) { toast.error(res.error ?? "No se pudo registrar la venta"); return; }
+    alTerminar(res.data);
+    if (res.data.registradas && !res.data.rechazadas.length) {
+      setLineas([lineaVacia()]); setNumero(""); setCliente(""); setTelefono(""); setDocumento(""); setDireccion(""); setEnvio(""); setNotas("");
+    }
+  };
+
+  const subirExcel = async (file: File | undefined) => {
+    if (!file) return;
+    setEnviando(true);
+    const res = await syncApi.importManualSales(file);
+    setEnviando(false);
+    if (archivo.current) archivo.current.value = "";
+    if (res.error || !res.data) { toast.error(res.error ?? "No se pudo leer el archivo"); return; }
+    alTerminar(res.data);
+  };
+
+  const plantilla = async () => {
+    try { await syncApi.downloadManualSalesTemplate(); } catch (e: any) { toast.error(e?.message ?? "No se pudo descargar la plantilla"); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) setResultado(null); }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Registrar ventas</DialogTitle>
+          <DialogDescription>
+            Para ventas de canales que no tienes conectados (Ripley, Juntoz, WhatsApp, tienda física…). Las de Mercado Libre y Falabella entran solas.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs defaultValue="una">
+          <TabsList className="grid grid-cols-2 w-full">
+            <TabsTrigger value="una">Una venta</TabsTrigger>
+            <TabsTrigger value="excel">Desde Excel</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="una" className="space-y-4 pt-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Canal</Label>
+                <Select value={canal} onValueChange={setCanal}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CANALES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    <SelectItem value={OTRO}>Otro…</SelectItem>
+                  </SelectContent>
+                </Select>
+                {canal === OTRO && <Input placeholder="Nombre del canal" value={canalOtro} onChange={(e) => setCanalOtro(e.target.value)} />}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Fecha de la venta</Label>
+                <Input type="date" value={fecha} max={hoy()} onChange={(e) => setFecha(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>N.º de pedido <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                <Input value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="R-1001" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Estado</Label>
+                <Select value={estado} onValueChange={setEstado}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {SALE_STATES.map((e) => <SelectItem key={e.value} value={e.value}>{e.singular}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Productos</Label>
+              {lineas.map((l, i) => (
+                <div key={i} className="rounded-xl border border-border p-3 space-y-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <Input placeholder="SKU" value={l.sku} onChange={(e) => cambiar(i, { sku: e.target.value })} />
+                    <Input placeholder="Nombre (si no tiene SKU)" className="col-span-1 sm:col-span-1" value={l.producto} onChange={(e) => cambiar(i, { producto: e.target.value })} />
+                    <Input type="number" min={1} step={1} placeholder="Cantidad" value={l.cantidad} onChange={(e) => cambiar(i, { cantidad: e.target.value })} />
+                    <Input type="number" min={0} step="0.01" placeholder="Precio por unidad" value={l.precio} onChange={(e) => cambiar(i, { precio: e.target.value })} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+                      <Checkbox checked={l.descontar} onCheckedChange={(v) => cambiar(i, { descontar: v === true })} />
+                      Descontar del stock
+                    </label>
+                    {lineas.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setLineas((ls) => ls.filter((_, j) => j !== i))}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => setLineas((ls) => [...ls, lineaVacia()])}>
+                <Plus className="w-3.5 h-3.5" /> Agregar producto
+              </Button>
+              <p className="text-xs text-muted-foreground">El precio es lo que pagó el cliente por una unidad, sin el envío.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5"><Label>Cliente</Label><Input value={cliente} onChange={(e) => setCliente(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Teléfono</Label><Input value={telefono} onChange={(e) => setTelefono(e.target.value)} /></div>
+              <div className="space-y-1.5"><Label>Documento</Label><Input value={documento} onChange={(e) => setDocumento(e.target.value)} /></div>
+              <div className="space-y-1.5">
+                <Label>Envío cobrado <span className="text-muted-foreground font-normal">(no cuenta para la comisión)</span></Label>
+                <Input type="number" min={0} step="0.01" value={envio} onChange={(e) => setEnvio(e.target.value)} />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2"><Label>Dirección</Label><Input value={direccion} onChange={(e) => setDireccion(e.target.value)} /></div>
+              <div className="space-y-1.5 sm:col-span-2"><Label>Notas</Label><Textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} /></div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <p className="text-sm text-muted-foreground tabular-nums">Productos: <span className="text-foreground font-semibold">S/ {total.toFixed(2)}</span></p>
+              <Button onClick={registrar} disabled={enviando} className="gap-1.5">
+                {enviando && <Loader2 className="w-4 h-4 animate-spin" />} Registrar venta
+              </Button>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="excel" className="space-y-4 pt-3">
+            <ol className="text-sm text-muted-foreground list-decimal pl-5 space-y-1">
+              <li>Descarga la plantilla y llena una fila por producto (varias filas con el mismo n.º de pedido son una sola venta).</li>
+              <li>Borra las filas de ejemplo y sube el archivo.</li>
+            </ol>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="gap-1.5" onClick={plantilla}>
+                <Download className="w-4 h-4" /> Descargar plantilla
+              </Button>
+              <Button type="button" className="gap-1.5" disabled={enviando} onClick={() => archivo.current?.click()}>
+                {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileSpreadsheet className="w-4 h-4" />} Subir Excel
+              </Button>
+              <input ref={archivo} type="file" accept=".xlsx" className="hidden" onChange={(e) => subirExcel(e.target.files?.[0])} />
+            </div>
+          </TabsContent>
+        </Tabs>
+
+        {resultado && (
+          <div className="rounded-xl border border-border p-3 text-sm space-y-1.5">
+            <p className="font-medium">{resultado.registradas} {resultado.registradas === 1 ? "venta registrada" : "ventas registradas"}{resultado.rechazadas.length ? ` · ${resultado.rechazadas.length} sin registrar` : ""}</p>
+            {resultado.rechazadas.length > 0 && (
+              <ul className="text-xs text-amber-500 list-disc pl-4 space-y-0.5 break-words">
+                {resultado.rechazadas.slice(0, 30).map((r, i) => <li key={i}>{r}</li>)}
+                {resultado.rechazadas.length > 30 && <li>… y {resultado.rechazadas.length - 30} más</li>}
+              </ul>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

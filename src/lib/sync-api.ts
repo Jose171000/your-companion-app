@@ -1,4 +1,4 @@
-import { apiRequest } from './api';
+import { apiRequest, apiRequestMultipart, apiDownload } from './api';
 import type { SaleState } from './sale-status';
 
 // ─────────────────────────────────────────────
@@ -133,6 +133,12 @@ export interface Sale {
   shipping: { status: string | null; method: string | null } | null;
   lines: SaleLine[];
   details?: SaleDetails | null;
+}
+
+export interface ManualSalesResult {
+  registradas: number;
+  /** Una línea por venta o fila que no se registró, con el motivo */
+  rechazadas: string[];
 }
 
 export interface SalesQuery {
@@ -622,6 +628,19 @@ export const syncApi = {
     const qs = params.toString();
     return apiRequest<{ total: number; limit: number; offset: number; porEstado?: Partial<Record<SaleState, number>>; items: Sale[] }>(`/sync/orders${qs ? `?${qs}` : ''}`, { method: 'GET' });
   },
+
+  /** Registra a mano una venta de un canal no conectado. Cada fila lleva las columnas de la plantilla (varias filas con el mismo numero_pedido = una venta). */
+  registerManualSale: (filas: Record<string, string | number>[]) =>
+    apiRequest<ManualSalesResult>('/sync/orders/manual', { method: 'POST', body: JSON.stringify({ filas }) }),
+
+  /** Registra ventas de canales no conectados desde un Excel con la plantilla */
+  importManualSales: (file: File) => {
+    const form = new FormData();
+    form.append('excel', file);
+    return apiRequestMultipart<ManualSalesResult>('/sync/orders/manual/import', form);
+  },
+
+  downloadManualSalesTemplate: () => apiDownload('/sync/orders/manual/template', 'plantilla-ventas.xlsx'),
 
   getSale: (id: string) => apiRequest<Sale>(`/sync/orders/${id}`, { method: 'GET' }),
 
