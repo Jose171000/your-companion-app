@@ -126,6 +126,10 @@ export interface Sale {
   status: string;
   /** Estado común a todos los canales */
   saleState?: SaleState;
+  /** Registrada a mano o desde Excel: la única que se puede editar o eliminar */
+  manual?: boolean;
+  /** Datos para precargar la edición (solo el dueño, solo en el detalle de una venta manual) */
+  manualEdit?: ManualSaleEdit;
   customerName: string | null;
   /** Fecha máxima para despachar */
   shipByDate: string | null;
@@ -145,6 +149,22 @@ export interface ManualSaleProduct {
   price: number | null;
   stock: number;
   imageUrl: string | null;
+}
+
+/** Lo que el formulario necesita para editar una venta manual */
+export interface ManualSaleEdit {
+  canal: string;
+  fecha: string;
+  numeroPedido: string;
+  estado: string;
+  envio: number;
+  cliente: string;
+  telefono: string;
+  documento: string;
+  direccion: string;
+  notas: string;
+  moneda: string;
+  lineas: { sku: string; cantidad: number; precio: number; descontar: boolean; producto: ManualSaleProduct }[];
 }
 
 export interface ManualSalesResult {
@@ -651,6 +671,14 @@ export const syncApi = {
     form.append('excel', file);
     return apiRequestMultipart<ManualSalesResult>('/sync/orders/manual/import', form);
   },
+
+  /** Edita una venta manual: devuelve el stock anterior y descuenta el nuevo */
+  updateManualSale: (id: string, filas: Record<string, string | number>[]) =>
+    apiRequest<ManualSalesResult>(`/sync/orders/manual/${id}`, { method: 'PUT', body: JSON.stringify({ filas }) }),
+
+  /** Elimina una venta manual y devuelve al stock lo que descontó */
+  deleteManualSale: (id: string) =>
+    apiRequest<{ eliminada: boolean }>(`/sync/orders/manual/${id}`, { method: 'DELETE' }),
 
   /** Busca productos del catálogo por SKU o nombre para elegir el de una venta manual */
   searchManualSaleProducts: (search: string) =>

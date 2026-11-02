@@ -1,8 +1,8 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Download, FileSpreadsheet, Loader2, Plus, Trash2 } from "lucide-react";
-import { ManualSaleProduct, ManualSalesResult, syncApi } from "@/lib/sync-api";
+import { ManualSaleProduct, ManualSalesResult, Sale, syncApi } from "@/lib/sync-api";
 import { SkuPicker } from "./SkuPicker";
 import { SALE_STATES } from "@/lib/sale-status";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,15 @@ const hoy = () => aIso(new Date());
  * Registra ventas de canales que la tienda NO tiene conectados (Ripley, Juntoz, WhatsApp, tienda física…), una por una
  * o con un Excel. Cuentan en Ventas, Analíticas y el cobro como cualquier otra venta.
  */
-export function ManualSaleDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+const clave = (t: string) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+export function ManualSaleDialog({ open, onOpenChange, editar, onGuardada }: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  /** Una venta manual para editar (con sus datos de edición); sin ella, se registran ventas nuevas. */
+  editar?: Sale | null;
+  onGuardada?: () => void;
+}) {
   const queryClient = useQueryClient();
   const [canal, setCanal] = useState("Ripley");
   const [canalOtro, setCanalOtro] = useState("");
@@ -45,6 +53,27 @@ export function ManualSaleDialog({ open, onOpenChange }: { open: boolean; onOpen
   const [enviando, setEnviando] = useState(false);
   const [resultado, setResultado] = useState<ManualSalesResult | null>(null);
   const archivo = useRef<HTMLInputElement>(null);
+  const edicion = editar?.manualEdit ?? null;
+
+  // Al editar, el formulario se llena con los datos de la venta.
+  useEffect(() => {
+    if (!open || !edicion) return;
+    const conocido = CANALES.find((c) => clave(c) === edicion.canal);
+    setCanal(conocido ?? OTRO);
+    setCanalOtro(conocido ? "" : edicion.canal.replace(/-/g, " "));
+    setFecha(edicion.fecha);
+    setNumero(edicion.numeroPedido);
+    setEstado(edicion.estado);
+    setCliente(edicion.cliente);
+    setTelefono(edicion.telefono);
+    setDocumento(edicion.documento);
+    setDireccion(edicion.direccion);
+    setEnvio(edicion.envio ? String(edicion.envio) : "");
+    setNotas(edicion.notas);
+    setLineas(edicion.lineas.map((l) => ({ producto: l.producto, cantidad: String(l.cantidad), precio: String(l.precio), descontar: l.descontar })));
+    setResultado(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editar?.id]);
 
   const cambiar = (i: number, parte: Partial<Linea>) => setLineas((ls) => ls.map((l, j) => (j === i ? { ...l, ...parte } : l)));
   const canalFinal = canal === OTRO ? canalOtro.trim() : canal;
@@ -70,6 +99,17 @@ export function ManualSaleDialog({ open, onOpenChange }: { open: boolean; onOpen
       precio_unitario: l.precio,
       descontar_stock: l.descontar ? "SI" : "NO",
     }));
+    if (editar && edicion) {
+      setEnviando(true);
+      const res = await syncApi.updateManualSale(editar.id, filas as any);
+      setEnviando(false);
+      if (res.error || !res.data) { toast.error(res.error ?? "No se pudo guardar la venta"); return; }
+      toast.success("Venta actualizada");
+      for (const k of ["sync-orders", "sync-order", "sales-report", "dashboard-summary", "products"]) queryClient.invalidateQueries({ queryKey: [k] });
+      onOpenChange(false);
+      onGuardada?.();
+      return;
+    }
     // Con varias líneas hace falta un número para que sean una sola venta.
     const conNumero = lineas.length > 1 && !numero.trim() ? filas.map((f) => ({ ...f, numero_pedido: `V-${Date.now().toString(36)}` })) : filas;
     setEnviando(true);
@@ -100,14 +140,16 @@ export function ManualSaleDialog({ open, onOpenChange }: { open: boolean; onOpen
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) setResultado(null); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Registrar ventas</DialogTitle>
+          <DialogTitle>{edicion ? "Editar venta" : "Registrar ventas"}</DialogTitle>
           <DialogDescription>
-            Para ventas de canales que no tienes conectados (Ripley, Juntoz, WhatsApp, tienda física…). Las de Mercado Libre y Falabella entran solas.
+            {edicion
+              ? "Al guardar, el stock descontado antes se devuelve y se descuenta de nuevo con los datos nuevos."
+              : "Para ventas de canales que no tienes conectados (Ripley, Juntoz, WhatsApp, tienda física…). Las de Mercado Libre y Falabella entran solas."}
           </DialogDescription>
         </DialogHeader>
 
         <Tabs defaultValue="una">
-          <TabsList className="grid grid-cols-2 w-full">
+          <TabsList className={edicion ? "hidden" : "grid grid-cols-2 w-full"}>
             <TabsTrigger value="una">Una venta</TabsTrigger>
             <TabsTrigger value="excel">Desde Excel</TabsTrigger>
           </TabsList>
@@ -197,7 +239,7 @@ export function ManualSaleDialog({ open, onOpenChange }: { open: boolean; onOpen
             <div className="flex items-center justify-between gap-3 pt-1">
               <p className="text-sm text-muted-foreground tabular-nums">Productos: <span className="text-foreground font-semibold">S/ {total.toFixed(2)}</span></p>
               <Button onClick={registrar} disabled={enviando} className="gap-1.5">
-                {enviando && <Loader2 className="w-4 h-4 animate-spin" />} Registrar venta
+                {enviando && <Loader2 className="w-4 h-4 animate-spin" />} {edicion ? "Guardar cambios" : "Registrar venta"}
               </Button>
             </div>
           </TabsContent>

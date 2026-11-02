@@ -1,8 +1,16 @@
-import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { ArrowRight, Loader2, Pencil, Trash2 } from "lucide-react";
 import { Sale, syncApi } from "@/lib/sync-api";
 import { useStores } from "@/contexts/StoreContext";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { ManualSaleDialog } from "./ManualSaleDialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { channelName, money } from "./format";
 import { ProductThumb } from "./ProductThumb";
@@ -30,6 +38,10 @@ const Bloque = ({ titulo, children }: { titulo: string; children: React.ReactNod
 /** Panel con todo lo que se sabe de una venta: cliente, envío, pago y productos. */
 export function OrderDetailSheet({ sale, onClose }: Props) {
   const { activeStore } = useStores();
+  const queryClient = useQueryClient();
+  const [editando, setEditando] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
   // El listado ya trae lo básico: se muestra al instante y el detalle completo llega después.
   const { data, isFetching } = useQuery({
     queryKey: ["sync-order", activeStore?.id, sale?.id],
@@ -47,6 +59,18 @@ export function OrderDetailSheet({ sale, onClose }: Props) {
   const d = s?.details ?? null;
   const sinPermiso = !!d && d.customer.phone === null && d.customer.email === null && d.customer.document === null && d.shipping.address.line === null;
   const dir = d?.shipping.address;
+  // Solo las ventas registradas a mano o desde Excel se editan o eliminan (el servidor manda los datos solo al dueño).
+  const eliminar = async () => {
+    if (!s) return;
+    setEliminando(true);
+    const res = await syncApi.deleteManualSale(s.id);
+    setEliminando(false);
+    if (res.error) { toast.error(res.error); return; }
+    toast.success("Venta eliminada y stock devuelto");
+    for (const k of ["sync-orders", "sync-order", "sales-report", "dashboard-summary", "products"]) queryClient.invalidateQueries({ queryKey: [k] });
+    setConfirmando(false);
+    onClose();
+  };
   const direccion = dir ? [dir.line, dir.city, dir.region, dir.postalCode, dir.country].filter(Boolean).join(", ") : "";
 
   return (
@@ -70,6 +94,18 @@ export function OrderDetailSheet({ sale, onClose }: Props) {
               <span className="text-xs text-muted-foreground">Enviar antes de</span>
               <ShipByBadge sale={s} />
             </div>
+
+            {s.manualEdit && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="secondary" className="text-[10px]">Registrada a mano</Badge>
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditando(true)}>
+                  <Pencil className="w-3.5 h-3.5" /> Editar
+                </Button>
+                <Button size="sm" variant="outline" className="gap-1.5 text-red-500 hover:text-red-500" onClick={() => setConfirmando(true)}>
+                  <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                </Button>
+              </div>
+            )}
 
             <div className="rounded-2xl bg-secondary/30 p-4 flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Total pagado</span>
@@ -172,6 +208,27 @@ export function OrderDetailSheet({ sale, onClose }: Props) {
           </div>
         )}
       </SheetContent>
+      {s?.manualEdit && (
+        <>
+          <ManualSaleDialog open={editando} onOpenChange={setEditando} editar={s} />
+          <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>¿Eliminar esta venta?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Se borra del registro y deja de contar en Ventas, Analíticas y el cobro. El stock que descontó se devuelve al producto.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={eliminando}>Cancelar</AlertDialogCancel>
+                <AlertDialogAction disabled={eliminando} onClick={(e) => { e.preventDefault(); void eliminar(); }}>
+                  {eliminando ? "Eliminando…" : "Eliminar venta"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      )}
     </Sheet>
   );
 }
