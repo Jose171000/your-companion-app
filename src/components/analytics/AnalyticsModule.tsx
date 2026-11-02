@@ -125,10 +125,13 @@ export function AnalyticsModule() {
   const embedTitle = configRes?.data?.embedTitle || "Reporte detallado";
 
   const { from, to } = rango;
+  const [estados, setEstados] = useState<SaleState[]>([]);
 
   const { data: result, isLoading, isError } = useQuery({
-    queryKey: ["sales-report", storeId, from, to],
-    queryFn: () => reportsApi.getSales(from, to),
+    queryKey: ["sales-report", storeId, from, to, estados.join(",")],
+    queryFn: () => reportsApi.getSales(from, to, estados.join(",") || undefined),
+    // Al cambiar el filtro se siguen viendo los números anteriores hasta que lleguen los nuevos.
+    placeholderData: keepPreviousData,
     enabled: !!storeId,
     staleTime: 60_000,
     // Las ventas entran solas cada pocos minutos: se refresca sin recargar la página.
@@ -188,7 +191,18 @@ export function AnalyticsModule() {
       </div>
 
       {/* Selector de rango */}
-      <DateRangeFilter value={rango} onChange={setRango} />
+      <div className="flex flex-col gap-3">
+        <DateRangeFilter value={rango} onChange={setRango} />
+        {/* Solo pedidos en ciertos estados: entregados, enviados, cancelados o devueltos (igual que en cada canal) */}
+        <SaleStatusFilter
+          value={estados}
+          onChange={setEstados}
+          counts={Object.fromEntries((report.byStatus ?? []).map((e) => [e.status, e.orders]))}
+        />
+        {estados.length > 0 && report.sources.sheets && (
+          <p className="text-xs text-muted-foreground">Con un estado elegido no se incluyen las ventas del Google Sheet, porque no tiene estado.</p>
+        )}
+      </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

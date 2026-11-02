@@ -236,6 +236,10 @@ export interface SalesReport {
   byChannel: { channel: string; sales: number; orders: number; source: string }[];
   /** Desglose por cuenta del canal: una tienda puede tener varias del mismo marketplace */
   byAccount?: { connectionId: string | null; channel: string; label: string | null; sales: number; orders: number }[];
+  /** Ventas y monto por estado en el rango (sin aplicar el filtro de estado) */
+  byStatus?: { status: string; orders: number; sales: number }[];
+  /** Estados que se están filtrando (vacío = todos) */
+  statusFilter?: string[];
   /** Cuándo entró la última venta de la tienda */
   lastOrderAt?: string | null;
   sources: { marketplaces: boolean; sheets: boolean; sheetError: string | null };
@@ -250,10 +254,11 @@ export const reportsApi = {
   /** Reporte externo que el admin configuró para este usuario */
   getConfig: () => apiRequest<ReportConfig>('/reports/config', { method: 'GET' }),
 
-  getSales: (from?: string, to?: string) => {
+  getSales: (from?: string, to?: string, status?: string) => {
     const params = new URLSearchParams();
     if (from) params.set('from', from);
     if (to) params.set('to', to);
+    if (status) params.set('status', status);
     const qs = params.toString();
     return apiRequest<SalesReport>(`/reports/sales${qs ? `?${qs}` : ''}`, { method: 'GET' });
   },
