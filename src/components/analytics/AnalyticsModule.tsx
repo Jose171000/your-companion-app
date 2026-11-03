@@ -93,9 +93,9 @@ export function AnalyticsModule() {
   const [rango, setRango] = useRangoDeFechas(30);
   const queryClient = useQueryClient();
   // Las analíticas son de la tienda activa: cada tienda tiene sus propias métricas.
-  const { activeStore } = useStores();
+  const { activeStore, can } = useStores();
   const storeId = activeStore?.id;
-  const isOwner = activeStore?.role === "owner";
+  const puedeSincronizar = can("ventas.registrar");
 
   const syncOrders = useMutation({
     mutationFn: () => syncApi.syncOrders(),
@@ -181,7 +181,7 @@ export function AnalyticsModule() {
             Última venta registrada: {haceCuanto(report.lastOrderAt)}. Las ventas se traen solas cada pocos minutos.
           </p>
         </div>
-        {isOwner && (
+        {puedeSincronizar && (
           <Button
             variant="outline"
             size="sm"

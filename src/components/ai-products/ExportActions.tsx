@@ -9,6 +9,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useStores } from "@/contexts/StoreContext";
 
 interface ExportOption {
   id: string;
@@ -61,6 +62,9 @@ interface ExportActionsProps {
 }
 
 export function ExportActions({ visible, selectedMarketplaces, onExport, onPublish }: ExportActionsProps) {
+  const { can } = useStores();
+  // Publicar en canales y descargar archivos son permisos distintos: cada persona ve solo lo que puede usar.
+  const opcionesPermitidas = exportOptions.filter((o) => (o.type === "send" ? can("canales.publicar") : can("productos.descargar")));
   if (!visible) return null;
 
   return (
@@ -73,7 +77,7 @@ export function ExportActions({ visible, selectedMarketplaces, onExport, onPubli
       </div>
 
       <div className="grid gap-3 md:gap-4">
-        {exportOptions.map((option) => {
+        {opcionesPermitidas.map((option) => {
           const Icon = option.icon;
           const isSend = option.type === "send";
           

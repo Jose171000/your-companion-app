@@ -32,11 +32,16 @@ interface Row {
 interface Props {
   accounts: MarketplaceConnection[];
   /** Solo el dueño de la tienda puede traer el historial */
+  /** Registrar ventas manuales (permiso «ventas.registrar») */
   canImport?: boolean;
+  /** Descargar el Excel de ventas («ventas.descargar») */
+  canDownload?: boolean;
+  /** Importar el historial desde las cuentas conectadas («canales.conectar») */
+  canImportHistory?: boolean;
 }
 
 /** Todas las ventas de la tienda en una sola lista, una fila por producto vendido. */
-export function SalesList({ accounts, canImport }: Props) {
+export function SalesList({ accounts, canImport, canDownload, canImportHistory }: Props) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [descargando, setDescargando] = useState(false);
@@ -161,17 +166,21 @@ export function SalesList({ accounts, canImport }: Props) {
         </div>
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
         <div className="flex items-center gap-2 flex-wrap lg:order-2">
-          <Button size="sm" variant="outline" className="gap-1.5" disabled={descargando || total === 0} onClick={descargar}>
-            {descargando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Descargar
-          </Button>
+          {canDownload && (
+            <Button size="sm" variant="outline" className="gap-1.5" disabled={descargando || total === 0} onClick={descargar}>
+              {descargando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Descargar
+            </Button>
+          )}
         {canImport && (
           <>
             <Button size="sm" className="gap-1.5" onClick={() => setManualOpen(true)}>
               <Plus className="w-3.5 h-3.5" /> Registrar ventas
             </Button>
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setHistoryOpen(true)}>
-              <History className="w-3.5 h-3.5" /> Importar historial
-            </Button>
+            {canImportHistory && (
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setHistoryOpen(true)}>
+                <History className="w-3.5 h-3.5" /> Importar historial
+              </Button>
+            )}
           </>
         )}
         </div>
@@ -318,7 +327,7 @@ export function SalesList({ accounts, canImport }: Props) {
 
       <OrderDetailSheet sale={selected} onClose={() => setSelected(null)} />
       {canImport && <ManualSaleDialog open={manualOpen} onOpenChange={setManualOpen} />}
-      {canImport && (
+      {canImportHistory && (
         <ImportHistoryDialog
           open={historyOpen}
           onOpenChange={setHistoryOpen}

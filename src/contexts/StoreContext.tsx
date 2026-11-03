@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { storesApi, StoreSummary } from '@/lib/stores-api';
+import { Permiso, PERMISOS_DE_FABRICA } from '@/lib/store-permissions';
 
 /** Datos que dependen de la tienda activa (además de los «sync-»): al cambiar de tienda no deben mostrarse los de la anterior. */
 const DE_LA_TIENDA = ['products', 'product', 'launch', 'falabella', 'bulk', 'dashboard', 'reports', 'sales', 'report'];
@@ -15,6 +16,8 @@ interface StoreContextType {
   stores: StoreSummary[];
   isLoading: boolean;
   activeStore: StoreSummary | null;
+  /** ¿Puede esta persona hacer esto en la tienda activa? (El servidor lo vuelve a comprobar en cada petición.) */
+  can: (permiso: Permiso) => boolean;
   /** Las cuentas que llegaron por invitación no pueden crear tiendas */
   canCreateStores: boolean;
   setActiveStore: (id: string) => void;
@@ -90,9 +93,15 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     });
   }, [isAuthenticated, refresh, setActiveStore]);
 
+  const can = useCallback((permiso: Permiso) => {
+    if (!activeStore) return false;
+    const lista: readonly Permiso[] = activeStore.permissions ?? PERMISOS_DE_FABRICA[activeStore.role] ?? [];
+    return lista.includes(permiso);
+  }, [activeStore]);
+
   const value = useMemo(
-    () => ({ stores, isLoading, activeStore, canCreateStores, setActiveStore, refresh }),
-    [stores, isLoading, activeStore, canCreateStores, setActiveStore, refresh],
+    () => ({ stores, isLoading, activeStore, can, canCreateStores, setActiveStore, refresh }),
+    [stores, isLoading, activeStore, can, canCreateStores, setActiveStore, refresh],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

@@ -57,11 +57,11 @@ const MAX_ACCOUNTS = 3;
 
 export function MarketplacesModule() {
   const queryClient = useQueryClient();
-  const { activeStore, setActiveStore } = useStores();
+  const { activeStore, setActiveStore, can } = useStores();
   const storeId = activeStore?.id;
   // Roles: el lector mira; el editor propone cambios; el dueño conecta, importa y aprueba.
-  const isOwner = activeStore?.role === "owner";
-  const canEdit = activeStore?.role === "owner" || activeStore?.role === "editor";
+  // Lo que cada persona puede hacer lo dicen sus permisos en la tienda (docs/roles-de-tienda.md en el servidor).
+  const puedeConectar = can("canales.conectar");
   const [disconnectTarget, setDisconnectTarget] = useState<MarketplaceConnection | null>(null);
   const [yavendioOpen, setYavendioOpen] = useState(false);
   const [yavendioImportOpen, setYavendioImportOpen] = useState(false);
@@ -221,18 +221,19 @@ export function MarketplacesModule() {
             listings={listings}
             pending={pendingChanges}
             reviewMode={reviewMode}
-            canEdit={canEdit}
+            canEdit={can("inventario.editar")}
+            canPublish={can("canales.publicar")}
             isLoading={loadingListings}
             isError={listingsError}
           />
         </TabsContent>
 
         <TabsContent value="ventas" className="pt-6">
-          <SalesList accounts={connections} canImport={isOwner} />
+          <SalesList accounts={connections} canImport={can("ventas.registrar")} canDownload={can("ventas.descargar")} canImportHistory={puedeConectar} />
         </TabsContent>
 
         <TabsContent value="revision" className="pt-6">
-          <ReviewQueue requests={changes} reviewMode={reviewMode} canManage={isOwner} isLoading={loadingChanges} />
+          <ReviewQueue requests={changes} reviewMode={reviewMode} canManage={can("cambios.aprobar")} isLoading={loadingChanges} />
         </TabsContent>
 
         <TabsContent value="canales" className="pt-6 space-y-8">
@@ -252,7 +253,7 @@ export function MarketplacesModule() {
               marketplace={mp}
               connections={connections.filter((c) => c.marketplace === mp.id)}
               maxAccounts={MAX_ACCOUNTS}
-              canManage={isOwner}
+              canManage={puedeConectar}
               isLoading={loadingConnections}
               isConnecting={connectMutation.isPending && mp.id === "mercadolibre"}
               onConnect={() => handleConnect(mp.id)}
@@ -271,7 +272,7 @@ export function MarketplacesModule() {
               Productos publicados en tus canales y su estado de sincronización
             </p>
           </div>
-          {isOwner && (falabellaAccounts.length > 0 || meliAccounts.length > 0 || wooAccounts.length > 0 || shopifyAccounts.length > 0 || yavendioAccounts.length > 0) && (
+          {puedeConectar && (falabellaAccounts.length > 0 || meliAccounts.length > 0 || wooAccounts.length > 0 || shopifyAccounts.length > 0 || yavendioAccounts.length > 0) && (
             <div className="flex flex-wrap gap-2 shrink-0">
               <Button variant="outline" size="sm" className="gap-1.5" disabled={refreshMutation.isPending} onClick={() => refreshMutation.mutate()}>
                 {refreshMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />} Actualizar ahora

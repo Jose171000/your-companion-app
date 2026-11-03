@@ -1,4 +1,5 @@
 import { apiRequest } from './api';
+import type { Permiso } from './store-permissions';
 
 export type StoreRole = 'owner' | 'editor' | 'viewer';
 
@@ -6,6 +7,8 @@ export interface StoreSummary {
   id: string;
   name: string;
   role: StoreRole;
+  /** Lo que puede hacer en esta tienda. Las versiones anteriores del servidor no lo mandan: se usan los de su rol. */
+  permissions?: Permiso[];
   publicEnabled: boolean;
 }
 

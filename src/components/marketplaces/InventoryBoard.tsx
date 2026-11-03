@@ -20,8 +20,10 @@ interface Props {
   listings: UserListing[];
   pending: ChangeRequest[];
   reviewMode: boolean;
-  /** Los lectores miran; editor y dueño pueden editar */
+  /** Cambiar stock y precio (permiso «inventario.editar») */
   canEdit: boolean;
+  /** Pausar, reactivar y publicar en los canales («canales.publicar») */
+  canPublish: boolean;
   isLoading: boolean;
   isError: boolean;
 }
@@ -302,7 +304,7 @@ function PendingBadge({ count, long }: { count: number; long?: boolean }) {
 }
 
 /** Tablero maestro: precio y stock de cada producto, canal por canal. */
-export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoading, isError }: Props) {
+export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPublish, isLoading, isError }: Props) {
   const [view, setView] = useState<"rows" | "grid">("rows");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<EditableProduct | null>(null);
@@ -350,7 +352,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
                 </div>
                 <div className="flex flex-wrap gap-2 flex-1">
                   {r.channels.map((c) => (
-                    <ChannelChip key={c.listing.id} cell={c} canEdit={canEdit} onAction={askChannelAction(r)} />
+                    <ChannelChip key={c.listing.id} cell={c} canEdit={canPublish} onAction={askChannelAction(r)} />
                   ))}
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -362,7 +364,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
                       <Pencil className="w-3.5 h-3.5" /> Editar
                     </Button>
                   )}
-                  {canEdit && <AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} />}
+                  {canPublish && <AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} />}
                 </div>
               </div>
   );
@@ -397,10 +399,10 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, isLoadi
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {r.channels.map((c) => (
-                    <ChannelChip key={c.listing.id} cell={c} canEdit={canEdit} onAction={askChannelAction(r)} />
+                    <ChannelChip key={c.listing.id} cell={c} canEdit={canPublish} onAction={askChannelAction(r)} />
                   ))}
                 </div>
-                {canEdit && <div className="flex justify-end"><AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} /></div>}
+                {canPublish && <div className="flex justify-end"><AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} /></div>}
               </div>
   );
 

@@ -99,7 +99,7 @@ async function apiRequest<T>(
 
     // Todo lo de canales ocurre dentro de la tienda activa. El servidor la
     // comprueba en cada petición: este encabezado solo dice cuál se está viendo.
-    if (endpoint.startsWith('/sync/') || endpoint.startsWith('/reports/') || endpoint.startsWith('/dashboard/summary') || endpoint.startsWith('/bulk-upload/') || endpoint.startsWith('/ai/products/') || endpoint.startsWith('/products')) {
+    if (endpoint.startsWith('/sync/') || endpoint.startsWith('/reports/') || endpoint.startsWith('/dashboard/summary') || endpoint.startsWith('/dashboard/insights') || endpoint.startsWith('/export/') || endpoint.startsWith('/bulk-upload/') || endpoint.startsWith('/ai/products/') || endpoint.startsWith('/products')) {
       try {
         const storeId = localStorage.getItem('active_store_id');
         if (storeId) (headers as Record<string, string>)['X-Store-Id'] = storeId;
@@ -205,7 +205,7 @@ async function apiDownload(
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
   }
   // La plantilla de carga masiva depende de la tienda activa (sus canales conectados).
-  if (endpoint.startsWith('/bulk-upload/') || endpoint.startsWith('/sync/orders/')) {
+  if (endpoint.startsWith('/bulk-upload/') || endpoint.startsWith('/sync/orders/') || endpoint.startsWith('/export/')) {
     try {
       const storeId = localStorage.getItem('active_store_id');
       if (storeId) (headers as Record<string, string>)['X-Store-Id'] = storeId;

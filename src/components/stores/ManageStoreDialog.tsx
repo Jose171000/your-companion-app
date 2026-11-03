@@ -29,8 +29,8 @@ interface Props {
 type InviteRole = "editor" | "viewer";
 
 const ROLE_HELP: Record<InviteRole, string> = {
-  editor: "Puede proponer cambios; el dueño los aprueba.",
-  viewer: "Solo puede ver.",
+  editor: "Crea y edita productos, publica en los canales, registra ventas y propone cambios de precio y stock.",
+  viewer: "Solo puede ver: no descarga archivos ni modifica nada.",
 };
 
 export function ManageStoreDialog({ store, onClose }: Props) {
