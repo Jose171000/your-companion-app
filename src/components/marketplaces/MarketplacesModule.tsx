@@ -62,6 +62,14 @@ export function MarketplacesModule() {
   // Roles: el lector mira; el editor propone cambios; el dueño conecta, importa y aprueba.
   // Lo que cada persona puede hacer lo dicen sus permisos en la tienda (docs/roles-de-tienda.md en el servidor).
   const puedeConectar = can("canales.conectar");
+  // «Ver» también es un permiso: cada pestaña solo está para quien puede ver lo que muestra.
+  const verCanales = can("canales.ver");
+  const verVentas = can("ventas.ver");
+  const pestanasPermitidas = [...(verCanales ? ["canales", "tablero"] : []), ...(verVentas ? ["ventas"] : []), ...(verCanales ? ["revision"] : [])];
+  const [pestana, setPestana] = useState("canales");
+  useEffect(() => {
+    if (activeStore && pestanasPermitidas.length && !pestanasPermitidas.includes(pestana)) setPestana(pestanasPermitidas[0]);
+  }, [activeStore, pestana, pestanasPermitidas.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const [disconnectTarget, setDisconnectTarget] = useState<MarketplaceConnection | null>(null);
   const [yavendioOpen, setYavendioOpen] = useState(false);
   const [yavendioImportOpen, setYavendioImportOpen] = useState(false);
@@ -206,14 +214,16 @@ export function MarketplacesModule() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-8">
-      <Tabs defaultValue="canales">
+      <Tabs value={pestana} onValueChange={setPestana}>
         <TabsList>
-          <TabsTrigger value="canales">Canales</TabsTrigger>
-          <TabsTrigger value="tablero">Tablero</TabsTrigger>
-          <TabsTrigger value="ventas">Ventas</TabsTrigger>
-          <TabsTrigger value="revision">
-            Revisión{pendingChanges.length > 0 ? ` (${pendingChanges.length})` : ""}
-          </TabsTrigger>
+          {verCanales && <TabsTrigger value="canales">Canales</TabsTrigger>}
+          {verCanales && <TabsTrigger value="tablero">Tablero</TabsTrigger>}
+          {verVentas && <TabsTrigger value="ventas">Ventas</TabsTrigger>}
+          {verCanales && (
+            <TabsTrigger value="revision">
+              Revisión{pendingChanges.length > 0 ? ` (${pendingChanges.length})` : ""}
+            </TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="tablero" className="pt-6">

@@ -81,7 +81,7 @@ export default function AcceptInvitation() {
             <>
               <p className="text-sm text-muted-foreground">
                 {invitacion.inviterName ?? "El dueño de la tienda"} te invitó a <strong className="text-foreground">{invitacion.storeName}</strong> como{" "}
-                <strong className="text-foreground">{ROLE_LABELS[invitacion.role as StoreRole] ?? invitacion.role}</strong>.
+                <strong className="text-foreground">{invitacion.roleName ?? ROLE_LABELS[invitacion.role as StoreRole] ?? invitacion.role}</strong>.
               </p>
               <p className="text-xs text-muted-foreground">
                 Usa el correo <strong className="text-foreground">{invitacion.email}</strong>. Si aún no tienes cuenta, crearla toma un minuto y no necesitas registrar una empresa.

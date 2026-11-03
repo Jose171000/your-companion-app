@@ -204,11 +204,14 @@ export function AnalyticsModule() {
           onChange={setEstados}
           counts={Object.fromEntries((report.byStatus ?? []).map((e) => [e.status, e.orders]))}
         />
-        <label className="inline-flex items-center gap-2 text-sm cursor-pointer w-fit">
-          <Switch checked={incluirEnvio} onCheckedChange={setIncluirEnvio} aria-label="Incluir el envío en las ventas" />
-          <span>Incluir envío</span>
-          <span className="text-xs text-muted-foreground">{incluirEnvio ? "Ventas = productos + envío que pagó el cliente" : "Ventas = solo el precio de los productos"}</span>
-        </label>
+        {/* Sin «costos.ver» no se ve el envío: las ventas son solo los productos y no hay nada que incluir */}
+        {!report.costsHidden && (
+          <label className="inline-flex items-center gap-2 text-sm cursor-pointer w-fit">
+            <Switch checked={incluirEnvio} onCheckedChange={setIncluirEnvio} aria-label="Incluir el envío en las ventas" />
+            <span>Incluir envío</span>
+            <span className="text-xs text-muted-foreground">{incluirEnvio ? "Ventas = productos + envío que pagó el cliente" : "Ventas = solo el precio de los productos"}</span>
+          </label>
+        )}
         {estados.length > 0 && report.sources.sheets && (
           <p className="text-xs text-muted-foreground">Con un estado elegido no se incluyen las ventas del Google Sheet, porque no tiene estado.</p>
         )}
@@ -216,7 +219,7 @@ export function AnalyticsModule() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiCard icon={TrendingUp} label="Ventas del periodo" value={money(report.totals.sales)} hint={incluirEnvio ? "Lo que pagó el cliente: productos + envío" : "Solo productos, sin envío"} />
+        <KpiCard icon={TrendingUp} label="Ventas del periodo" value={money(report.totals.sales)} hint={incluirEnvio && !report.costsHidden ? "Lo que pagó el cliente: productos + envío" : "Solo productos, sin envío"} />
         <KpiCard icon={Package} label="Pedidos" value={`${report.totals.orders}`} />
         <KpiCard icon={Receipt} label="Ticket promedio" value={money(report.totals.avgTicket)} />
       </div>
@@ -288,7 +291,7 @@ export function AnalyticsModule() {
       <MapaDeCalor celdas={report.heatmap ?? []} />
 
       {/* Envío y cupones */}
-      {report.shipping && report.discounts && (
+      {!report.costsHidden && report.shipping && report.discounts && (
         <EnviosYCupones envio={report.shipping} cupones={report.discounts} incluirEnvio={incluirEnvio} />
       )}
 

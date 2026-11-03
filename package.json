@@ -8,6 +8,7 @@
     "build": "vite build",
     "probar:etiquetas": "node scripts/probar-etiquetas.ts",
     "probar:plano": "node scripts/probar-plano.ts",
+    "probar:permisos": "node scripts/probar-permisos.ts",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"

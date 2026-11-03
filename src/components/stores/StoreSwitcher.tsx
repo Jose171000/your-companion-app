@@ -45,7 +45,7 @@ export function StoreSwitcher() {
                 <Check className={`w-3.5 h-3.5 shrink-0 ${s.id === activeStore?.id ? "opacity-100" : "opacity-0"}`} />
                 <span className="truncate">{s.name}</span>
               </span>
-              <span className="text-[10px] text-muted-foreground shrink-0">{ROLE_LABELS[s.role]}</span>
+              <span className="text-[10px] text-muted-foreground shrink-0">{s.roleName ?? ROLE_LABELS[s.role]}</span>
             </DropdownMenuItem>
           ))}
 

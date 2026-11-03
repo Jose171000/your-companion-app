@@ -62,6 +62,8 @@ interface SidebarProps {
   isAccountant?: boolean;
   /** Secciones permitidas; vacío o nulo = acceso completo */
   allowedSections?: string[] | null;
+  /** Además de las secciones del usuario, lo que permite su rol en la tienda activa (ver docs/roles-de-tienda.md) */
+  storeAllows?: (sectionId: string) => boolean;
 }
 
 export function Sidebar({
@@ -72,6 +74,7 @@ export function Sidebar({
   isAdmin,
   isAccountant,
   allowedSections,
+  storeAllows,
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const isMobile = useIsMobile();
@@ -79,7 +82,7 @@ export function Sidebar({
   const items = navItems
     .filter((item) => {
       if (item.adminOnly && !isAdmin) return false;
-      return isSectionAllowed(item.id, allowedSections, isAdmin);
+      return isSectionAllowed(item.id, allowedSections, isAdmin) && (storeAllows?.(item.id) ?? true);
     })
     // Para el contador la sección se llama por lo que realmente hace
     .map((item) =>

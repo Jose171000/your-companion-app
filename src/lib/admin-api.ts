@@ -240,6 +240,8 @@ export interface SalesReport {
   byAccount?: { connectionId: string | null; channel: string; label: string | null; sales: number; orders: number }[];
   /** Si las ventas incluyen lo que el cliente pagó por el envío */
   includeShipping?: boolean;
+  /** true si esta persona no tiene «costos.ver»: el envío y los cupones vienen vacíos y no se muestran */
+  costsHidden?: boolean;
   /** Cómo se pagó el envío y cuánto costó cuando el canal lo informa */
   shipping?: ResumenDeEnvio;
   /** Cupones y descuentos del canal al comprador */

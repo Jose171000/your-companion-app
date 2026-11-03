@@ -27,15 +27,26 @@ import {
 
 function MiNegocio() {
   // El resumen es de la tienda activa: cada tienda tiene sus propios canales y ventas.
-  const { activeStore } = useStores();
+  const { activeStore, can } = useStores();
   const storeId = activeStore?.id;
   const { data, isLoading, isError } = useQuery({
     queryKey: ["dashboard-summary", storeId],
-    enabled: !!storeId,
+    enabled: !!storeId && can("analiticas.ver"),
     queryFn: () => dashboardApi.getSummary(),
     staleTime: 60_000,
     refetchInterval: 120_000,
   });
+
+  // «Ver analíticas» es un permiso: sin él el dashboard de la tienda no tiene nada que mostrar.
+  if (activeStore && !can("analiticas.ver")) {
+    return (
+      <Card>
+        <p className="text-sm text-muted-foreground">
+          Tu rol en «{activeStore.name}» no incluye ver el resumen del negocio. Usa el menú para entrar a lo que sí puedes ver.
+        </p>
+      </Card>
+    );
+  }
 
   if (isLoading) return <LoadingGrid />;
   if (isError || !data?.data) {

@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Copy, Link2, Mail, RefreshCw, Trash2 } from "lucide-react";
-import { ROLE_LABELS, storesApi, StoreSummary } from "@/lib/stores-api";
+import { nombreDeRol, ROLE_LABELS, storesApi, StoreSummary } from "@/lib/stores-api";
+import { asignacionDeValor, RolePicker, ValorDeRol, valorDeRol } from "./RolePicker";
+import { RolesTab } from "./RolesTab";
 import { useStores } from "@/contexts/StoreContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -26,11 +27,9 @@ interface Props {
   onClose: () => void;
 }
 
-type InviteRole = "editor" | "viewer";
-
-const ROLE_HELP: Record<InviteRole, string> = {
-  editor: "Crea y edita productos, publica en los canales, registra ventas y propone cambios de precio y stock.",
-  viewer: "Solo puede ver: no descarga archivos ni modifica nada.",
+const ROLE_HELP: Record<string, string> = {
+  "f:editor": "Crea y edita productos, publica en los canales, registra ventas y propone cambios de precio y stock.",
+  "f:viewer": "Solo puede ver: no descarga archivos ni modifica nada.",
 };
 
 export function ManageStoreDialog({ store, onClose }: Props) {
@@ -40,13 +39,14 @@ export function ManageStoreDialog({ store, onClose }: Props) {
   const isOwner = store?.role === "owner";
 
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<InviteRole>("viewer");
+  const [role, setRole] = useState<ValorDeRol>("f:viewer");
   const [publicUrl, setPublicUrl] = useState<string | null>(null);
 
   const id = store?.id ?? "";
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["store-members", id] });
     queryClient.invalidateQueries({ queryKey: ["store-invitations", id] });
+    queryClient.invalidateQueries({ queryKey: ["store-roles", id] });
     refresh();
   };
 
@@ -61,11 +61,28 @@ export function ManageStoreDialog({ store, onClose }: Props) {
     enabled: !!store && isOwner,
   });
 
+  // Los roles de la tienda (con los personalizados) para elegirlos al invitar o al cambiar el rol de alguien.
+  const rolesQuery = useQuery({
+    queryKey: ["store-roles", id],
+    queryFn: () => storesApi.roles(id),
+    enabled: !!store && isOwner,
+  });
+  const roles = rolesQuery.data?.data;
+
+  /** Qué puede hacer quien tenga este rol, en una frase. */
+  const ayudaDeRol = (valor: ValorDeRol): string => {
+    if (ROLE_HELP[valor]) return ROLE_HELP[valor];
+    const personalizado = roles?.personalizados.find((r) => `c:${r.id}` === valor);
+    if (!personalizado) return "";
+    const titulos = personalizado.permissions.map((p) => roles?.permisos.find((x) => x.clave === p)?.titulo ?? p);
+    return `${personalizado.permissions.length} permisos: ${titulos.slice(0, 5).join(", ")}${titulos.length > 5 ? ` y ${titulos.length - 5} más` : ""}.`;
+  };
+
   // Enlace de la última invitación: solo se conoce al crearla, así que se muestra aquí.
   const [lastInvite, setLastInvite] = useState<{ email: string; url: string } | null>(null);
 
   const inviteMutation = useMutation({
-    mutationFn: () => storesApi.invite(id, email.trim(), role),
+    mutationFn: () => storesApi.invite(id, email.trim(), asignacionDeValor(role)),
     onSuccess: (res) => {
       if (res.error || !res.data) {
         toast.error(res.error ?? "No se pudo enviar la invitación");
@@ -84,7 +101,7 @@ export function ManageStoreDialog({ store, onClose }: Props) {
   });
 
   const roleMutation = useMutation({
-    mutationFn: (v: { userId: string; role: InviteRole }) => storesApi.changeRole(id, v.userId, v.role),
+    mutationFn: (v: { userId: string; valor: ValorDeRol }) => storesApi.changeRole(id, v.userId, asignacionDeValor(v.valor)),
     onSuccess: (res) => (res.error ? toast.error(res.error) : invalidate()),
   });
 
@@ -137,7 +154,7 @@ export function ManageStoreDialog({ store, onClose }: Props) {
         <DialogHeader>
           <DialogTitle>{store?.name}</DialogTitle>
           <DialogDescription>
-            Tu rol: <span className="font-medium">{store ? ROLE_LABELS[store.role] : ""}</span>
+            Tu rol: <span className="font-medium">{store ? (store.roleName ?? ROLE_LABELS[store.role]) : ""}</span>
           </DialogDescription>
         </DialogHeader>
 
@@ -148,6 +165,7 @@ export function ManageStoreDialog({ store, onClose }: Props) {
             <TabsList>
               <TabsTrigger value="miembros">Equipo</TabsTrigger>
               {isOwner && <TabsTrigger value="invitar">Invitar</TabsTrigger>}
+              {isOwner && <TabsTrigger value="roles">Roles</TabsTrigger>}
               {isOwner && <TabsTrigger value="enlace">Enlace público</TabsTrigger>}
             </TabsList>
 
@@ -163,13 +181,12 @@ export function ManageStoreDialog({ store, onClose }: Props) {
                   </div>
                   {isOwner && m.role !== "owner" ? (
                     <div className="flex items-center gap-2 shrink-0">
-                      <Select value={m.role} onValueChange={(v) => roleMutation.mutate({ userId: m.userId, role: v as InviteRole })}>
-                        <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="editor">Editor</SelectItem>
-                          <SelectItem value="viewer">Lector</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <RolePicker
+                        value={valorDeRol(m)}
+                        roles={roles}
+                        triggerClassName="h-8 w-36 text-xs"
+                        onChange={(valor) => roleMutation.mutate({ userId: m.userId, valor })}
+                      />
                       <Button
                         variant="outline" size="icon" className="h-8 w-8" aria-label="Quitar acceso"
                         onClick={() => removeMutation.mutate(m.userId)}
@@ -178,7 +195,7 @@ export function ManageStoreDialog({ store, onClose }: Props) {
                       </Button>
                     </div>
                   ) : (
-                    <Badge variant="secondary" className="text-[10px]">{ROLE_LABELS[m.role]}</Badge>
+                    <Badge variant="secondary" className="text-[10px]">{nombreDeRol(m)}</Badge>
                   )}
                 </div>
               ))}
@@ -193,14 +210,8 @@ export function ManageStoreDialog({ store, onClose }: Props) {
                   </div>
                   <div className="space-y-2">
                     <Label>Rol</Label>
-                    <Select value={role} onValueChange={(v) => setRole(v as InviteRole)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="viewer">Lector</SelectItem>
-                        <SelectItem value="editor">Editor</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">{ROLE_HELP[role]}</p>
+                    <RolePicker value={role} roles={roles} onChange={setRole} />
+                    <p className="text-xs text-muted-foreground">{ayudaDeRol(role)}</p>
                   </div>
                   <Button
                     className="gradient-primary gap-1.5"
@@ -240,7 +251,7 @@ export function ManageStoreDialog({ store, onClose }: Props) {
                         <div className="min-w-0">
                           <p className="text-sm truncate">{i.email}</p>
                           <p className="text-xs text-muted-foreground">
-                            {ROLE_LABELS[i.role]} · {i.expired ? "caducó" : `vence ${new Date(i.expiresAt).toLocaleDateString()}`}
+                            {nombreDeRol(i)} · {i.expired ? "caducó" : `vence ${new Date(i.expiresAt).toLocaleDateString()}`}
                           </p>
                         </div>
                         <Button variant="outline" size="sm" onClick={() => revokeMutation.mutate(i.id)}>Anular</Button>
@@ -248,6 +259,12 @@ export function ManageStoreDialog({ store, onClose }: Props) {
                     ))}
                   </div>
                 )}
+              </TabsContent>
+            )}
+
+            {isOwner && (
+              <TabsContent value="roles" className="pt-4">
+                <RolesTab storeId={id} />
               </TabsContent>
             )}
 

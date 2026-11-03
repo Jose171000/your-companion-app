@@ -126,6 +126,8 @@ export interface Sale {
   status: string;
   /** Estado común a todos los canales */
   saleState?: SaleState;
+  /** true si esta persona no tiene «costos.ver»: envío y cupones vienen vacíos */
+  costsHidden?: boolean;
   /** Lo que pagó el comprador por el envío */
   shippingPaid?: number;
   /** Quién pagó el envío: comprador, gratis (no pagó el comprador), retiro (sin envío) o sin_dato */

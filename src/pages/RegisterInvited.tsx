@@ -92,7 +92,7 @@ export default function RegisterInvited() {
   return (
     <AuthShell
       title={`Únete a ${invitacion.storeName}`}
-      subtitle={`${invitacion.inviterName ?? 'El dueño de la tienda'} te invitó como ${ROLE_LABELS[invitacion.role as StoreRole] ?? invitacion.role}. Crea tu acceso, no necesitas registrar una empresa.`}
+      subtitle={`${invitacion.inviterName ?? 'El dueño de la tienda'} te invitó como ${invitacion.roleName ?? ROLE_LABELS[invitacion.role as StoreRole] ?? invitacion.role}. Crea tu acceso, no necesitas registrar una empresa.`}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (

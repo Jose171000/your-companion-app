@@ -45,7 +45,7 @@ export function SalesList({ accounts, canImport, canDownload, canImportHistory }
   const [historyOpen, setHistoryOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [descargando, setDescargando] = useState(false);
-  const { activeStore } = useStores();
+  const { activeStore, can } = useStores();
   const storeId = activeStore?.id;
 
   const [rango, setRango] = useRangoDeFechas(30);
@@ -153,16 +153,19 @@ export function SalesList({ accounts, canImport, canDownload, canImportHistory }
               </SelectContent>
             </Select>
           )}
-          <Select value={envio} onValueChange={setEnvio}>
-            <SelectTrigger className="h-9 w-48 text-sm"><SelectValue placeholder="Envío" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los envíos</SelectItem>
-              <SelectItem value="comprador">Pagado por el cliente</SelectItem>
-              <SelectItem value="gratis">Envío gratis para el cliente</SelectItem>
-              <SelectItem value="retiro">Retiro en tienda</SelectItem>
-              <SelectItem value="sin_dato">Sin dato de envío</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Filtrar por cómo se pagó el envío es ver costos: solo con «costos.ver» */}
+          {can("costos.ver") && (
+            <Select value={envio} onValueChange={setEnvio}>
+              <SelectTrigger className="h-9 w-48 text-sm"><SelectValue placeholder="Envío" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los envíos</SelectItem>
+                <SelectItem value="comprador">Pagado por el cliente</SelectItem>
+                <SelectItem value="gratis">Envío gratis para el cliente</SelectItem>
+                <SelectItem value="retiro">Retiro en tienda</SelectItem>
+                <SelectItem value="sin_dato">Sin dato de envío</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
         </div>
         <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
         <div className="flex items-center gap-2 flex-wrap lg:order-2">

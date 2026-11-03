@@ -14,6 +14,7 @@ import { FormDraftProvider, useFormDraft } from "@/contexts/FormDraftContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { NavigationGuardDialog } from "./NavigationGuardDialog";
 import { ActivityTracker } from "@/components/activity/ActivityTracker";
+import { useStores } from "@/contexts/StoreContext";
 import { Construction, Lock } from "lucide-react";
 
 // ─── Page metadata ────────────────────────────────────────────────────────────
@@ -74,12 +75,27 @@ function DashboardContent() {
   // El contador entra a la misma sección, que ya se recorta por su rol
   const canSeeAdmin    = isAdmin || isAccountant;
   const allowed        = user?.allowedSections;
-  const canSee         = (id: string) => isSectionAllowed(id, allowed, isAdmin || isAccountant);
+  const { activeStore, can } = useStores();
+  /**
+   * Lo que permite el rol de la persona en la tienda activa: «ver» también es un permiso, así que un rol sin «ver analíticas» no
+   * ve esa sección, y quien no puede crear productos no ve «IA Productos». Mientras no hay tienda cargada no se oculta nada.
+   */
+  const storeAllows = (id: string) => {
+    if (!activeStore) return true;
+    switch (id) {
+      case "products":    return can("productos.ver");
+      case "ai-products": return can("productos.editar");
+      case "analytics":   return can("analiticas.ver");
+      case "marketplaces": return can("canales.ver") || can("ventas.ver");
+      default:            return true;
+    }
+  };
+  const canSee         = (id: string) => isSectionAllowed(id, allowed, isAdmin || isAccountant) && storeAllows(id);
 
   // Si la sección inicial no está permitida, aterriza en el dashboard
   useEffect(() => {
     if (user && !canSee(activeItem)) setActiveItem("dashboard");
-  }, [user, activeItem]);
+  }, [user, activeItem, activeStore]);
 
   const pageInfo = pageTitles[activeItem] ?? { title: "Dashboard", subtitle: "" };
 
@@ -129,6 +145,7 @@ function DashboardContent() {
         isAdmin={canSeeAdmin}
         isAccountant={isAccountant}
         allowedSections={allowed}
+        storeAllows={storeAllows}
       />
 
       <main
