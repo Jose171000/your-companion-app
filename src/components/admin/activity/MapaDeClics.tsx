@@ -39,6 +39,18 @@ export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; 
   }, [data]);
   const ranking = data ?? [];
 
+  // Las posiciones se miden sobre la altura TOTAL de la página; si los clics están todos arriba, el mapa se estira hacia
+  // abajo para ocupar el lienzo (es un esquema, no una captura a escala).
+  const escala = useMemo(() => {
+    const alcance = Math.max(0, ...conPosicion.map((e) => (e.rect?.y ?? 0) + (e.rect?.h ?? 0)));
+    return alcance > 0 ? Math.min(8, Math.max(1, 1000 / (alcance * 1.15))) : 1;
+  }, [conPosicion]);
+  // Lo grande se dibuja primero para que lo pequeño (un botón dentro de una tarjeta) quede encima.
+  const ordenados = useMemo(
+    () => [...conPosicion].sort((a, b) => (b.rect!.w ?? 0) * (b.rect!.h ?? 0) - (a.rect!.w ?? 0) * (a.rect!.h ?? 0)),
+    [conPosicion],
+  );
+
   return (
     <div className="glass rounded-2xl border border-border dark:border-white/10 p-5 md:p-6 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -84,7 +96,7 @@ export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; 
                     <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
                       {verMapa ? "Los clics de esta pantalla fueron en ventanas emergentes o menús: no tienen posición. Mira la lista de al lado." : "Mapa oculto: la lista de al lado muestra lo mismo en orden."}
                     </div>
-                  ) : conPosicion.map((e) => <Cuadro key={e.elemento} e={e} />)}
+                  ) : ordenados.map((e) => <Cuadro key={e.elemento} e={e} escala={escala} />)}
                 </div>
                 <div className="flex items-center justify-end gap-2 mt-2 text-[10px] text-muted-foreground">
                   <span>Menos clics</span>
@@ -115,10 +127,10 @@ export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; 
   );
 }
 
-function Cuadro({ e }: { e: ElementoDeMapa }) {
-  const r = e.rect!;
+function Cuadro({ e, escala }: { e: ElementoDeMapa; escala: number }) {
+  const r = { ...e.rect!, y: e.rect!.y * escala, h: (e.rect!.h ?? 0) * escala };
   const ancho = Math.max(r.w ?? 0, 18);
-  const alto = Math.max(r.h ?? 0, 14);
+  const alto = Math.max(r.h ?? 0, 26);
   return (
     <div
       className="absolute rounded-[5px] border border-black/20 dark:border-white/20 flex items-center justify-center overflow-hidden text-[10px] leading-none text-black/80"
