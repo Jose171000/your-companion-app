@@ -229,6 +229,8 @@ export const adminApi = {
 // Reports API (cliente ve sus propias ventas)
 // ─────────────────────────────────────────────
 
+import type { ResumenDeCupones, ResumenDeEnvio } from '@/components/analytics/EnviosYCupones';
+
 export interface SalesReport {
   range: { from: string; to: string };
   totals: { sales: number; orders: number; avgTicket: number };
@@ -236,6 +238,14 @@ export interface SalesReport {
   byChannel: { channel: string; sales: number; orders: number; source: string }[];
   /** Desglose por cuenta del canal: una tienda puede tener varias del mismo marketplace */
   byAccount?: { connectionId: string | null; channel: string; label: string | null; sales: number; orders: number }[];
+  /** Si las ventas incluyen lo que el cliente pagó por el envío */
+  includeShipping?: boolean;
+  /** Cómo se pagó el envío y cuánto costó cuando el canal lo informa */
+  shipping?: ResumenDeEnvio;
+  /** Cupones y descuentos del canal al comprador */
+  discounts?: ResumenDeCupones;
+  /** Ventas por día de la semana (0 = domingo) y hora, en hora de Lima */
+  heatmap?: { dow: number; hour: number; orders: number; sales: number }[];
   /** Ventas y monto por estado en el rango (sin aplicar el filtro de estado) */
   byStatus?: { status: string; orders: number; sales: number }[];
   /** Estados que se están filtrando (vacío = todos) */
@@ -254,8 +264,9 @@ export const reportsApi = {
   /** Reporte externo que el admin configuró para este usuario */
   getConfig: () => apiRequest<ReportConfig>('/reports/config', { method: 'GET' }),
 
-  getSales: (from?: string, to?: string, status?: string) => {
+  getSales: (from?: string, to?: string, status?: string, includeShipping = true) => {
     const params = new URLSearchParams();
+    if (!includeShipping) params.set('includeShipping', 'false');
     if (from) params.set('from', from);
     if (to) params.set('to', to);
     if (status) params.set('status', status);

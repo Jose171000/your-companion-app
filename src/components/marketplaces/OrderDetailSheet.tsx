@@ -112,6 +112,15 @@ export function OrderDetailSheet({ sale, onClose }: Props) {
               <span className="text-xl font-semibold tabular-nums">{money(s.totalAmount, s.currency)}</span>
             </div>
 
+            {(s.shippingType && s.shippingType !== "sin_dato") || (s.discountAmount ?? 0) > 0 ? (
+              <div className="text-xs text-muted-foreground space-y-1 -mt-3">
+                {s.shippingType === "comprador" && <p>Envío pagado por el comprador: <span className="text-foreground tabular-nums">{money(s.shippingPaid ?? 0, s.currency)}</span></p>}
+                {s.shippingType === "gratis" && <p>Envío gratis para el comprador{s.shippingSellerCost != null ? <> · te costó <span className="text-foreground tabular-nums">{money(s.shippingSellerCost, s.currency)}</span></> : " (el canal no informa su costo)"}</p>}
+                {s.shippingType === "retiro" && <p>Retiro en tienda: sin envío</p>}
+                {(s.discountAmount ?? 0) > 0 && <p>Cupón o descuento del canal: <span className="text-foreground tabular-nums">{money(s.discountAmount ?? 0, s.currency)}</span></p>}
+              </div>
+            ) : null}
+
             <section className="space-y-3">
               <h3 className="text-sm font-semibold">Productos</h3>
               {s.lines.map((l, i) => (

@@ -12,6 +12,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { MapaDeCalor } from "./MapaDeCalor";
+import { EnviosYCupones } from "./EnviosYCupones";
 import { cn } from "@/lib/utils";
 import { AlertCircle, Loader2, Package, Receipt, RefreshCw, TrendingUp } from "lucide-react";
 import {
@@ -126,10 +129,12 @@ export function AnalyticsModule() {
 
   const { from, to } = rango;
   const [estados, setEstados] = useState<SaleState[]>([]);
+  // Por defecto las ventas son todo lo que pagó el cliente: productos y envío.
+  const [incluirEnvio, setIncluirEnvio] = useState(true);
 
   const { data: result, isLoading, isError } = useQuery({
-    queryKey: ["sales-report", storeId, from, to, estados.join(",")],
-    queryFn: () => reportsApi.getSales(from, to, estados.join(",") || undefined),
+    queryKey: ["sales-report", storeId, from, to, estados.join(","), incluirEnvio],
+    queryFn: () => reportsApi.getSales(from, to, estados.join(",") || undefined, incluirEnvio),
     // Al cambiar el filtro se siguen viendo los números anteriores hasta que lleguen los nuevos.
     placeholderData: keepPreviousData,
     enabled: !!storeId,
@@ -199,6 +204,11 @@ export function AnalyticsModule() {
           onChange={setEstados}
           counts={Object.fromEntries((report.byStatus ?? []).map((e) => [e.status, e.orders]))}
         />
+        <label className="inline-flex items-center gap-2 text-sm cursor-pointer w-fit">
+          <Switch checked={incluirEnvio} onCheckedChange={setIncluirEnvio} aria-label="Incluir el envío en las ventas" />
+          <span>Incluir envío</span>
+          <span className="text-xs text-muted-foreground">{incluirEnvio ? "Ventas = productos + envío que pagó el cliente" : "Ventas = solo el precio de los productos"}</span>
+        </label>
         {estados.length > 0 && report.sources.sheets && (
           <p className="text-xs text-muted-foreground">Con un estado elegido no se incluyen las ventas del Google Sheet, porque no tiene estado.</p>
         )}
@@ -206,7 +216,7 @@ export function AnalyticsModule() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiCard icon={TrendingUp} label="Ventas del periodo" value={money(report.totals.sales)} />
+        <KpiCard icon={TrendingUp} label="Ventas del periodo" value={money(report.totals.sales)} hint={incluirEnvio ? "Lo que pagó el cliente: productos + envío" : "Solo productos, sin envío"} />
         <KpiCard icon={Package} label="Pedidos" value={`${report.totals.orders}`} />
         <KpiCard icon={Receipt} label="Ticket promedio" value={money(report.totals.avgTicket)} />
       </div>
@@ -273,6 +283,14 @@ export function AnalyticsModule() {
           </div>
         )}
       </div>
+
+      {/* Cuándo entran más ventas */}
+      <MapaDeCalor celdas={report.heatmap ?? []} />
+
+      {/* Envío y cupones */}
+      {report.shipping && report.discounts && (
+        <EnviosYCupones envio={report.shipping} cupones={report.discounts} incluirEnvio={incluirEnvio} />
+      )}
 
       {/* Ventas por canal */}
       <div className="glass rounded-2xl border border-border dark:border-white/10 p-5 md:p-6">

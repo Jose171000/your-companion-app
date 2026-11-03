@@ -49,6 +49,7 @@ export function SalesList({ accounts, canImport }: Props) {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [estados, setEstados] = useState<SaleState[]>([]);
+  const [envio, setEnvio] = useState("all");
   const [selected, setSelected] = useState<Sale | null>(null);
 
   // La búsqueda espera a que se deje de escribir: una consulta por tecla sobra.
@@ -60,7 +61,7 @@ export function SalesList({ accounts, canImport }: Props) {
   const { from, to } = rango;
 
   const query = useInfiniteQuery({
-    queryKey: ["sync-orders", storeId, from, to, marketplace, connectionId, search, estados.join(",")],
+    queryKey: ["sync-orders", storeId, from, to, marketplace, connectionId, search, estados.join(","), envio],
     placeholderData: keepPreviousData,
     enabled: !!storeId,
     initialPageParam: 0,
@@ -72,6 +73,7 @@ export function SalesList({ accounts, canImport }: Props) {
         connectionId: connectionId === "all" ? undefined : connectionId,
         search: search || undefined,
         status: estados.join(",") || undefined,
+        shipping: envio === "all" ? undefined : envio,
         limit: PAGE,
         offset: pageParam,
       });
@@ -107,6 +109,7 @@ export function SalesList({ accounts, canImport }: Props) {
         connectionId: connectionId === "all" ? undefined : connectionId,
         search: search || undefined,
         status: estados.join(",") || undefined,
+        shipping: envio === "all" ? undefined : envio,
       });
     } catch (e: any) {
       toast.error(e?.message ?? "No se pudo descargar las ventas");
@@ -145,6 +148,16 @@ export function SalesList({ accounts, canImport }: Props) {
               </SelectContent>
             </Select>
           )}
+          <Select value={envio} onValueChange={setEnvio}>
+            <SelectTrigger className="h-9 w-48 text-sm"><SelectValue placeholder="Envío" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los envíos</SelectItem>
+              <SelectItem value="comprador">Pagado por el cliente</SelectItem>
+              <SelectItem value="gratis">Envío gratis para el cliente</SelectItem>
+              <SelectItem value="retiro">Retiro en tienda</SelectItem>
+              <SelectItem value="sin_dato">Sin dato de envío</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <Button size="sm" variant="outline" className="gap-1.5" disabled={descargando || total === 0} onClick={descargar}>

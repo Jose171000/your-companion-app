@@ -126,6 +126,15 @@ export interface Sale {
   status: string;
   /** Estado común a todos los canales */
   saleState?: SaleState;
+  /** Lo que pagó el comprador por el envío */
+  shippingPaid?: number;
+  /** Quién pagó el envío: comprador, gratis (no pagó el comprador), retiro (sin envío) o sin_dato */
+  shippingType?: 'comprador' | 'gratis' | 'retiro' | 'sin_dato';
+  /** Lo que te costó el envío, si el canal lo informa */
+  shippingSellerCost?: number | null;
+  /** Cupones y descuentos del canal al comprador */
+  discountAmount?: number;
+  discountSellerFunded?: number | null;
   /** Registrada a mano o desde Excel: la única que se puede editar o eliminar */
   manual?: boolean;
   /** Datos para precargar la edición (solo el dueño, solo en el detalle de una venta manual) */
@@ -158,6 +167,8 @@ export interface ManualSaleEdit {
   numeroPedido: string;
   estado: string;
   envio: number;
+  /** Envío que cubriste tú (envío gratis para el comprador) */
+  envioCubierto: number;
   cliente: string;
   telefono: string;
   documento: string;
@@ -181,6 +192,8 @@ export interface SalesQuery {
   search?: string;
   /** Estados separados por coma: pendiente,enviado,entregado,cancelado,devuelto */
   status?: string;
+  /** Cómo se pagó el envío, separados por coma: comprador,gratis,retiro,sin_dato */
+  shipping?: string;
   limit?: number;
   offset?: number;
 }

@@ -48,6 +48,7 @@ export function ManualSaleDialog({ open, onOpenChange, editar, onGuardada }: {
   const [documento, setDocumento] = useState("");
   const [direccion, setDireccion] = useState("");
   const [envio, setEnvio] = useState("");
+  const [envioCubierto, setEnvioCubierto] = useState("");
   const [notas, setNotas] = useState("");
   const [lineas, setLineas] = useState<Linea[]>([lineaVacia()]);
   const [enviando, setEnviando] = useState(false);
@@ -69,6 +70,7 @@ export function ManualSaleDialog({ open, onOpenChange, editar, onGuardada }: {
     setDocumento(edicion.documento);
     setDireccion(edicion.direccion);
     setEnvio(edicion.envio ? String(edicion.envio) : "");
+    setEnvioCubierto(edicion.envioCubierto ? String(edicion.envioCubierto) : "");
     setNotas(edicion.notas);
     setLineas(edicion.lineas.map((l) => ({ producto: l.producto, cantidad: String(l.cantidad), precio: String(l.precio), descontar: l.descontar })));
     setResultado(null);
@@ -93,7 +95,7 @@ export function ManualSaleDialog({ open, onOpenChange, editar, onGuardada }: {
     if (lineas.some((l) => !l.producto)) { toast.error("Elige el producto de cada línea (busca por SKU o nombre)."); return; }
     const filas = lineas.map((l, i) => ({
       numero_pedido: numero.trim() || undefined,
-      ...(i === 0 ? { fecha, canal: canalFinal, estado, envio, cliente, telefono, documento, direccion, notas } : {}),
+      ...(i === 0 ? { fecha, canal: canalFinal, estado, envio, envio_cubierto: envioCubierto, cliente, telefono, documento, direccion, notas } : {}),
       sku: l.producto!.sku,
       cantidad: l.cantidad,
       precio_unitario: l.precio,
@@ -118,7 +120,7 @@ export function ManualSaleDialog({ open, onOpenChange, editar, onGuardada }: {
     if (res.error || !res.data) { toast.error(res.error ?? "No se pudo registrar la venta"); return; }
     alTerminar(res.data);
     if (res.data.registradas && !res.data.rechazadas.length) {
-      setLineas([lineaVacia()]); setNumero(""); setCliente(""); setTelefono(""); setDocumento(""); setDireccion(""); setEnvio(""); setNotas("");
+      setLineas([lineaVacia()]); setNumero(""); setCliente(""); setTelefono(""); setDocumento(""); setDireccion(""); setEnvio(""); setEnvioCubierto(""); setNotas("");
     }
   };
 
@@ -231,6 +233,10 @@ export function ManualSaleDialog({ open, onOpenChange, editar, onGuardada }: {
               <div className="space-y-1.5">
                 <Label>Envío cobrado <span className="text-muted-foreground font-normal">(no cuenta para la comisión)</span></Label>
                 <Input type="number" min={0} step="0.01" value={envio} onChange={(e) => setEnvio(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Envío cubierto por mí <span className="text-muted-foreground font-normal">(envío gratis para el cliente)</span></Label>
+                <Input type="number" min={0} step="0.01" value={envioCubierto} onChange={(e) => setEnvioCubierto(e.target.value)} />
               </div>
               <div className="space-y-1.5 sm:col-span-2"><Label>Dirección</Label><Input value={direccion} onChange={(e) => setDireccion(e.target.value)} /></div>
               <div className="space-y-1.5 sm:col-span-2"><Label>Notas</Label><Textarea rows={2} value={notas} onChange={(e) => setNotas(e.target.value)} /></div>
