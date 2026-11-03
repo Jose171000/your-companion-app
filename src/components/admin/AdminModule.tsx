@@ -9,6 +9,7 @@ import { DeleteClientDialog } from "./DeleteClientDialog";
 import { CrmModule } from "@/components/crm/CrmModule";
 import { BillingModule } from "./BillingModule";
 import { SignupRequests } from "./SignupRequests";
+import { ActividadModule } from "./activity/ActividadModule";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +19,8 @@ import { Search, UserPlus } from "lucide-react";
 export function AdminModule() {
   const { user } = useAuth();
   const isAccountant = user?.role === "contador";
+  // La actividad de los usuarios la ve solo el superadmin (rol admin), ni siquiera el contador.
+  const isSuperadmin = user?.role === "admin";
   const [search, setSearch] = useState("");
   const [manageTarget, setManageTarget] = useState<AdminClient | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AdminClient | null>(null);
@@ -78,6 +81,7 @@ export function AdminModule() {
             </TabsTrigger>
           )}
           {!isAccountant && <TabsTrigger value="crm">CRM</TabsTrigger>}
+          {isSuperadmin && <TabsTrigger value="actividad">Actividad</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="facturacion" className="pt-6">
@@ -126,6 +130,11 @@ export function AdminModule() {
         <TabsContent value="crm" className="pt-6">
           <CrmModule />
         </TabsContent>
+        {isSuperadmin && (
+          <TabsContent value="actividad" className="pt-6">
+            <ActividadModule />
+          </TabsContent>
+        )}
       </Tabs>
 
       <ClientDetailDialog client={manageTarget} onClose={() => setManageTarget(null)} />
