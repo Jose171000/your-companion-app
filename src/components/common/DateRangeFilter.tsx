@@ -88,7 +88,7 @@ export function DateRangeFilter({
         }}
       >
         <PopoverTrigger asChild>
-          <Button size="sm" variant={personalizado ? "default" : "outline"} className="gap-1.5">
+          <Button size="sm" variant={personalizado ? "default" : "outline"} className="gap-1.5" data-track="selector-de-fechas">
             <CalendarDays className="w-3.5 h-3.5" />
             {etiqueta}
           </Button>

@@ -34,6 +34,9 @@ igual('texto suelto fuera de controles', etiquetaDeClic(d({ tag: 'p', texto: 'Ho
 igual('zona ignorada', etiquetaDeClic(d({ texto: 'Descargar', dentroDeIgnorado: true })), null);
 igual('campo de texto: solo qué campo es', etiquetaDeClic(d({ tag: 'input', type: 'text', placeholder: 'Buscar cliente, pedido, SKU o producto…' })), 'campo-buscar-cliente-pedido-sku-o-producto');
 igual('campo de contraseña', etiquetaDeClic(d({ tag: 'input', type: 'password', ariaLabel: 'Mi clave secreta' })), 'campo-contrasena');
+igual('rango de fechas no usa su texto', etiquetaDeClic(d({ texto: '1 oct - 31 oct 2026' })), 'boton');
+igual('atajo con una cifra es rótulo fijo', etiquetaDeClic(d({ texto: '30 días' })), '30-dias');
+igual('rango con etiqueta accesible fija', etiquetaDeClic(d({ texto: '1 oct - 31 oct 2026', ariaLabel: 'Fechas' })), 'fechas');
 igual('selector', etiquetaDeClic(d({ tag: 'button', role: 'combobox', texto: 'Todos los canales' })), 'todos-los-canales');
 
 igual('pantalla con pestaña', pantallaCompuesta('marketplaces', 'Ventas'), 'marketplaces.ventas');

@@ -55,7 +55,8 @@ function descriptorDe(el: Element): DescriptorDeElemento {
     tag,
     role: el.getAttribute('role'),
     type: el.getAttribute('type'),
-    track: el.closest('[data-track]')?.getAttribute('data-track') ?? null,
+    // Los días de un calendario son fechas: se registran todos como «calendario», no uno por día.
+    track: el.closest('[data-track]')?.getAttribute('data-track') ?? (el.closest('[role=grid]') ? 'calendario' : null),
     ariaLabel: el.getAttribute('aria-label'),
     placeholder: el.getAttribute('placeholder'),
     name: el.getAttribute('name'),
@@ -164,7 +165,8 @@ export class ActivityTracker {
     try {
       this.seccion = this.obtenerSeccion() || 'otros';
       const visible = seccionVisible(zonaDeContenido());
-      const pestana = visible?.querySelector('[role=tab][data-state=active]')?.textContent ?? null;
+      // innerText (no textContent): una pestaña con rótulo corto para móvil no debe sumar el texto oculto al visible.
+      const pestana = (visible?.querySelector('[role=tab][data-state=active]') as HTMLElement | null)?.innerText?.split('\n')[0] ?? null;
       const actual = pantallaCompuesta(this.seccion, pestana);
       if (actual !== this.pantalla) {
         this.pantalla = actual;

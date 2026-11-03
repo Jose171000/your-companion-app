@@ -71,10 +71,12 @@ export function etiquetaDeClic(d: DescriptorDeElemento): string | null {
   // Una tarjeta entera clicable trae textos de datos (cliente, producto): se registra solo como «tarjeta».
   if (d.hijosComplejos) return aEtiqueta(d.ariaLabel, 60) ?? 'tarjeta';
 
+  // Un texto con varios números o con un año (un rango de fechas) cambia con los datos: no es un rótulo fijo. «30 días» sí.
   const texto = d.texto.replace(/\s+/g, ' ').trim();
-  if (texto && texto.length <= 40 && !parecePersonal(texto)) return aEtiqueta(texto, 60) ?? 'otros';
+  const variable = (texto.match(/\d+/g) ?? []).length >= 2 || /\b\d{4}\b/.test(texto);
+  if (texto && !variable && texto.length <= 40 && !parecePersonal(texto)) return aEtiqueta(texto, 60) ?? 'otros';
   const alternativo = d.ariaLabel ?? d.title;
-  if (alternativo && alternativo.length <= 60 && !parecePersonal(alternativo)) return aEtiqueta(alternativo, 60) ?? 'otros';
+  if (alternativo && alternativo.length <= 60 && !/\d{2,}/.test(alternativo) && !parecePersonal(alternativo)) return aEtiqueta(alternativo, 60) ?? 'otros';
   return texto ? 'boton' : 'icono';
 }
 
