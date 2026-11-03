@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AuthShell, authButtonClass, authInputClass } from '@/components/auth/AuthShell';
 import { CheckCircle2, Loader2 } from 'lucide-react';
+import { PrivacyCheckbox } from '@/components/activity/PrivacyNotice';
 
 const labelClass = 'text-sm font-medium text-[#111111] dark:text-[#F8F8F5]';
 
@@ -24,6 +25,7 @@ export default function Register() {
   const [url, setUrl] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [aceptaAviso, setAceptaAviso] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [enviada, setEnviada] = useState<string | null>(null);
@@ -46,6 +48,10 @@ export default function Register() {
       setError('Las contraseñas no coinciden.');
       return;
     }
+    if (!aceptaAviso) {
+      setError('Debes aceptar el aviso de privacidad para crear tu cuenta.');
+      return;
+    }
 
     setIsLoading(true);
     const result = await register({
@@ -56,6 +62,7 @@ export default function Register() {
       nameCompany: nameCompany.trim(),
       businessName: businessName.trim(),
       ruc: ruc.trim(),
+      acceptPrivacy: true,
       ...(url.trim() ? { url: url.trim() } : {}),
       ...(cellPhone.trim() ? { cellPhone: cellPhone.trim() } : {}),
     });
@@ -152,6 +159,8 @@ export default function Register() {
             <Input id="confirmPassword" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required disabled={isLoading} className={authInputClass} />
           </div>
         </div>
+
+        <PrivacyCheckbox checked={aceptaAviso} onChange={setAceptaAviso} disabled={isLoading} />
 
         <Button type="submit" disabled={isLoading} className={authButtonClass}>
           {isLoading ? (

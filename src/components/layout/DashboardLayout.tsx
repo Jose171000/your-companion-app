@@ -13,6 +13,7 @@ import { AdminModule } from "@/components/admin/AdminModule";
 import { FormDraftProvider, useFormDraft } from "@/contexts/FormDraftContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { NavigationGuardDialog } from "./NavigationGuardDialog";
+import { ActivityTracker } from "@/components/activity/ActivityTracker";
 import { Construction, Lock } from "lucide-react";
 
 // ─── Page metadata ────────────────────────────────────────────────────────────
@@ -143,7 +144,8 @@ function DashboardContent() {
           showMenuButton={isMobile}
         />
 
-        <div className="p-4 md:p-8">
+        {/* data-track-root: zona sobre la que se miden las posiciones del mapa de clics */}
+        <div className="p-4 md:p-8" data-track-root>
           {/*
            * LAZY MOUNT STRATEGY
            * Sections are mounted on first visit, then toggled with
@@ -211,6 +213,9 @@ function DashboardContent() {
             )}
         </div>
       </main>
+
+      {/* Registro de actividad (solo con el aviso de privacidad aceptado) */}
+      <ActivityTracker section={activeItem} />
 
       <NavigationGuardDialog
         open={guardOpen}

@@ -262,6 +262,8 @@ export interface RegisterCredentials {
   ruc?: string;
   /** Código de la invitación a una tienda: registro corto, sin datos de empresa */
   invitationToken?: string;
+  /** Acepta el aviso de privacidad (casilla obligatoria del registro) */
+  acceptPrivacy?: boolean;
   url?: string;
   cellPhone?: string;
 }

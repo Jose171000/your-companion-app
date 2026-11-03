@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "probar:etiquetas": "node scripts/probar-etiquetas.ts",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview"

@@ -234,7 +234,7 @@ export function SalesList({ accounts, canImport }: Props) {
               </thead>
               <tbody className="divide-y divide-border/50">
                 {rows.map(({ sale, line, key }) => (
-                  <tr key={key} className="hover:bg-secondary/20 transition-colors cursor-pointer" onClick={() => setSelected(sale)}>
+                  <tr key={key} data-track="fila-de-venta" className="hover:bg-secondary/20 transition-colors cursor-pointer" onClick={() => setSelected(sale)}>
                     <td className="px-3 py-3">
                       <div className="flex items-center gap-3 min-w-[220px]">
                         <ProductThumb src={line.imageUrl} alt={line.title} />

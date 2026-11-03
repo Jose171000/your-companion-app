@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AuthShell, authButtonClass, authInputClass } from '@/components/auth/AuthShell';
 import { Loader2 } from 'lucide-react';
+import { PrivacyCheckbox } from '@/components/activity/PrivacyNotice';
 
 const labelClass = 'text-sm font-medium text-[#111111] dark:text-[#F8F8F5]';
 
@@ -36,6 +37,7 @@ export default function RegisterInvited() {
   const [cellPhone, setCellPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [aceptaAviso, setAceptaAviso] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -47,6 +49,7 @@ export default function RegisterInvited() {
     if (!invitacion) return;
     if (password.length < 8) { setError('La contraseña debe tener al menos 8 caracteres.'); return; }
     if (password !== confirmPassword) { setError('Las contraseñas no coinciden.'); return; }
+    if (!aceptaAviso) { setError('Debes aceptar el aviso de privacidad para crear tu cuenta.'); return; }
 
     setIsLoading(true);
     const result = await register({
@@ -55,6 +58,7 @@ export default function RegisterInvited() {
       name: name.trim(),
       lastName: lastName.trim(),
       invitationToken: token,
+      acceptPrivacy: true,
       ...(cellPhone.trim() ? { cellPhone: cellPhone.trim() } : {}),
     });
     setIsLoading(false);
@@ -128,6 +132,8 @@ export default function RegisterInvited() {
             <Input id="confirmPassword" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required disabled={isLoading} className={authInputClass} />
           </div>
         </div>
+
+        <PrivacyCheckbox checked={aceptaAviso} onChange={setAceptaAviso} disabled={isLoading} />
 
         <Button type="submit" disabled={isLoading} className={authButtonClass}>
           {isLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creando tu acceso…</>) : 'Crear mi acceso y entrar'}
