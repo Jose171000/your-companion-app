@@ -1,5 +1,6 @@
 import { useCuentasPorCanal } from "@/components/marketplaces/AccountChooser";
 import { useEffect, useState } from "react";
+import { useStores } from "@/contexts/StoreContext";
 import { Search, Plus, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ export function ProductsToolbar({
 }: ProductsToolbarProps) {
   const [localSearch, setLocalSearch] = useState(search);
   const canales = useCanalesDeLaTienda(marketplace);
+  const { can } = useStores();
 
   // Debounce search → notify parent after 400 ms
   useEffect(() => {
@@ -129,28 +131,32 @@ export function ProductsToolbar({
 
       {/* ── Export & New product buttons ───────────────────── */}
       <div className="flex w-full lg:w-auto gap-2 shrink-0">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full lg:w-auto font-semibold">
-              <Download className="w-4 h-4 mr-2" />
-              Exportar
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onExport("csv")}>Exportar como CSV</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onExport("xlsx")}>Exportar como Excel</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onExport("json")}>Exportar como JSON</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {can("productos.descargar") && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="w-full lg:w-auto font-semibold">
+                <Download className="w-4 h-4 mr-2" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onExport("csv")}>Exportar como CSV</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport("xlsx")}>Exportar como Excel</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExport("json")}>Exportar como JSON</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
-        <Button
-          id="products-new-btn"
-          onClick={onNewProduct}
-          className="w-full lg:w-auto gradient-primary glow-primary font-semibold"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Nuevo Producto
-        </Button>
+        {can("productos.editar") && (
+          <Button
+            id="products-new-btn"
+            onClick={onNewProduct}
+            className="w-full lg:w-auto gradient-primary glow-primary font-semibold"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nuevo Producto
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useStores } from "@/contexts/StoreContext";
 import { ProductCard } from "./ProductCard";
 import { CategoryCell, ChannelsCell, CompletenessCell, GroupChannelsCell, GroupCompletenessCell } from "./ProductStatusCells";
 
@@ -46,15 +47,16 @@ function Thumb({ product }: { product: Product }) {
 }
 
 function RowActions({ product, onSheet, onPublish, onPrepareFalabella, onRegenerate, onEdit, onDelete }: RowHandlers & { product: Product }) {
+  const { can } = useStores();
   const btn = "h-8 w-8 hover:text-primary hover:bg-primary/10";
   return (
     <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
       <Button variant="ghost" size="icon" className={btn} onClick={() => onSheet(product)} title="Ficha: lo que se envía a cada canal"><FileText className="w-4 h-4" /></Button>
-      <Button variant="ghost" size="icon" className={btn} onClick={() => onPublish(product)} title="Publicar en marketplaces"><Rocket className="w-4 h-4" /></Button>
-      <Button variant="ghost" size="icon" className={btn} onClick={() => onPrepareFalabella(product)} title="Preparar para Falabella (categoría, medidas y atributos)"><PackageCheck className="w-4 h-4" /></Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-accent hover:bg-accent/10" onClick={() => onRegenerate(product)} title="Regenerar con IA"><Sparkles className="w-4 h-4" /></Button>
-      <Button variant="ghost" size="icon" className={btn} onClick={() => onEdit(product)} title="Editar"><Edit className="w-4 h-4" /></Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(product)} title="Eliminar"><Trash2 className="w-4 h-4" /></Button>
+      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => onPublish(product)} title="Publicar en marketplaces"><Rocket className="w-4 h-4" /></Button>}
+      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => onPrepareFalabella(product)} title="Preparar para Falabella (categoría, medidas y atributos)"><PackageCheck className="w-4 h-4" /></Button>}
+      {can("productos.editar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-accent hover:bg-accent/10" onClick={() => onRegenerate(product)} title="Regenerar con IA"><Sparkles className="w-4 h-4" /></Button>}
+      {can("productos.editar") && <Button variant="ghost" size="icon" className={btn} onClick={() => onEdit(product)} title="Editar"><Edit className="w-4 h-4" /></Button>}
+      {can("productos.eliminar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(product)} title="Eliminar"><Trash2 className="w-4 h-4" /></Button>}
     </div>
   );
 }
@@ -64,6 +66,7 @@ function RowActions({ product, onSheet, onPublish, onPrepareFalabella, onRegener
  * eliminar actúan sobre el grupo entero; la ficha deja elegir variante dentro de su ventana, y editar pide elegir cuál.
  */
 function GroupActions({ product, ...handlers }: RowHandlers & { product: Product }) {
+  const { can } = useStores();
   const grupo = product.group!;
   const resumen = product.groupSummary!;
   const [eligiendo, setEligiendo] = useState(false);
@@ -76,10 +79,10 @@ function GroupActions({ product, ...handlers }: RowHandlers & { product: Product
   return (
     <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
       <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onSheet(delGrupo)} title="Ficha: lo que se envía a cada canal (elige la variante dentro)"><FileText className="w-4 h-4" /></Button>
-      <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPublish(delGrupo)} title={`Publicar ${todas} en marketplaces`}><Rocket className="w-4 h-4" /></Button>
-      <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPrepareFalabella(delGrupo)} title={`Preparar ${todas} para Falabella (categoría, medidas y atributos)`}><PackageCheck className="w-4 h-4" /></Button>
-      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-accent hover:bg-accent/10" onClick={() => handlers.onRegenerate(delGrupo)} title={`Regenerar con IA ${todas}`}><Sparkles className="w-4 h-4" /></Button>
-      <Popover open={eligiendo} onOpenChange={setEligiendo}>
+      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPublish(delGrupo)} title={`Publicar ${todas} en marketplaces`}><Rocket className="w-4 h-4" /></Button>}
+      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPrepareFalabella(delGrupo)} title={`Preparar ${todas} para Falabella (categoría, medidas y atributos)`}><PackageCheck className="w-4 h-4" /></Button>}
+      {can("productos.editar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-accent hover:bg-accent/10" onClick={() => handlers.onRegenerate(delGrupo)} title={`Regenerar con IA ${todas}`}><Sparkles className="w-4 h-4" /></Button>}
+      {can("productos.editar") && <Popover open={eligiendo} onOpenChange={setEligiendo}>
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon" className={btn} title="Editar: elige la variante"><Edit className="w-4 h-4" /></Button>
         </PopoverTrigger>
@@ -93,8 +96,8 @@ function GroupActions({ product, ...handlers }: RowHandlers & { product: Product
             </button>
           ))}
         </PopoverContent>
-      </Popover>
-      <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => handlers.onDelete(delGrupo)} title={`Eliminar ${todas}`}><Trash2 className="w-4 h-4" /></Button>
+      </Popover>}
+      {can("productos.eliminar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => handlers.onDelete(delGrupo)} title={`Eliminar ${todas}`}><Trash2 className="w-4 h-4" /></Button>}
     </div>
   );
 }
