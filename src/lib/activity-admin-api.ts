@@ -1,4 +1,4 @@
-import { apiRequest } from './api';
+import { apiDownload, apiRequest } from './api';
 
 /** Filtros comunes de todas las consultas de Superadmin › Actividad (solo superadmin; el servidor lo vuelve a exigir). */
 export interface FiltroDeActividad {
@@ -107,6 +107,17 @@ function consulta(f: FiltroDeActividad, extra: Record<string, string> = {}): str
   return p.toString();
 }
 
+/** Qué lleva una descarga. Sin elegir nada, lleva todo (informe completo). */
+export type BloqueDeInforme = 'resumen' | 'secciones' | 'funciones' | 'horarios' | 'personas' | 'clics' | 'linea';
+
+export interface OpcionesDeDescarga {
+  formato: 'xlsx' | 'pdf';
+  /** Vacío = todos los bloques. */
+  bloques: BloqueDeInforme[];
+  /** Vacío = todas las pantallas con clics. */
+  pantallas: string[];
+}
+
 export const activityAdminApi = {
   options: () => apiRequest<OpcionesDeActividad>('/admin/activity/options', { method: 'GET' }),
   overview: (f: FiltroDeActividad) => apiRequest<ResumenDeActividad>(`/admin/activity/overview?${consulta(f)}`, { method: 'GET' }),
@@ -114,4 +125,12 @@ export const activityAdminApi = {
   screens: (f: FiltroDeActividad) => apiRequest<PantallaConMapa[]>(`/admin/activity/screens?${consulta(f)}`, { method: 'GET' }),
   clicks: (f: FiltroDeActividad, screen: string) =>
     apiRequest<ElementoDeMapa[]>(`/admin/activity/clicks?${consulta(f, { screen })}`, { method: 'GET' }),
+
+  /** Descarga el informe (Excel o PDF) con los filtros puestos. Solo superadmin. */
+  download: (f: FiltroDeActividad, o: OpcionesDeDescarga) => {
+    const extra: Record<string, string> = {};
+    if (o.bloques.length) extra.include = o.bloques.join(',');
+    if (o.pantallas.length) extra.screens = o.pantallas.join(',');
+    return apiDownload(`/admin/activity/export/${o.formato}?${consulta(f, extra)}`, `actividad-synkro_${f.from}_${f.to}.${o.formato}`, { method: 'GET' });
+  },
 };

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { MapaDeClics } from "./MapaDeClics";
+import { DescargasDeActividad } from "./DescargasDeActividad";
 
 const TODOS = "todos";
 const ORDEN_SEMANA = [1, 2, 3, 4, 5, 6, 7];
@@ -92,6 +93,10 @@ export function ActividadModule() {
           <div className="space-y-1.5">
             <p className="text-xs text-muted-foreground">Periodo</p>
             <DateRangeFilter value={rango} onChange={setRango} />
+          </div>
+
+          <div className="ml-auto">
+            <DescargasDeActividad filtro={filtro} pantallas={pantallas.data ?? []} />
           </div>
         </div>
 
