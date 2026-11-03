@@ -127,11 +127,11 @@ export function SalesList({ accounts, canImport }: Props) {
   return (
     <div className="space-y-4">
       {/* Filtros */}
-      <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+      <div className="space-y-3">
         <div className="flex items-center gap-2 flex-wrap">
           <DateRangeFilter value={rango} onChange={setRango} />
           <Select value={marketplace} onValueChange={(v) => { setMarketplace(v); setConnectionId("all"); }}>
-            <SelectTrigger className="h-9 w-40 text-sm"><SelectValue placeholder="Canal" /></SelectTrigger>
+            <SelectTrigger className="h-9 w-48 text-sm"><SelectValue placeholder="Canal" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos los canales</SelectItem>
               {channels.map((c) => <SelectItem key={c} value={c}>{channelName(c)}</SelectItem>)}
@@ -159,7 +159,8 @@ export function SalesList({ accounts, canImport }: Props) {
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+        <div className="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
+        <div className="flex items-center gap-2 flex-wrap lg:order-2">
           <Button size="sm" variant="outline" className="gap-1.5" disabled={descargando || total === 0} onClick={descargar}>
             {descargando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} Descargar
           </Button>
@@ -174,7 +175,7 @@ export function SalesList({ accounts, canImport }: Props) {
           </>
         )}
         </div>
-        <div className="relative w-full lg:max-w-sm">
+        <div className="relative w-full lg:max-w-sm lg:order-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             className="pl-9"
@@ -182,6 +183,7 @@ export function SalesList({ accounts, canImport }: Props) {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
           />
+        </div>
         </div>
       </div>
 
