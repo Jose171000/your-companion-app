@@ -23,7 +23,8 @@ igual('botón con icono y sin nada', etiquetaDeClic(d({})), 'icono');
 // Privacidad
 igual('botón cuyo texto es un correo', etiquetaDeClic(d({ tag: 'a', texto: 'juan@correo.com' })), 'boton');
 igual('botón cuyo texto es un teléfono', etiquetaDeClic(d({ tag: 'a', texto: '999 888 777' })), 'boton');
-igual('botón con número de pedido', etiquetaDeClic(d({ texto: 'Pedido 3259674549' })), 'boton');
+igual('botón con número de pedido: el número se descarta', etiquetaDeClic(d({ texto: 'Pedido 3259674549' })), 'pedido');
+igual('el número de pedido nunca llega a la etiqueta', etiquetaDeClic(d({ texto: 'Pedido 3259674549' }))?.includes('3259') ?? false, false);
 igual('tarjeta clicable con datos adentro', etiquetaDeClic(d({ texto: 'Almohada Luz Morante S/ 179', hijosComplejos: true })), 'tarjeta');
 igual('control dentro de una fila: no usa el texto', etiquetaDeClic(d({ texto: 'Luis Enrique Chavez', dentroDeFila: true })), 'control-en-fila');
 igual('control dentro de una fila con etiqueta accesible', etiquetaDeClic(d({ texto: 'Luis', dentroDeFila: true, ariaLabel: 'Ver detalle' })), 'ver-detalle');
