@@ -99,6 +99,15 @@ export interface ElementoDeMapa {
   rect: { x: number; y: number; w: number | null; h: number | null } | null;
 }
 
+/** Plano de una pantalla: la forma de sus bloques (sin texto) en milésimas del ancho y alto de la zona de contenido. */
+export interface PlanoDePantalla {
+  bloques: { k: 'titulo' | 'tabla' | 'pestanas' | 'grafico' | 'imagen' | 'campo' | 'boton' | 'tarjeta'; x: number; y: number; w: number; h: number }[];
+  /** Tamaño en píxeles de la zona de contenido cuando se tomó (su proporción). */
+  ancho: number;
+  alto: number;
+  tomadoEl: string;
+}
+
 function consulta(f: FiltroDeActividad, extra: Record<string, string> = {}): string {
   const p = new URLSearchParams({ from: f.from, to: f.to, mode: f.mode, ...extra });
   if (f.userId) p.set('userId', f.userId);
@@ -125,6 +134,8 @@ export const activityAdminApi = {
   screens: (f: FiltroDeActividad) => apiRequest<PantallaConMapa[]>(`/admin/activity/screens?${consulta(f)}`, { method: 'GET' }),
   clicks: (f: FiltroDeActividad, screen: string) =>
     apiRequest<ElementoDeMapa[]>(`/admin/activity/clicks?${consulta(f, { screen })}`, { method: 'GET' }),
+
+  layout: (screen: string) => apiRequest<{ plano: PlanoDePantalla | null }>(`/admin/activity/layout?screen=${encodeURIComponent(screen)}`, { method: 'GET' }),
 
   /** Descarga el informe (Excel o PDF) con los filtros puestos. Solo superadmin. */
   download: (f: FiltroDeActividad, o: OpcionesDeDescarga) => {

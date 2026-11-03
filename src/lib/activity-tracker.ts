@@ -1,4 +1,5 @@
 import { activityApi, EventoDeActividad } from './activity-api';
+import { capturarPlano } from './activity-layout';
 import { aEtiqueta, aMilesimas, DescriptorDeElemento, etiquetaDeClic, pantallaCompuesta } from './activity-naming';
 
 /**
@@ -16,6 +17,27 @@ const CADA_LATIDO_S = 30;
 const SIN_ACTIVIDAD_MS = 60_000;
 const MAX_EN_COLA = 500;
 const MAX_POR_LOTE = 100;
+const ESPERA_DEL_PLANO_MS = 2500;
+const UN_DIA_MS = 24 * 3600_000;
+const PLANOS_KEY = 'synkro_activity_layouts';
+
+/** ¿Ya mandó este navegador el plano de esa pantalla en el último día? (el servidor igual lo limita) */
+function planoReciente(pantalla: string): boolean {
+  try {
+    const guardado = JSON.parse(localStorage.getItem(PLANOS_KEY) ?? '{}') as Record<string, number>;
+    return Date.now() - (guardado[pantalla] ?? 0) < UN_DIA_MS;
+  } catch {
+    return false;
+  }
+}
+
+function recordarPlano(pantalla: string) {
+  try {
+    const guardado = JSON.parse(localStorage.getItem(PLANOS_KEY) ?? '{}') as Record<string, number>;
+    guardado[pantalla] = Date.now();
+    localStorage.setItem(PLANOS_KEY, JSON.stringify(guardado));
+  } catch { /* sin almacenamiento: el servidor limita igual */ }
+}
 
 const uuid = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto
   ? crypto.randomUUID()
@@ -79,6 +101,7 @@ export class ActivityTracker {
   private temporizadores: number[] = [];
   private corriendo = false;
   private enviando = false;
+  private planos = new Set<string>();
 
   constructor(
     /** Devuelve el id de la sección visible (dashboard, products, marketplaces…). */
@@ -171,8 +194,31 @@ export class ActivityTracker {
       if (actual !== this.pantalla) {
         this.pantalla = actual;
         this.poner({ t: 'view', screen: actual, at: Date.now() });
+        this.programarPlano(actual);
       }
     } catch { /* ver arriba */ }
+  }
+
+  // ── Plano de la pantalla (para dibujar los mapas de clics sobre su estructura real) ──
+
+  /** Solo en pantallas anchas y una vez por pantalla y día. Se espera un poco a que la pantalla termine de cargar. */
+  private programarPlano(pantalla: string) {
+    if (window.innerWidth < 1024 || this.planos.has(pantalla) || planoReciente(pantalla)) return;
+    this.temporizadores.push(window.setTimeout(() => void this.mandarPlano(pantalla), ESPERA_DEL_PLANO_MS));
+  }
+
+  private async mandarPlano(pantalla: string) {
+    try {
+      // Si ya se fue a otra pantalla o la pestaña no se ve, la estructura leída no sería la de esta pantalla.
+      if (!this.corriendo || this.pantalla !== pantalla || document.visibilityState !== 'visible') return;
+      const raiz = zonaDeContenido();
+      const plano = raiz ? capturarPlano(raiz, seccionVisible(raiz)) : null;
+      if (!plano) return;
+      this.planos.add(pantalla);
+      const res = await activityApi.sendLayout({ screen: pantalla, ...plano });
+      if (res.data?.requiereAviso) { this.stop(); this.alFaltarAviso(); return; }
+      if (!res.error) recordarPlano(pantalla);
+    } catch { /* el rastreo nunca debe afectar a la aplicación */ }
   }
 
   private latir() {

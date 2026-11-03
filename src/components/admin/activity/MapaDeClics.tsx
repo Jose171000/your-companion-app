@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { MousePointerClick } from "lucide-react";
-import { activityAdminApi, ElementoDeMapa, FiltroDeActividad, PantallaConMapa } from "@/lib/activity-admin-api";
+import { activityAdminApi, ElementoDeMapa, FiltroDeActividad, PantallaConMapa, PlanoDePantalla } from "@/lib/activity-admin-api";
 import { nombreDeElemento, nombreDePantalla } from "@/lib/activity-labels";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -10,9 +10,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 const color = (i: number, opacidad = 0.35 + 0.5 * i) => `hsl(${Math.round(50 - 50 * i)} 95% 52% / ${opacidad.toFixed(2)})`;
 
 /**
- * Mapa de clics de una pantalla. La posición de cada elemento se aprendió de los propios clics, así que es un esquema
- * (cada control en el lugar medio donde se tocó), no una captura. Los controles de ventanas emergentes no tienen posición:
- * se listan aparte y cuentan igual.
+ * Mapa de clics de una pantalla, dibujado sobre su plano (la forma de sus bloques: títulos, tablas, tarjetas, botones…,
+ * aprendida de los navegadores, sin ningún texto). Si todavía nadie mandó el plano, se dibuja solo la posición de cada
+ * elemento tocado. Los controles de ventanas emergentes no tienen posición: se listan aparte y cuentan igual.
  */
 export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; pantallas: PantallaConMapa[] }) {
   const [elegida, setElegida] = useState<string>("");
@@ -30,6 +30,18 @@ export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; 
     staleTime: 30_000,
   });
 
+  const planoQ = useQuery({
+    queryKey: ["activity-layout", pantalla],
+    enabled: !!pantalla,
+    queryFn: async () => {
+      const res = await activityAdminApi.layout(pantalla);
+      if (res.error) throw new Error(res.error);
+      return res.data?.plano ?? null;
+    },
+    staleTime: 5 * 60_000,
+  });
+  const plano = planoQ.data ?? null;
+
   const { conPosicion, sinPosicion } = useMemo(() => {
     const todos = data ?? [];
     return {
@@ -42,9 +54,10 @@ export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; 
   // Las posiciones se miden sobre la altura TOTAL de la página; si los clics están todos arriba, el mapa se estira hacia
   // abajo para ocupar el lienzo (es un esquema, no una captura a escala).
   const escala = useMemo(() => {
+    if (plano) return 1; // con el plano, las posiciones son las reales
     const alcance = Math.max(0, ...conPosicion.map((e) => (e.rect?.y ?? 0) + (e.rect?.h ?? 0)));
     return alcance > 0 ? Math.min(8, Math.max(1, 1000 / (alcance * 1.15))) : 1;
-  }, [conPosicion]);
+  }, [conPosicion, plano]);
   // Lo grande se dibuja primero para que lo pequeño (un botón dentro de una tarjeta) quede encima.
   const ordenados = useMemo(
     () => [...conPosicion].sort((a, b) => (b.rect!.w ?? 0) * (b.rect!.h ?? 0) - (a.rect!.w ?? 0) * (a.rect!.h ?? 0)),
@@ -91,13 +104,21 @@ export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; 
           {isLoading ? <Skeleton className="h-72 w-full rounded-xl" /> : (
             <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] gap-5">
               <div>
-                <div className="relative w-full rounded-xl border border-border bg-secondary/20 overflow-hidden" style={{ aspectRatio: "16 / 10" }}>
-                  {!verMapa || conPosicion.length === 0 ? (
-                    <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground">
-                      {verMapa ? "Los clics de esta pantalla fueron en ventanas emergentes o menús: no tienen posición. Mira la lista de al lado." : "Mapa oculto: la lista de al lado muestra lo mismo en orden."}
-                    </div>
-                  ) : ordenados.map((e) => <Cuadro key={e.elemento} e={e} escala={escala} />)}
+                <div className={plano ? "max-h-[640px] overflow-y-auto rounded-xl" : undefined}>
+                  <div className="relative w-full rounded-xl border border-border bg-secondary/20 overflow-hidden" style={{ aspectRatio: plano ? `1 / ${Math.min(3.2, Math.max(0.5, plano.alto / plano.ancho)).toFixed(3)}` : "16 / 10" }}>
+                    {verMapa && plano && <Plano plano={plano} />}
+                    {!verMapa || conPosicion.length === 0 ? (
+                      <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground pointer-events-none">
+                        {!verMapa ? "Mapa oculto: la lista de al lado muestra lo mismo en orden." : "Los clics de esta pantalla fueron en ventanas emergentes o menús: no tienen posición. Mira la lista de al lado."}
+                      </div>
+                    ) : ordenados.map((e) => <Cuadro key={e.elemento} e={e} escala={escala} />)}
+                  </div>
                 </div>
+                {!plano && !planoQ.isLoading && verMapa && (
+                  <p className="text-[11px] text-muted-foreground mt-2">
+                    Todavía no hay plano de esta pantalla: se arma solo cuando alguien la abre desde un computador. Mientras tanto se muestra solo la posición de lo tocado.
+                  </p>
+                )}
                 <div className="flex items-center justify-end gap-2 mt-2 text-[10px] text-muted-foreground">
                   <span>Menos clics</span>
                   {[0.05, 0.3, 0.55, 0.8, 1].map((i) => <span key={i} className="w-5 h-3 rounded-[3px]" style={{ backgroundColor: color(i, 0.8) }} />)}
@@ -123,6 +144,37 @@ export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; 
           )}
         </>
       )}
+    </div>
+  );
+}
+
+const ROTULOS: Partial<Record<PlanoDePantalla["bloques"][number]["k"], string>> = { tabla: "Tabla", grafico: "Gráfico", tarjeta: "Tarjeta", pestanas: "Pestañas" };
+const ESTILO_DE_BLOQUE: Record<PlanoDePantalla["bloques"][number]["k"], string> = {
+  tarjeta: "border border-foreground/10 bg-foreground/[0.03] rounded-md",
+  tabla: "border border-foreground/15 bg-foreground/[0.05] rounded-md",
+  grafico: "border border-dashed border-foreground/20 bg-foreground/[0.04] rounded-md",
+  pestanas: "bg-foreground/10 rounded-full",
+  titulo: "bg-foreground/25 rounded-sm",
+  campo: "border border-foreground/20 bg-background/40 rounded-sm",
+  boton: "bg-foreground/10 rounded-sm",
+  imagen: "bg-foreground/10 rounded-sm",
+};
+
+/** La estructura de la pantalla en gris: lo que hay (tablas, tarjetas, filtros, botones), sin ningún contenido. */
+function Plano({ plano }: { plano: PlanoDePantalla }) {
+  // Lo grande primero para que lo pequeño (un botón dentro de una tarjeta) quede encima.
+  const bloques = useMemo(() => [...plano.bloques].sort((a, b) => b.w * b.h - a.w * a.h), [plano]);
+  return (
+    <div className="absolute inset-0 pointer-events-none" aria-hidden>
+      {bloques.map((b, i) => (
+        <div
+          key={i}
+          className={`absolute overflow-hidden ${ESTILO_DE_BLOQUE[b.k]}`}
+          style={{ left: `${b.x / 10}%`, top: `${b.y / 10}%`, width: `${b.w / 10}%`, height: `${b.h / 10}%` }}
+        >
+          {ROTULOS[b.k] && b.w >= 60 && b.h >= 30 && <span className="block px-1.5 pt-1 text-[9px] leading-none text-foreground/35">{ROTULOS[b.k]}</span>}
+        </div>
+      ))}
     </div>
   );
 }
