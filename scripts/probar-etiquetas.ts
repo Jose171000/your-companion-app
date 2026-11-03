@@ -37,6 +37,10 @@ igual('campo de contraseña', etiquetaDeClic(d({ tag: 'input', type: 'password',
 igual('rango de fechas no usa su texto', etiquetaDeClic(d({ texto: '1 oct - 31 oct 2026' })), 'boton');
 igual('atajo con una cifra es rótulo fijo', etiquetaDeClic(d({ texto: '30 días' })), '30-dias');
 igual('rango con etiqueta accesible fija', etiquetaDeClic(d({ texto: '1 oct - 31 oct 2026', ariaLabel: 'Fechas' })), 'fechas');
+igual('filtro con contador pegado', etiquetaDeClic(d({ texto: 'Cancelados 2' })), 'cancelados');
+igual('contador entre paréntesis', etiquetaDeClic(d({ texto: 'Clientes (12)' })), 'clientes');
+igual('el contador no cambia el nombre', etiquetaDeClic(d({ texto: 'Cancelados 37' })), etiquetaDeClic(d({ texto: 'Cancelados 2' })));
+igual('un número solo se conserva', etiquetaDeClic(d({ texto: '7' })), '7');
 igual('selector', etiquetaDeClic(d({ tag: 'button', role: 'combobox', texto: 'Todos los canales' })), 'todos-los-canales');
 
 igual('pantalla con pestaña', pantallaCompuesta('marketplaces', 'Ventas'), 'marketplaces.ventas');
