@@ -17,6 +17,8 @@ const color = (i: number, opacidad = 0.35 + 0.5 * i) => `hsl(${Math.round(50 - 5
 export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; pantallas: PantallaConMapa[] }) {
   const [elegida, setElegida] = useState<string>("");
   const [verMapa, setVerMapa] = useState(true);
+  const [difusion, setDifusion] = useState(100);
+  const [cifras, setCifras] = useState(true);
   const pantalla = pantallas.some((p) => p.pantalla === elegida) ? elegida : pantallas[0]?.pantalla ?? "";
 
   const { data, isLoading } = useQuery({
@@ -58,11 +60,8 @@ export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; 
     const alcance = Math.max(0, ...conPosicion.map((e) => (e.rect?.y ?? 0) + (e.rect?.h ?? 0)));
     return alcance > 0 ? Math.min(8, Math.max(1, 1000 / (alcance * 1.15))) : 1;
   }, [conPosicion, plano]);
-  // Lo grande se dibuja primero para que lo pequeño (un botón dentro de una tarjeta) quede encima.
-  const ordenados = useMemo(
-    () => [...conPosicion].sort((a, b) => (b.rect!.w ?? 0) * (b.rect!.h ?? 0) - (a.rect!.w ?? 0) * (a.rect!.h ?? 0)),
-    [conPosicion],
-  );
+  // Lo menos tocado se dibuja primero: donde dos zonas se mezclan, manda la más caliente.
+  const ordenados = useMemo(() => [...conPosicion].sort((a, b) => a.intensidad - b.intensidad), [conPosicion]);
 
   return (
     <div className="glass rounded-2xl border border-border dark:border-white/10 p-5 md:p-6 space-y-4">
@@ -111,7 +110,12 @@ export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; 
                       <div className="absolute inset-0 flex items-center justify-center p-6 text-center text-sm text-muted-foreground pointer-events-none">
                         {!verMapa ? "Mapa oculto: la lista de al lado muestra lo mismo en orden." : "Los clics de esta pantalla fueron en ventanas emergentes o menús: no tienen posición. Mira la lista de al lado."}
                       </div>
-                    ) : ordenados.map((e) => <Cuadro key={e.elemento} e={e} escala={escala} />)}
+                    ) : (
+                      <>
+                        {ordenados.map((e) => <Mancha key={e.elemento} e={e} escala={escala} difusion={difusion / 100} />)}
+                        {cifras && ordenados.map((e) => <Cifra key={e.elemento} e={e} escala={escala} />)}
+                      </>
+                    )}
                   </div>
                 </div>
                 {!plano && !planoQ.isLoading && verMapa && (
@@ -119,17 +123,29 @@ export function MapaDeClics({ filtro, pantallas }: { filtro: FiltroDeActividad; 
                     Todavía no hay plano de esta pantalla: se arma solo cuando alguien la abre desde un computador. Mientras tanto se muestra solo la posición de lo tocado.
                   </p>
                 )}
-                <div className="flex items-center justify-end gap-2 mt-2 text-[10px] text-muted-foreground">
-                  <span>Menos clics</span>
-                  {[0.05, 0.3, 0.55, 0.8, 1].map((i) => <span key={i} className="w-5 h-3 rounded-[3px]" style={{ backgroundColor: color(i, 0.8) }} />)}
-                  <span>Más clics</span>
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mt-2 text-[10px] text-muted-foreground">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      Difusión
+                      <input type="range" min={60} max={160} step={1} value={difusion} onChange={(ev) => setDifusion(Number(ev.target.value))} className="w-24 accent-[#FCCB34]" aria-label="Difusión de las zonas de calor" />
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={cifras} onChange={(ev) => setCifras(ev.target.checked)} className="accent-[#FCCB34]" />
+                      Mostrar cifras
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span>Menos clics</span>
+                    <span className="w-36 h-2.5 rounded-full" style={{ background: `linear-gradient(90deg, ${color(0, 0.6)}, ${color(0.5, 0.8)}, ${color(1, 0.95)})` }} />
+                    <span>Más clics</span>
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
                 {ranking.map((e) => (
                   <div key={e.elemento} className="flex items-center gap-2 text-sm">
-                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: color(e.intensidad, 0.9) }} />
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color(e.intensidad, 0.9) }} />
                     <span className="truncate flex-1" title={e.elemento}>{nombreDeElemento(e.elemento)}</span>
                     {!e.rect && <span className="text-[10px] text-muted-foreground">emergente</span>}
                     <span className="text-xs text-muted-foreground tabular-nums">{e.participacion.toLocaleString("es-PE")}%</span>
@@ -179,23 +195,43 @@ function Plano({ plano }: { plano: PlanoDePantalla }) {
   );
 }
 
-function Cuadro({ e, escala }: { e: ElementoDeMapa; escala: number }) {
-  const r = { ...e.rect!, y: e.rect!.y * escala, h: (e.rect!.h ?? 0) * escala };
-  const ancho = Math.max(r.w ?? 0, 18);
-  const alto = Math.max(r.h ?? 0, 26);
+/** Centro de un elemento sobre el lienzo, en porcentaje. */
+function centroDe(e: ElementoDeMapa, escala: number) {
+  const r = e.rect!;
+  const x = (r.x + (r.w ?? 0) / 2) / 10;
+  const y = ((r.y + (r.h ?? 0) / 2) * escala) / 10;
+  return { x: Math.min(100, Math.max(0, x)), y: Math.min(100, Math.max(0, y)) };
+}
+
+/** Zona de calor: una mancha redonda que se desvanece hacia los bordes; crece y enrojece con los clics. */
+function Mancha({ e, escala, difusion }: { e: ElementoDeMapa; escala: number; difusion: number }) {
+  const { x, y } = centroDe(e, escala);
+  const diametro = (14 + 22 * Math.sqrt(e.intensidad)) * difusion; // % del ancho del lienzo
   return (
     <div
-      className="absolute rounded-[5px] border border-black/20 dark:border-white/20 flex items-center justify-center overflow-hidden text-[10px] leading-none text-black/80"
+      className="absolute rounded-full pointer-events-none"
       style={{
-        left: `${Math.min(r.x / 10, 100 - ancho / 10)}%`,
-        top: `${Math.min(r.y / 10, 100 - alto / 10)}%`,
-        width: `${ancho / 10}%`,
-        height: `${alto / 10}%`,
-        backgroundColor: color(e.intensidad),
+        left: `${x}%`,
+        top: `${y}%`,
+        width: `${diametro}%`,
+        aspectRatio: "1 / 1",
+        transform: "translate(-50%, -50%)",
+        background: `radial-gradient(circle, ${color(e.intensidad, 0.9)} 0%, ${color(e.intensidad, 0.45)} 38%, ${color(e.intensidad, 0)} 72%)`,
       }}
+    />
+  );
+}
+
+/** La cifra de clics en el centro de la zona; al pasar el cursor dice qué elemento es. */
+function Cifra({ e, escala }: { e: ElementoDeMapa; escala: number }) {
+  const { x, y } = centroDe(e, escala);
+  return (
+    <span
+      className="absolute -translate-x-1/2 -translate-y-1/2 text-[11px] font-medium leading-none text-black/80 px-1 py-0.5 cursor-default"
+      style={{ left: `${x}%`, top: `${y}%` }}
       title={`${nombreDeElemento(e.elemento)}: ${e.clics} clics · ${e.usuarios} ${e.usuarios === 1 ? "persona" : "personas"} · ${e.participacion.toLocaleString("es-PE")}%`}
     >
-      <span className="px-1 truncate">{ancho >= 90 ? `${nombreDeElemento(e.elemento)} · ${e.clics}` : e.clics}</span>
-    </div>
+      {e.clics}
+    </span>
   );
 }
