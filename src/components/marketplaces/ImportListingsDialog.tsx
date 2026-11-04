@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Download, Loader2 } from "lucide-react";
-import { FalabellaImportSummary, MarketplaceConnection, syncApi } from "@/lib/sync-api";
+import { FalabellaImportSummary, GrupoManual, MarketplaceConnection, syncApi } from "@/lib/sync-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -59,9 +59,11 @@ const motivoCorto = (motivo: string) => {
 
 export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts }: Props) {
   const canal = CANAL[marketplace];
+  // Familias de variantes que la persona estructuró a mano: se agrupan en el mismo paso que la importación.
+  const [manuales, setManuales] = useState<Record<string, GrupoManual>>({});
   const llamar = (dryRun: boolean, id: string, generar = false) =>
     marketplace === "falabella"
-      ? syncApi.importFalabellaListings(dryRun, id)
+      ? syncApi.importFalabellaListings(dryRun, id, dryRun ? [] : Object.values(manuales))
       : marketplace === "mercadolibre"
         ? syncApi.importMeliListings(dryRun, id, generar)
         : syncApi.importChannelListings(marketplace, dryRun, id);
@@ -105,7 +107,9 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
         toast.error(res.error ?? "No se pudo importar");
         return;
       }
-      toast.success(`${canal}: ${res.data.enlazadas} publicaciones importadas`);
+      const agrupadas = res.data.variantes?.manuales;
+      toast.success(`${canal}: ${res.data.enlazadas} publicaciones importadas${agrupadas?.gruposCreados ? ` y ${agrupadas.gruposCreados} ${agrupadas.gruposCreados === 1 ? "familia agrupada" : "familias agrupadas"}` : ""}`);
+      if (agrupadas?.omitidos?.length) toast.error(`No se pudo agrupar: ${agrupadas.omitidos.slice(0, 3).map((o) => `${o.parentSku} (${o.motivo})`).join("; ")}`);
       queryClient.invalidateQueries({ queryKey: ["sync-listings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       onOpenChange(false);
@@ -124,6 +128,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
     if (!open || !accountId) return;
     setPreview(null);
     setError(null);
+    setManuales({});
     setGenerarSku(false);
     setDuplicadasHechas({});
     previewMutation.mutate({ id: accountId, generar: false });
@@ -235,18 +240,29 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
                 )}
                 {preview.variantes.sinResolver.length > 0 && (
                   <div className="text-yellow-400 space-y-0.5">
-                    <p>{preview.variantes.sinResolver.length} grupo(s) no se pudieron armar y se importarán como productos sueltos:</p>
-                    {preview.variantes.sinResolver.slice(0, 8).map((g) => (
-                      <div key={g.parentSku} className="flex items-start justify-between gap-2">
-                        <p>· {g.titulo ? `${g.titulo} (${g.parentSku})` : g.parentSku}{g.skus.length > 0 ? ` (${g.skus.length} fichas)` : ""}: {motivoCorto(g.motivo)}</p>
-                        {g.enlace && (g.fichas?.length ?? 0) < 2 && (
-                          <a href={g.enlace} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-foreground hover:border-primary/50">Abrir en {canal}</a>
-                        )}
-                        {(g.fichas?.length ?? 0) > 1 && (
-                          <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] shrink-0 text-foreground" onClick={() => setManual(g)}>Estructurar</Button>
-                        )}
-                      </div>
-                    ))}
+                    <p>
+                      {preview.variantes.sinResolver.filter((g) => !manuales[g.parentSku]).length > 0
+                        ? `${preview.variantes.sinResolver.filter((g) => !manuales[g.parentSku]).length} grupo(s) no se pudieron armar y se importarán como productos sueltos${Object.keys(manuales).length > 0 ? " (salvo los que ya estructuraste)" : ""}:`
+                        : "Todos los grupos pendientes ya están estructurados y se agruparán al importar:"}
+                    </p>
+                    {preview.variantes.sinResolver.slice(0, 8).map((g) => {
+                      const hecho = manuales[g.parentSku];
+                      return (
+                        <div key={g.parentSku} className="flex items-start justify-between gap-2">
+                          {hecho ? (
+                            <p className="text-green-500">✓ {hecho.name} ({g.parentSku}): {hecho.variants.length} variantes por {hecho.axes.join(" y ")}. Se agrupa al importar.</p>
+                          ) : (
+                            <p>· {g.titulo ? `${g.titulo} (${g.parentSku})` : g.parentSku}{g.skus.length > 0 ? ` (${g.skus.length} fichas)` : ""}: {motivoCorto(g.motivo)}</p>
+                          )}
+                          {g.enlace && (g.fichas?.length ?? 0) < 2 && (
+                            <a href={g.enlace} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-foreground hover:border-primary/50">Abrir en {canal}</a>
+                          )}
+                          {(g.fichas?.length ?? 0) > 1 && (
+                            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] shrink-0 text-foreground" onClick={() => setManual(g)}>{hecho ? "Editar" : "Estructurar"}</Button>
+                          )}
+                        </div>
+                      );
+                    })}
                     {preview.variantes.sinResolver.length > 8 && <p>… y {preview.variantes.sinResolver.length - 8} más</p>}
                   </div>
                 )}
@@ -373,7 +389,9 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
             disabled={!preview || preview.total === 0 || importMutation.isPending}
             onClick={() => importMutation.mutate()}
           >
-            {importMutation.isPending ? "Importando…" : `Importar ${preview?.total ?? ""}`.trim()}
+            {importMutation.isPending
+              ? "Importando…"
+              : `Importar ${preview?.total ?? ""}${Object.keys(manuales).length > 0 ? ` y agrupar ${Object.keys(manuales).length} ${Object.keys(manuales).length === 1 ? "familia" : "familias"}` : ""}`.trim()}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -397,12 +415,13 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-    <ManualVariantsDialog familia={manual} onClose={() => setManual(null)} onDone={() => {
-      // La familia ya quedó agrupada: sale de la lista al instante y la vista previa se vuelve a calcular en segundo plano.
-      const agrupada = manual?.parentSku;
-      setPreview((p) => (p?.variantes ? { ...p, variantes: { ...p.variantes, sinResolver: p.variantes.sinResolver.filter((g) => g.parentSku !== agrupada), yaAgrupadas: (p.variantes.yaAgrupadas ?? 0) + 1 } } : p));
-      if (accountId) previewMutation.mutate({ id: accountId, generar: generarSku });
-    }} />
+    <ManualVariantsDialog
+      familia={manual}
+      guardado={manual ? manuales[manual.parentSku] ?? null : null}
+      onClose={() => setManual(null)}
+      // La estructura queda anotada para esta familia; los productos se crean y se agrupan al pulsar «Importar».
+      onGuardar={(grupo) => setManuales((m) => ({ ...m, [grupo.parentSku]: grupo }))}
+    />
     </>
   );
 }

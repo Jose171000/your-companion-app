@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-import { FalabellaImportSummary, syncApi } from "@/lib/sync-api";
+import { FalabellaImportSummary, GrupoManual } from "@/lib/sync-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,14 +9,19 @@ type Familia = NonNullable<NonNullable<FalabellaImportSummary["variantes"]>["sin
 
 interface Props {
   familia: Familia | null;
+  /** Lo que la persona ya estructuró de esta familia (para editarlo), si lo hay. */
+  guardado?: GrupoManual | null;
   onClose: () => void;
-  /** Tras agrupar, para volver a leer la vista previa. */
-  onDone: () => void;
+  /** Al pulsar «Agrupar»: la estructura queda anotada y se aplica en la importación, junto con la creación de los productos. */
+  onGuardar: (grupo: GrupoManual) => void;
 }
 
-/** Último recurso: la persona define el nombre, los ejes y el valor de cada SKU. La IA, si propuso algo, lo deja prellenado. */
-export function ManualVariantsDialog({ familia, onClose, onDone }: Props) {
-  const queryClient = useQueryClient();
+/**
+ * Último recurso: la persona define el nombre, los ejes y el valor de cada SKU. La IA, si propuso algo, lo deja prellenado.
+ * Los productos todavía no existen en la tienda (la importación los crea), así que aquí no se guarda nada en el servidor: se anota
+ * la estructura y se agrupa en el mismo paso que la importación.
+ */
+export function ManualVariantsDialog({ familia, guardado, onClose, onGuardar }: Props) {
   const [nombre, setNombre] = useState("");
   const [ejes, setEjes] = useState<string[]>(["Color"]);
   const [valores, setValores] = useState<Record<string, Record<string, string>>>({});
@@ -27,36 +30,35 @@ export function ManualVariantsDialog({ familia, onClose, onDone }: Props) {
 
   useEffect(() => {
     if (!familia) return;
+    if (guardado) {
+      setNombre(guardado.name);
+      setEjes(guardado.axes);
+      setValores(Object.fromEntries(guardado.variants.map((v) => [v.sellerSku, v.values])));
+      return;
+    }
     setNombre(familia.fichas?.[0]?.nombre ?? familia.parentSku);
     const sugeridos = familia.sugerencia?.ejes?.filter(Boolean) ?? [];
     setEjes(sugeridos.length ? sugeridos.slice(0, 3) : ["Color"]);
     setValores(familia.sugerencia?.valores ?? {});
-  }, [familia]);
-
-  const guardar = useMutation({
-    mutationFn: () =>
-      syncApi.groupFalabellaVariants({
-        parentSku: familia!.parentSku,
-        name: nombre.trim(),
-        axes: ejes.map((e) => e.trim()),
-        variants: fichas.map((f) => ({ sellerSku: f.sku, values: Object.fromEntries(ejes.map((e) => [e.trim(), (valores[f.sku]?.[e] ?? "").trim()])) })),
-      }),
-    onSuccess: (res) => {
-      if (res.error) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success("Variantes agrupadas");
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["sync-listings"] });
-      onDone();
-      onClose();
-    },
-    onError: () => toast.error("No se pudo agrupar. Inténtalo de nuevo."),
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [familia, guardado]);
 
   const ejesValidos = ejes.every((e) => e.trim()) && new Set(ejes.map((e) => e.trim().toLowerCase())).size === ejes.length;
   const completo = ejesValidos && !!nombre.trim() && fichas.every((f) => ejes.every((e) => (valores[f.sku]?.[e] ?? "").trim()));
+  // Dos variantes con la misma combinación de valores no se distinguirían: se avisa antes de anotar.
+  const combinaciones = fichas.map((f) => ejes.map((e) => (valores[f.sku]?.[e] ?? "").trim().toLowerCase()).join("|"));
+  const repetida = completo && new Set(combinaciones).size !== combinaciones.length;
+
+  const agrupar = () => {
+    if (!familia || !completo || repetida) return;
+    onGuardar({
+      parentSku: familia.parentSku,
+      name: nombre.trim(),
+      axes: ejes.map((e) => e.trim()),
+      variants: fichas.map((f) => ({ sellerSku: f.sku, values: Object.fromEntries(ejes.map((e) => [e.trim(), (valores[f.sku]?.[e] ?? "").trim()])) })),
+    });
+    onClose();
+  };
 
   const cambiarEje = (i: number, nuevo: string) => {
     const anterior = ejes[i];
@@ -66,12 +68,12 @@ export function ManualVariantsDialog({ familia, onClose, onDone }: Props) {
   };
 
   return (
-    <Dialog open={!!familia} onOpenChange={(abierto) => !abierto && !guardar.isPending && onClose()}>
+    <Dialog open={!!familia} onOpenChange={(abierto) => !abierto && onClose()}>
       <DialogContent className="sm:max-w-[760px] max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Estructurar variantes</DialogTitle>
           <DialogDescription>
-            Familia {familia?.parentSku}: {fichas.length} productos. Define en qué se diferencian y el valor de cada uno. Las fotos, el precio y el stock de cada variante no cambian.
+            Familia {familia?.parentSku}: {fichas.length} productos. Define en qué se diferencian y el valor de cada uno. Las fotos, el precio y el stock de cada variante no cambian. Se agruparán al importar: no hace falta importar primero.
           </DialogDescription>
         </DialogHeader>
 
@@ -140,10 +142,9 @@ export function ManualVariantsDialog({ familia, onClose, onDone }: Props) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={guardar.isPending}>Cancelar</Button>
-          <Button onClick={() => guardar.mutate()} disabled={!completo || guardar.isPending}>
-            {guardar.isPending ? "Agrupando…" : "Agrupar"}
-          </Button>
+          {repetida && <p className="text-xs text-red-400 mr-auto self-center">Dos variantes tienen la misma combinación: cada una debe ser distinta.</p>}
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={agrupar} disabled={!completo || repetida}>Agrupar</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

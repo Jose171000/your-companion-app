@@ -375,7 +375,17 @@ export interface FalabellaImportSummary {
     /** Familias que ya estaban agrupadas en Synkro: no se vuelven a proponer */
     yaAgrupadas?: number;
     aplicado: { gruposCreados: number; gruposActualizados: number; variantesAgrupadas: number; omitidos: { parentSku: string; motivo: string }[] } | null;
+    /** Familias estructuradas a mano en la vista previa que se agruparon en esta misma importación */
+    manuales?: { gruposCreados: number; gruposActualizados: number; variantesAgrupadas: number; omitidos: { parentSku: string; motivo: string }[] } | null;
   };
+}
+
+/** Una familia de variantes que la persona estructuró a mano: nombre, ejes y el valor de cada SKU. */
+export interface GrupoManual {
+  parentSku: string;
+  name: string;
+  axes: string[];
+  variants: { sellerSku: string; values: Record<string, string> }[];
 }
 
 /** Una variante de Yavendió y el producto de Synkro con el que parece corresponder. */
@@ -490,10 +500,10 @@ export const syncApi = {
     ),
 
   /** Trae las publicaciones que ya existen en Falabella. Con dryRun solo informa qué pasaría. */
-  importFalabellaListings: (dryRun: boolean, connectionId?: string) =>
+  importFalabellaListings: (dryRun: boolean, connectionId?: string, gruposManuales: GrupoManual[] = []) =>
     apiRequest<FalabellaImportSummary>(
       `/sync/falabella/listings/import?dryRun=${dryRun}${connectionId ? `&connectionId=${connectionId}` : ''}`,
-      { method: 'POST' },
+      { method: 'POST', ...(gruposManuales.length ? { body: JSON.stringify({ gruposManuales }) } : {}) },
     ),
 
   /** Importa (o previsualiza) las publicaciones de una cuenta de Mercado Libre, enlazadas por SKU. */
