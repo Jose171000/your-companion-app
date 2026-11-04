@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
-const NOMBRE_CANAL: Record<string, string> = { falabella: "Falabella", mercadolibre: "Mercado Libre", woocommerce: "WooCommerce", shopify: "Shopify" };
+const NOMBRE_CANAL: Record<string, string> = { falabella: "Falabella", mercadolibre: "Mercado Libre", woocommerce: "WooCommerce", shopify: "Shopify", ripley: "Ripley" };
 
 const ESTADO: Record<string, { texto: string; clase: string }> = {
   published: { texto: "Publicado", clase: "bg-green-500/10 text-green-500" },

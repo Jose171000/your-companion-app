@@ -21,7 +21,7 @@ import { EstadoDeLaVenta, ShipByBadge, StockCell, fmtDate } from "./SaleParts";
 
 const PAGE = 50;
 /** Canales de los que se leen ventas. */
-const VENTA_CHANNELS = ["falabella", "mercadolibre", "woocommerce", "shopify"];
+const VENTA_CHANNELS = ["falabella", "mercadolibre", "woocommerce", "shopify", "ripley"];
 
 interface Row {
   sale: Sale;

@@ -23,7 +23,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Canal desde el que se importa */
-  marketplace: "falabella" | "mercadolibre" | "woocommerce" | "shopify";
+  marketplace: "falabella" | "mercadolibre" | "woocommerce" | "shopify" | "ripley";
   /** Las cuentas de ese canal en la tienda activa */
   accounts: MarketplaceConnection[];
 }
@@ -33,6 +33,7 @@ const CANAL = {
   mercadolibre: "Mercado Libre",
   woocommerce: "WooCommerce",
   shopify: "Shopify",
+  ripley: "Ripley",
 };
 
 const ESTADOS: Record<string, string> = {

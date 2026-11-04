@@ -468,8 +468,15 @@ export const syncApi = {
       body: JSON.stringify({ shop, accessToken, ...(label?.trim() ? { label: label.trim() } : {}) }),
     }),
 
-  /** Trae los productos que ya existen en WooCommerce o Shopify. Con dryRun solo informa qué pasaría. */
-  importChannelListings: (marketplace: 'woocommerce' | 'shopify', dryRun: boolean, connectionId?: string) =>
+  /** Conecta Mercado Ripley (Mirakl) con la clave de API de la tienda; la dirección vacía es la de Perú. */
+  connectRipley: (apiKey: string, site?: string, label?: string) =>
+    apiRequest<{ marketplace: string; nickname: string }>('/sync/ripley/connect', {
+      method: 'POST',
+      body: JSON.stringify({ apiKey, ...(site?.trim() ? { site: site.trim() } : {}), ...(label?.trim() ? { label: label.trim() } : {}) }),
+    }),
+
+  /** Trae los productos que ya existen en WooCommerce, Shopify o Ripley. Con dryRun solo informa qué pasaría. */
+  importChannelListings: (marketplace: 'woocommerce' | 'shopify' | 'ripley', dryRun: boolean, connectionId?: string) =>
     apiRequest<FalabellaImportSummary>(
       `/sync/channels/${marketplace}/listings/import?dryRun=${dryRun}${connectionId ? `&connectionId=${connectionId}` : ''}`,
       { method: 'POST' },

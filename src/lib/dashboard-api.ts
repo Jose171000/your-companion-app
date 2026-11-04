@@ -242,6 +242,7 @@ export const MARKETPLACE_LABEL: Record<string, string> = {
   shopify: 'Shopify',
   woocommerce: 'WooCommerce',
   amazon: 'Amazon',
+  ripley: 'Ripley',
 };
 
 /** Importe en la moneda del plan (soles por defecto). */
