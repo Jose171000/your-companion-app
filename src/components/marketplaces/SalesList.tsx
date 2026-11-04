@@ -343,7 +343,7 @@ export function SalesList({ accounts, canImport, canDownload, canImportHistory }
         </>
       )}
 
-      <OrderDetailSheet sale={selected} onClose={() => setSelected(null)} />
+      <OrderDetailSheet sale={selected} onClose={() => setSelected(null)} canRestock={canImport} />
       {canImport && <ManualSaleDialog open={manualOpen} onOpenChange={setManualOpen} />}
       {canImportHistory && (
         <ImportHistoryDialog

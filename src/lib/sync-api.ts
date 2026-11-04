@@ -96,6 +96,10 @@ export interface SaleLine {
   /** Stock que había antes y el que quedó después de esta venta */
   stockBefore?: number | null;
   stockAfter?: number | null;
+  /** La venta se canceló o devolvió y esta línea ya devolvió su stock */
+  repuesto?: boolean | null;
+  /** La venta se canceló o devolvió después de enviarse: el stock espera a que el producto vuelva */
+  porReponer?: boolean | null;
   /** Stock de ahora y foto del producto (null si ya no está en el catálogo) */
   currentStock: number | null;
   imageUrl: string | null;
@@ -709,6 +713,10 @@ export const syncApi = {
     apiRequest<ManualSalesResult>(`/sync/orders/manual/${id}`, { method: 'PUT', body: JSON.stringify({ filas }) }),
 
   /** Elimina una venta manual y devuelve al stock lo que descontó */
+  /** Confirma que el producto de una venta cancelada o devuelta ya volvió al almacén: repone su stock */
+  restockSale: (id: string) =>
+    apiRequest<{ repuestas: number }>(`/sync/orders/${id}/restock`, { method: 'POST' }),
+
   deleteManualSale: (id: string) =>
     apiRequest<{ eliminada: boolean }>(`/sync/orders/manual/${id}`, { method: 'DELETE' }),
 

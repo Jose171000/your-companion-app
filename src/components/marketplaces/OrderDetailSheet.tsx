@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowRight, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ArrowRight, Loader2, PackageCheck, Pencil, Trash2 } from "lucide-react";
 import { Sale, syncApi } from "@/lib/sync-api";
 import { useStores } from "@/contexts/StoreContext";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,8 @@ import { ShipByBadge, EstadoDeLaVenta, StockCell, fmtDate } from "./SaleParts";
 interface Props {
   sale: Sale | null;
   onClose: () => void;
+  /** Quien puede registrar ventas también confirma que un producto devuelto ya volvió al almacén. */
+  canRestock?: boolean;
 }
 
 const Dato = ({ label, value }: { label: string; value: React.ReactNode }) => (
@@ -36,12 +38,13 @@ const Bloque = ({ titulo, children }: { titulo: string; children: React.ReactNod
 );
 
 /** Panel con todo lo que se sabe de una venta: cliente, envío, pago y productos. */
-export function OrderDetailSheet({ sale, onClose }: Props) {
+export function OrderDetailSheet({ sale, onClose, canRestock }: Props) {
   const { activeStore } = useStores();
   const queryClient = useQueryClient();
   const [editando, setEditando] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
+  const [reponiendo, setReponiendo] = useState(false);
   // El listado ya trae lo básico: se muestra al instante y el detalle completo llega después.
   const { data, isFetching } = useQuery({
     queryKey: ["sync-order", activeStore?.id, sale?.id],
@@ -71,6 +74,16 @@ export function OrderDetailSheet({ sale, onClose }: Props) {
     setConfirmando(false);
     onClose();
   };
+  const porReponer = !!s?.lines.some((l) => l.porReponer && !l.repuesto);
+  const reponer = async () => {
+    if (!s) return;
+    setReponiendo(true);
+    const res = await syncApi.restockSale(s.id);
+    setReponiendo(false);
+    if (res.error) { toast.error(res.error); return; }
+    toast.success("Stock repuesto");
+    for (const k of ["sync-orders", "sync-order", "sales-report", "dashboard-summary", "products"]) queryClient.invalidateQueries({ queryKey: [k] });
+  };
   const direccion = dir ? [dir.line, dir.city, dir.region, dir.postalCode, dir.country].filter(Boolean).join(", ") : "";
 
   return (
@@ -94,6 +107,21 @@ export function OrderDetailSheet({ sale, onClose }: Props) {
               <span className="text-xs text-muted-foreground">Enviar antes de</span>
               <ShipByBadge sale={s} />
             </div>
+
+            {porReponer && (
+              <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+                <p className="text-sm">
+                  Esta venta {s.saleState === "devuelto" ? "se devolvió" : "se canceló"} después de enviarse, así que el stock <strong>aún no volvió</strong>.
+                  Cuando el producto llegue al almacén, confírmalo para sumarlo al stock y avisar a tus canales.
+                </p>
+                {canRestock && (
+                  <Button size="sm" className="gap-1.5" onClick={reponer} disabled={reponiendo}>
+                    {reponiendo ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PackageCheck className="w-3.5 h-3.5" />}
+                    Ya llegó: reponer stock
+                  </Button>
+                )}
+              </div>
+            )}
 
             {s.manualEdit && (
               <div className="flex flex-wrap items-center gap-2">
@@ -158,6 +186,8 @@ export function OrderDetailSheet({ sale, onClose }: Props) {
                       <StockCell value={l.currentStock} low />
                     </div>
                   </div>
+                  {l.repuesto && <p className="text-xs text-emerald-500">Stock repuesto: las {l.quantity} unidades volvieron al producto.</p>}
+                  {l.porReponer && !l.repuesto && <p className="text-xs text-amber-500">Stock por reponer: espera a que el producto vuelva.</p>}
                   {(l.trackingCode || l.carrier || l.shippingAmount != null) && (
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                       {l.carrier && <Dato label="Transportista" value={l.carrier} />}
