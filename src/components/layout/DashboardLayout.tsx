@@ -16,6 +16,8 @@ import { NavigationGuardDialog } from "./NavigationGuardDialog";
 import { ActivityTracker } from "@/components/activity/ActivityTracker";
 import { useStores } from "@/contexts/StoreContext";
 import { Construction, Lock } from "lucide-react";
+import { toast } from "sonner";
+import { alPedirDestino, descartarDestino } from "@/lib/aviso-destino";
 
 // ─── Page metadata ────────────────────────────────────────────────────────────
 
@@ -75,7 +77,7 @@ function DashboardContent() {
   // El contador entra a la misma sección, que ya se recorta por su rol
   const canSeeAdmin    = isAdmin || isAccountant;
   const allowed        = user?.allowedSections;
-  const { activeStore, can } = useStores();
+  const { stores, activeStore, can, setActiveStore } = useStores();
   /**
    * Lo que permite el rol de la persona en la tienda activa: «ver» también es un permiso, así que un rol sin «ver analíticas» no
    * ve esa sección, y quien no puede crear productos no ve «IA Productos». Mientras no hay tienda cargada no se oculta nada.
@@ -132,7 +134,23 @@ function DashboardContent() {
   const handleGuardStay = () => {
     setGuardOpen(false);
     setPendingSection(null);
+    descartarDestino();
   };
+
+  // Clic en un aviso de la campana: cambia a la tienda del aviso y abre su sección (cada pantalla recoge su producto o su venta).
+  useEffect(() => {
+    return alPedirDestino(({ storeId, seccion }) => {
+      if (storeId && storeId !== activeStore?.id) {
+        if (!stores.some((s) => s.id === storeId)) {
+          toast.error("Ese aviso es de una tienda a la que ya no tienes acceso.");
+          descartarDestino();
+          return;
+        }
+        setActiveStore(storeId);
+      }
+      if (seccion) handleSectionChange(seccion);
+    });
+  }, [stores, activeStore?.id, setActiveStore, handleSectionChange]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (

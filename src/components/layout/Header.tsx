@@ -35,6 +35,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { ProfileDialog } from "./ProfileDialog";
+import { destinoDe, pedirDestino } from "@/lib/aviso-destino";
 import {
   AppNotification,
   notificationsApi,
@@ -109,6 +110,15 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton }: HeaderP
 
   const markAllRead = () => markAllReadMutation.mutate();
   const dismissNotif = (id: string) => dismissMutation.mutate(id);
+
+  // El clic en un aviso lo marca como leído y lleva a su tienda, su sección y, si lo hay, su producto o su venta.
+  const abrirAviso = (notif: AppNotification) => {
+    if (!notif.read) markReadMutation.mutate(notif.id);
+    const destino = destinoDe(notif);
+    if (!destino.storeId && !destino.seccion) return;
+    setNotifOpen(false);
+    pedirDestino(destino);
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -206,10 +216,10 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton }: HeaderP
                     {notifications.map((notif) => (
                       <div
                         key={notif.id}
-                        onClick={() => !notif.read && markReadMutation.mutate(notif.id)}
+                        onClick={() => abrirAviso(notif)}
                         className={cn(
-                          "flex gap-3 px-4 py-3 hover:bg-secondary/30 transition-colors group",
-                          !notif.read && "bg-primary/5 cursor-pointer"
+                          "flex gap-3 px-4 py-3 hover:bg-secondary/30 transition-colors group cursor-pointer",
+                          !notif.read && "bg-primary/5"
                         )}
                       >
                         {/* Icon */}
@@ -239,6 +249,7 @@ export function Header({ title, subtitle, onMenuClick, showMenuButton }: HeaderP
                             {notif.body}
                           </p>
                           <p className="text-[10px] text-muted-foreground/60 mt-1.5">
+                            {notif.store?.name && <span className="font-medium text-muted-foreground">{notif.store.name} · </span>}
                             {tiempoRelativo(notif.createdAt)}
                             {notif.marketplace && ` · ${notif.marketplace}`}
                           </p>

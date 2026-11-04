@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useDestinoPendiente } from "@/lib/aviso-destino";
 import { Download, History, Loader2, Plus, Search, ShoppingBag } from "lucide-react";
 import { MarketplaceConnection, Sale, SaleLine, syncApi } from "@/lib/sync-api";
 import { useStores } from "@/contexts/StoreContext";
@@ -56,6 +57,20 @@ export function SalesList({ accounts, canImport, canDownload, canImportHistory }
   const [estados, setEstados] = useState<SaleState[]>([]);
   const [envio, setEnvio] = useState("all");
   const [selected, setSelected] = useState<Sale | null>(null);
+
+  // Clic en un aviso de venta: busca esa venta y abre su detalle, como si se hubiera tocado su fila.
+  useDestinoPendiente("sales", async ({ orderId, marketplace, desde }) => {
+    const dia = (t: number) => new Date(t).toISOString().slice(0, 10);
+    const t0 = new Date(desde).getTime() || Date.now();
+    const res = await syncApi.getSales({ from: dia(t0 - 14 * 86_400_000), to: dia(Date.now() + 86_400_000), marketplace, search: orderId, limit: 20 });
+    const filas = res.data?.items ?? [];
+    const venta = filas.find((v) => v.externalId === orderId || v.externalId.endsWith(`:${orderId}`) || v.orderNumber === orderId) ?? filas[0];
+    if (venta) setSelected(venta);
+    else {
+      setSearchInput(orderId);
+      toast.error("No se encontró esa venta en los últimos días. Se dejó el número en el buscador.");
+    }
+  });
 
   // La búsqueda espera a que se deje de escribir: una consulta por tecla sobra.
   useEffect(() => {

@@ -18,6 +18,8 @@ export interface AppNotification {
   title: string;
   body: string;
   marketplace?: string;
+  /** La tienda a la que corresponde el aviso (nulo en avisos de la plataforma). */
+  store?: { id: string; name: string } | null;
   meta?: Record<string, unknown>;
   read: boolean;
   createdAt: string;

@@ -7,6 +7,7 @@ import { ConnectFalabellaDialog } from "./ConnectFalabellaDialog";
 import { ConnectWooCommerceDialog } from "./ConnectWooCommerceDialog";
 import { ConnectShopifyDialog } from "./ConnectShopifyDialog";
 import { ConnectRipleyDialog } from "./ConnectRipleyDialog";
+import { useDestinoPendiente } from "@/lib/aviso-destino";
 import { ListingsTable } from "./ListingsTable";
 import { InventoryBoard } from "./InventoryBoard";
 import { ImportListingsDialog } from "./ImportListingsDialog";
@@ -69,6 +70,8 @@ export function MarketplacesModule() {
   const verVentas = can("ventas.ver");
   const pestanasPermitidas = [...(verCanales ? ["canales", "tablero"] : []), ...(verVentas ? ["ventas"] : []), ...(verCanales ? ["revision"] : [])];
   const [pestana, setPestana] = useState("canales");
+  // Clic en un aviso de la campana: abre la pestaña que corresponde.
+  useDestinoPendiente("marketplaces", (p) => setPestana(p.pestana));
   useEffect(() => {
     if (activeStore && pestanasPermitidas.length && !pestanasPermitidas.includes(pestana)) setPestana(pestanasPermitidas[0]);
   }, [activeStore, pestana, pestanasPermitidas.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps

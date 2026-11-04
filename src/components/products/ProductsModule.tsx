@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useStores } from "@/contexts/StoreContext";
+import { useDestinoPendiente } from "@/lib/aviso-destino";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productsApi, Product, ProductsQueryParams } from "@/lib/products-api";
 import { ProductsToolbar } from "./ProductsToolbar";
@@ -37,6 +38,13 @@ export function ProductsModule() {
   const [regenTarget, setRegenTarget]   = useState<Product | null>(null);
   const [publishTarget, setPublishTarget] = useState<Product | null>(null);
   const [sheetTarget, setSheetTarget] = useState<Product | null>(null);
+
+  // Clic en un aviso de la campana: abre la ficha del producto.
+  useDestinoPendiente("products", async ({ productId }) => {
+    const res = await productsApi.findOne(productId);
+    if (res.error || !res.data) toast.error("No se encontró ese producto: quizá ya no existe o no tienes acceso.");
+    else setSheetTarget(res.data);
+  });
   const [falabellaTarget, setFalabellaTarget] = useState<Product | null>(null);
 
   // ── Query ─────────────────────────────────────────────────────────────────
