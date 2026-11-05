@@ -66,7 +66,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
       ? syncApi.importFalabellaListings(dryRun, id, dryRun ? [] : Object.values(manuales))
       : marketplace === "mercadolibre"
         ? syncApi.importMeliListings(dryRun, id, generar)
-        : syncApi.importChannelListings(marketplace, dryRun, id);
+        : syncApi.importChannelListings(marketplace, dryRun, id, dryRun ? [] : Object.values(manuales));
   const queryClient = useQueryClient();
   const [accountId, setAccountId] = useState<string>("");
   // Mercado Libre: lo que no tiene SKU no se importa; solo si la persona lo pide, Synkro le da uno propio.
@@ -107,9 +107,12 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
         toast.error(res.error ?? "No se pudo importar");
         return;
       }
-      const agrupadas = res.data.variantes?.manuales;
-      toast.success(`${canal}: ${res.data.enlazadas} publicaciones importadas${agrupadas?.gruposCreados ? ` y ${agrupadas.gruposCreados} ${agrupadas.gruposCreados === 1 ? "familia agrupada" : "familias agrupadas"}` : ""}`);
-      if (agrupadas?.omitidos?.length) toast.error(`No se pudo agrupar: ${agrupadas.omitidos.slice(0, 3).map((o) => `${o.parentSku} (${o.motivo})`).join("; ")}`);
+      // Las familias que Synkro armó solo (Ripley) y las que la persona estructuró a mano.
+      const hechas = [res.data.variantes?.aplicado, res.data.variantes?.manuales];
+      const familias = hechas.reduce((n, h) => n + (h?.gruposCreados ?? 0) + (h?.gruposActualizados ?? 0), 0);
+      const omitidos = hechas.flatMap((h) => h?.omitidos ?? []);
+      toast.success(`${canal}: ${res.data.enlazadas} publicaciones importadas${familias ? ` y ${familias} ${familias === 1 ? "familia agrupada" : "familias agrupadas"}` : ""}`);
+      if (omitidos.length) toast.error(`No se pudo agrupar: ${omitidos.slice(0, 3).map((o) => `${o.parentSku} (${o.motivo})`).join("; ")}`);
       queryClient.invalidateQueries({ queryKey: ["sync-listings"] });
       queryClient.invalidateQueries({ queryKey: ["products"] });
       onOpenChange(false);

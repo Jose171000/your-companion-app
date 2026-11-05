@@ -490,10 +490,10 @@ export const syncApi = {
     }),
 
   /** Trae los productos que ya existen en WooCommerce, Shopify o Ripley. Con dryRun solo informa qué pasaría. */
-  importChannelListings: (marketplace: 'woocommerce' | 'shopify' | 'ripley', dryRun: boolean, connectionId?: string) =>
+  importChannelListings: (marketplace: 'woocommerce' | 'shopify' | 'ripley', dryRun: boolean, connectionId?: string, gruposManuales: GrupoManual[] = []) =>
     apiRequest<FalabellaImportSummary>(
       `/sync/channels/${marketplace}/listings/import?dryRun=${dryRun}${connectionId ? `&connectionId=${connectionId}` : ''}`,
-      { method: 'POST' },
+      { method: 'POST', ...(gruposManuales.length ? { body: JSON.stringify({ gruposManuales }) } : {}) },
     ),
 
   /** Agrupa a mano productos ya importados como variantes: nombre, ejes y valor de cada SKU. */
