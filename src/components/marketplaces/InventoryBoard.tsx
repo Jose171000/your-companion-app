@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
-import { AlertCircle, ChevronDown, ChevronRight, Clock, FileText, LayoutGrid, List, MoreVertical, Pause, Pencil, Play, Power, Search, Trash2 } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { AlertCircle, ChevronDown, ChevronRight, Clock, FileText, LayoutGrid, List, MoreVertical, Pause, Pencil, Play, Power, RotateCw, Search, Trash2 } from "lucide-react";
 import { Product } from "@/lib/products-api";
 import { ProductSheetDialog } from "@/components/products/ProductSheetDialog";
-import { ChangeRequest, ChannelActionType, UserListing } from "@/lib/sync-api";
+import { ChangeRequest, ChannelActionType, UserListing, syncApi } from "@/lib/sync-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -250,10 +252,23 @@ function AllChannelsMenu({ channels, onAction }: { channels: ChannelCell[]; onAc
   );
 }
 
-function ChannelChip({ cell, canEdit, onAction }: { cell: ChannelCell; canEdit: boolean; onAction: OnChannelAction }) {
+function ChannelChip({ cell, canEdit, canResend, onAction }: { cell: ChannelCell; canEdit: boolean; canResend: boolean; onAction: OnChannelAction }) {
   const { listing: l } = cell;
   const estado = estadoVisible(l);
   const drift = estado === "published" && (cell.priceDrift || cell.stockDrift);
+  const queryClient = useQueryClient();
+  // El canal tiene un stock distinto al de Synkro: se puede volver a mandar el de Synkro a ESTA cuenta (Ripley todavía no recibe stock).
+  const puedeReenviar = canResend && estado === "published" && cell.stockDrift && l.lastStockSynced != null && l.marketplace !== "ripley";
+  const reenviar = useMutation({
+    mutationFn: () => syncApi.resendListingStock(l.id),
+    onSuccess: (res) => {
+      if (res.error) { toast.error(res.error); return; }
+      toast.success(res.data?.message ?? "Reenvío programado");
+      queryClient.invalidateQueries({ queryKey: ["sync-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["sync-change-requests"] });
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
   const chip = (
     <div
       className={cn(
@@ -278,10 +293,22 @@ function ChannelChip({ cell, canEdit, onAction }: { cell: ChannelCell; canEdit: 
         <ChannelPrice listing={l} />
         <span>{l.lastStockSynced ?? "—"} u.</span>
       </div>
+      {puedeReenviar && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 w-full gap-1 px-2 text-[11px] text-foreground"
+          disabled={reenviar.isPending}
+          onClick={(e) => { e.stopPropagation(); reenviar.mutate(); }}
+          title={`El canal tiene ${l.lastStockSynced} u. y Synkro tiene ${l.stock} u.`}
+        >
+          <RotateCw className={cn("w-3 h-3", reenviar.isPending && "animate-spin")} /> Reenviar {l.stock} u.
+        </Button>
+      )}
     </div>
   );
 
-  const note = l.lastError || (drift ? "El canal aún no tiene el último precio o stock de Synkro." : null);
+  const note = l.lastError || (drift ? (cell.stockDrift ? `El canal tiene ${l.lastStockSynced ?? "—"} u. y Synkro tiene ${l.stock} u.` : "El canal aún no tiene el último precio o stock de Synkro.") : null);
   if (!note) return chip;
   return (
     <TooltipProvider>
@@ -352,7 +379,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
                 </div>
                 <div className="flex flex-wrap gap-2 flex-1">
                   {r.channels.map((c) => (
-                    <ChannelChip key={c.listing.id} cell={c} canEdit={canPublish} onAction={askChannelAction(r)} />
+                    <ChannelChip key={c.listing.id} cell={c} canEdit={canPublish} canResend={canEdit} onAction={askChannelAction(r)} />
                   ))}
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -399,7 +426,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {r.channels.map((c) => (
-                    <ChannelChip key={c.listing.id} cell={c} canEdit={canPublish} onAction={askChannelAction(r)} />
+                    <ChannelChip key={c.listing.id} cell={c} canEdit={canPublish} canResend={canEdit} onAction={askChannelAction(r)} />
                   ))}
                 </div>
                 {canPublish && <div className="flex justify-end"><AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} /></div>}

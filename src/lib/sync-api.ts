@@ -633,6 +633,10 @@ export const syncApi = {
       body: JSON.stringify({ marketplaces, ...(connectionIds ? { connectionIds } : {}) }),
     }),
 
+  /** El canal quedó con otro stock que Synkro: vuelve a mandar a ESA cuenta el de Synkro (con el modo revisión, queda como solicitud) */
+  resendListingStock: (listingId: string) =>
+    apiRequest<{ message: string; pending?: number }>(`/sync/listings/${listingId}/resend-stock`, { method: 'POST' }),
+
   /** Actualiza stock/precio local y lo sincroniza con los canales publicados */
   updateInventory: (productId: string, dto: UpdateInventoryDto) =>
     apiRequest<{ message: string; pending?: number }>(`/sync/products/${productId}/inventory`, {
