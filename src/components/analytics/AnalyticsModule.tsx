@@ -3,7 +3,10 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 import { toast } from "sonner";
 import { useStores } from "@/contexts/StoreContext";
 import { syncApi } from "@/lib/sync-api";
-import { reportsApi } from "@/lib/admin-api";
+import { reportsApi, type OrdenDeGanadores } from "@/lib/admin-api";
+import { ProductosGanadores } from "./ProductosGanadores";
+import { pedirDestino } from "@/lib/aviso-destino";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { EmbeddedReport } from "./EmbeddedReport";
 import { DateRangeFilter, useRangoDeFechas } from "@/components/common/DateRangeFilter";
 import { SaleStatusFilter } from "@/components/common/SaleStatusFilter";
@@ -16,7 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { MapaDeCalor } from "./MapaDeCalor";
 import { EnviosYCupones } from "./EnviosYCupones";
 import { cn } from "@/lib/utils";
-import { AlertCircle, Loader2, Package, Receipt, RefreshCw, TrendingUp } from "lucide-react";
+import { AlertCircle, ArrowRight, Download, FileSpreadsheet, FileText, ListChecks, Loader2, Package, Receipt, RefreshCw, TrendingUp } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -131,6 +134,35 @@ export function AnalyticsModule() {
   const [estados, setEstados] = useState<SaleState[]>([]);
   // Por defecto las ventas son todo lo que pagó el cliente: productos y envío.
   const [incluirEnvio, setIncluirEnvio] = useState(true);
+  // Cómo se ordenan los productos ganadores (también lo usa el reporte descargable).
+  const [ordenGanadores, setOrdenGanadores] = useState<OrdenDeGanadores>("units");
+  const [descargando, setDescargando] = useState<"xlsx" | "pdf" | null>(null);
+  const [descargandoVentas, setDescargandoVentas] = useState(false);
+  // Cada pedido con su cliente, producto y estado, de las mismas fechas y estados que se están viendo.
+  const descargarVentas = async () => {
+    setDescargandoVentas(true);
+    try {
+      await syncApi.downloadSales({ from, to, status: estados.join(",") || undefined });
+      toast.success("Ventas desglosadas descargadas");
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : "No se pudieron descargar las ventas");
+    } finally {
+      setDescargandoVentas(false);
+    }
+  };
+  const verVentas = () =>
+    pedirDestino({ seccion: "marketplaces", partes: { marketplaces: { pestana: "ventas" }, salesFilter: { from, to, estados } } });
+  const descargar = async (formato: "xlsx" | "pdf") => {
+    setDescargando(formato);
+    try {
+      await reportsApi.downloadReport(formato, { from, to, status: estados.join(",") || undefined, includeShipping: incluirEnvio, sort: ordenGanadores });
+      toast.success(formato === "pdf" ? "Reporte en PDF descargado" : "Reporte en Excel descargado");
+    } catch (error) {
+      toast.error(error instanceof Error && error.message ? error.message : "No se pudo descargar el reporte");
+    } finally {
+      setDescargando(null);
+    }
+  };
 
   const { data: result, isLoading, isError } = useQuery({
     queryKey: ["sales-report", storeId, from, to, estados.join(","), incluirEnvio],
@@ -181,18 +213,36 @@ export function AnalyticsModule() {
             Última venta registrada: {haceCuanto(report.lastOrderAt)}. Las ventas se traen solas cada pocos minutos.
           </p>
         </div>
-        {puedeSincronizar && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 shrink-0"
-            disabled={syncOrders.isPending}
-            onClick={() => syncOrders.mutate()}
-          >
-            {syncOrders.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-            Actualizar ventas ahora
-          </Button>
-        )}
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5" disabled={descargando !== null}>
+                {descargando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                Descargar reporte
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => descargar("xlsx")}>
+                <FileSpreadsheet className="w-3.5 h-3.5 mr-2" /> Excel (para trabajar los datos)
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => descargar("pdf")}>
+                <FileText className="w-3.5 h-3.5 mr-2" /> PDF (con gráficos y fotos)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {puedeSincronizar && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              disabled={syncOrders.isPending}
+              onClick={() => syncOrders.mutate()}
+            >
+              {syncOrders.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+              Actualizar ventas ahora
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Selector de rango */}
@@ -286,6 +336,47 @@ export function AnalyticsModule() {
           </div>
         )}
       </div>
+
+      {/* Lo más vendido, con su stock y en cuánto se agota */}
+      <ProductosGanadores
+        storeId={storeId}
+        from={from}
+        to={to}
+        status={estados.join(",") || undefined}
+        orden={ordenGanadores}
+        onOrdenChange={setOrdenGanadores}
+      />
+
+      {/* Ventas desglosadas: bajarlas en Excel o revisarlas en Marketplaces › Ventas */}
+      {(can("ventas.descargar") || can("ventas.ver")) && (
+        <div className="glass rounded-2xl border border-border dark:border-white/10 p-5 md:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#FCCB34]/15 flex items-center justify-center shrink-0">
+              <ListChecks className="w-5 h-5 text-[#FCCB34]" />
+            </div>
+            <div>
+              <h3 className="font-semibold">Ventas desglosadas</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+                Cada venta con su cliente, producto, SKU, canal, estado y envío, del {report.range.from} al {report.range.to}
+                {estados.length > 0 ? " (con los estados elegidos)" : ""}: {report.totals.orders} {report.totals.orders === 1 ? "pedido" : "pedidos"}.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {can("ventas.descargar") && (
+              <Button variant="outline" size="sm" className="gap-1.5" disabled={descargandoVentas} onClick={descargarVentas}>
+                {descargandoVentas ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
+                Descargar ventas desglosadas (Excel)
+              </Button>
+            )}
+            {can("ventas.ver") && (
+              <Button variant="ghost" size="sm" className="gap-1.5" onClick={verVentas}>
+                Revisar las ventas desglosadas <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Cuándo entran más ventas */}
       <MapaDeCalor celdas={report.heatmap ?? []} />

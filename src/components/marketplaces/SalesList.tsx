@@ -58,6 +58,16 @@ export function SalesList({ accounts, canImport, canDownload, canImportHistory }
   const [envio, setEnvio] = useState("all");
   const [selected, setSelected] = useState<Sale | null>(null);
 
+  // «Revisar las ventas desglosadas» desde Analíticas: abre la lista con las mismas fechas y estados.
+  useDestinoPendiente("salesFilter", ({ from, to, estados: elegidos }) => {
+    setRango({ days: null, from, to });
+    setEstados(elegidos as SaleState[]);
+    setMarketplace("all");
+    setConnectionId("all");
+    setSearchInput("");
+    setEnvio("all");
+  });
+
   // Clic en un aviso de venta: busca esa venta y abre su detalle, como si se hubiera tocado su fila.
   useDestinoPendiente("sales", async ({ orderId, marketplace, desde }) => {
     const dia = (t: number) => new Date(t).toISOString().slice(0, 10);

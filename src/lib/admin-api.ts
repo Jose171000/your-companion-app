@@ -1,4 +1,4 @@
-import { apiRequest } from './api';
+import { apiDownload, apiRequest } from './api';
 
 // ─────────────────────────────────────────────
 // Types
@@ -262,7 +262,64 @@ export interface ReportConfig {
   embedTitle: string;
 }
 
+export type EstadoDeStock = 'agotado' | 'critico' | 'pronto' | 'suficiente' | 'sin_ventas';
+export type OrdenDeGanadores = 'units' | 'revenue' | 'days';
+
+export interface ProductoGanador {
+  productId: string | null;
+  sku: string | null;
+  name: string;
+  variant: string | null;
+  imageUrl: string | null;
+  units: number;
+  revenue: number;
+  orders: number;
+  /** Qué parte de los ingresos del periodo representa (en %) */
+  share: number;
+  /** Stock en Synkro; null si el producto ya no está en el catálogo */
+  stock: number | null;
+  estimate: {
+    estado: EstadoDeStock;
+    /** Unidades por día según los últimos 30 días */
+    porDia: number;
+    /** En cuántos días se agota al ritmo actual (null si ya está agotado o no tiene ventas) */
+    dias: number | null;
+    agotaEl: string | null;
+    /** Unidades a pedir para cubrir los próximos 30 días */
+    sugerido: number;
+    recomendacion: string;
+  };
+}
+
+export interface ProductosGanadoresInforme {
+  range: { from: string; to: string };
+  sort: OrdenDeGanadores;
+  paceWindowDays: number;
+  totals: { units: number; revenue: number; products: number };
+  items: ProductoGanador[];
+}
+
 export const reportsApi = {
+  /** Productos más vendidos del periodo, con su stock y en cuánto tiempo se agotaría */
+  getTopProducts: (from?: string, to?: string, status?: string) => {
+    const params = new URLSearchParams({ limit: '200' });
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    if (status) params.set('status', status);
+    return apiRequest<ProductosGanadoresInforme>(`/reports/top-products?${params}`, { method: 'GET' });
+  },
+
+  /** Descarga el reporte de analíticas (ventas del periodo y productos ganadores) en Excel o PDF */
+  downloadReport: (format: 'xlsx' | 'pdf', opts: { from?: string; to?: string; status?: string; includeShipping?: boolean; sort?: OrdenDeGanadores }) => {
+    const params = new URLSearchParams({ format });
+    if (opts.from) params.set('from', opts.from);
+    if (opts.to) params.set('to', opts.to);
+    if (opts.status) params.set('status', opts.status);
+    if (opts.includeShipping === false) params.set('includeShipping', 'false');
+    if (opts.sort) params.set('sort', opts.sort);
+    return apiDownload(`/reports/export?${params}`, `analiticas_${opts.from ?? ''}_${opts.to ?? ''}.${format}`);
+  },
+
   /** Reporte externo que el admin configuró para este usuario */
   getConfig: () => apiRequest<ReportConfig>('/reports/config', { method: 'GET' }),
 

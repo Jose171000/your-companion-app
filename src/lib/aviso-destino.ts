@@ -14,6 +14,8 @@ export interface Partes {
   products: { productId: string };
   /** Pestaña de Marketplaces. */
   marketplaces: { pestana: 'canales' | 'tablero' | 'ventas' | 'revision' };
+  /** Rango de fechas y estados con los que la lista de ventas debe abrirse (desde Analíticas). */
+  salesFilter: { from: string; to: string; estados: string[] };
   /** Detalle de una venta (lo abre la lista de ventas). */
   sales: { orderId: string; marketplace?: string; desde: string };
 }
