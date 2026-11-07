@@ -79,7 +79,7 @@ export function ManualVariantsDialog({ familia, guardado, onClose, onGuardar }: 
 
         {familia?.sugerencia && (
           <p className="text-xs text-yellow-400">
-            La IA propuso estos valores pero no se pudieron comprobar en los datos de cada ficha ({familia.sugerencia.motivo}). Revísalos antes de guardar.
+            La IA propuso estos valores ({familia.sugerencia.motivo}) y no se pudieron comprobar en los datos del canal. Mira cada foto y corrige lo que haga falta antes de agrupar.
           </p>
         )}
 

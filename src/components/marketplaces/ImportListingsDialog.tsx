@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Download, Loader2 } from "lucide-react";
+import { Download, Loader2, Sparkles } from "lucide-react";
 import { FalabellaImportSummary, GrupoManual, MarketplaceConnection, syncApi } from "@/lib/sync-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -89,7 +89,39 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
   });
   const [preview, setPreview] = useState<FalabellaImportSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Colores que la IA sugirió mirando las fotos: no se aplican solos, la persona los revisa en «Estructurar» antes de agrupar.
+  const [sugeridos, setSugeridos] = useState<Record<string, { ejes: string[]; valores: Record<string, Record<string, string>>; motivo: string }>>({});
+  const [pidiendoColores, setPidiendoColores] = useState(false);
   const [manual, setManual] = useState<NonNullable<NonNullable<FalabellaImportSummary["variantes"]>["sinResolver"]>[number] | null>(null);
+
+  const sugerirColores = async () => {
+    const pendientes = (preview?.variantes?.sinResolver ?? []).filter((g) => (g.fichas?.length ?? 0) > 1 && !manuales[g.parentSku] && !sugeridos[g.parentSku]);
+    if (!pendientes.length) return;
+    setPidiendoColores(true);
+    let sugeridas = 0;
+    try {
+      // De a 8 familias por llamada (cada una es una consulta de visión).
+      for (let i = 0; i < pendientes.length; i += 8) {
+        const lote = pendientes.slice(i, i + 8).map((g) => ({ parentSku: g.parentSku, fichas: (g.fichas ?? []).map((f) => ({ sku: f.sku, nombre: f.nombre, imagen: f.imagen ?? null })) }));
+        const res = await syncApi.suggestRipleyColors(lote);
+        if (res.error || !res.data) { toast.error(res.error ?? "No se pudieron sugerir los colores"); break; }
+        const nuevos: typeof sugeridos = {};
+        for (const r of res.data) {
+          if (Object.keys(r.colores ?? {}).length > 1) {
+            nuevos[r.parentSku] = { ejes: ["Color"], valores: Object.fromEntries(Object.entries(r.colores).map(([sku, c]) => [sku, { Color: c }])), motivo: "sugeridos a partir de las fotos" };
+            sugeridas++;
+          }
+        }
+        setSugeridos((prev) => ({ ...prev, ...nuevos }));
+      }
+      if (sugeridas) toast.success(`La IA sugirió los colores de ${sugeridas} grupo(s). Pulsa «Revisar» en cada uno para confirmarlos o corregirlos.`);
+      else toast.info("La IA no pudo distinguir los colores con seguridad en estos grupos. Estructúralos a mano.");
+    } catch {
+      toast.error("Error al conectar con el servidor");
+    } finally {
+      setPidiendoColores(false);
+    }
+  };
 
   const previewMutation = useMutation({
     mutationFn: ({ id, generar }: { id: string; generar: boolean }) => llamar(true, id, generar),
@@ -261,11 +293,17 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
                             <a href={g.enlace} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-md border border-border px-2 py-0.5 text-[11px] text-foreground hover:border-primary/50">Abrir en {canal}</a>
                           )}
                           {(g.fichas?.length ?? 0) > 1 && (
-                            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] shrink-0 text-foreground" onClick={() => setManual(g)}>{hecho ? "Editar" : "Estructurar"}</Button>
+                            <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] shrink-0 text-foreground" onClick={() => setManual(g)}>{hecho ? "Editar" : sugeridos[g.parentSku] ? "Revisar" : "Estructurar"}</Button>
                           )}
                         </div>
                       );
                     })}
+                    {marketplace === "ripley" && preview.variantes.sinResolver.some((g) => (g.fichas?.length ?? 0) > 1 && !manuales[g.parentSku] && !sugeridos[g.parentSku]) && (
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-[11px] text-foreground mt-1" onClick={sugerirColores} disabled={pidiendoColores}>
+                        {pidiendoColores ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                        Sugerir los colores con IA (mirando las fotos)
+                      </Button>
+                    )}
                     {preview.variantes.sinResolver.length > 8 && <p>… y {preview.variantes.sinResolver.length - 8} más</p>}
                   </div>
                 )}
@@ -419,7 +457,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
       </AlertDialogContent>
     </AlertDialog>
     <ManualVariantsDialog
-      familia={manual}
+      familia={manual ? { ...manual, sugerencia: sugeridos[manual.parentSku] ?? manual.sugerencia } : null}
       guardado={manual ? manuales[manual.parentSku] ?? null : null}
       onClose={() => setManual(null)}
       // La estructura queda anotada para esta familia; los productos se crean y se agrupan al pulsar «Importar».

@@ -496,6 +496,10 @@ export const syncApi = {
       { method: 'POST', ...(gruposManuales.length ? { body: JSON.stringify({ gruposManuales }) } : {}) },
     ),
 
+  /** Ripley: sugiere el color de cada oferta de las familias sin resolver, mirando sus fotos (solo sugiere; no escribe nada). */
+  suggestRipleyColors: (familias: { parentSku: string; fichas: { sku: string; nombre: string; imagen: string | null }[] }[]) =>
+    apiRequest<{ parentSku: string; colores: Record<string, string> }[]>('/sync/ripley/colores-ia', { method: 'POST', body: JSON.stringify({ familias }) }),
+
   /** Agrupa a mano productos ya importados como variantes: nombre, ejes y valor de cada SKU. */
   groupFalabellaVariants: (dto: { parentSku: string; name: string; axes: string[]; variants: { sellerSku: string; values: Record<string, string> }[] }) =>
     apiRequest<{ gruposCreados: number; gruposActualizados: number; variantesAgrupadas: number; omitidos: { parentSku: string; motivo: string }[] }>(
