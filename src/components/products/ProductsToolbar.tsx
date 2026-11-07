@@ -1,7 +1,8 @@
 import { useCuentasPorCanal } from "@/components/marketplaces/AccountChooser";
 import { useEffect, useState } from "react";
 import { useStores } from "@/contexts/StoreContext";
-import { Search, Plus, Download } from "lucide-react";
+import { Search, Plus, Download, FileSpreadsheet } from "lucide-react";
+import { BulkEditDialog } from "./BulkEditDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +64,7 @@ export function ProductsToolbar({
   onExport,
 }: ProductsToolbarProps) {
   const [localSearch, setLocalSearch] = useState(search);
+  const [edicionMasiva, setEdicionMasiva] = useState(false);
   const canales = useCanalesDeLaTienda(marketplace);
   const { can } = useStores();
 
@@ -148,6 +150,13 @@ export function ProductsToolbar({
         )}
 
         {can("productos.editar") && (
+          <Button variant="outline" className="w-full lg:w-auto font-semibold" onClick={() => setEdicionMasiva(true)}>
+            <FileSpreadsheet className="w-4 h-4 mr-2" />
+            Edición masiva
+          </Button>
+        )}
+
+        {can("productos.editar") && (
           <Button
             id="products-new-btn"
             onClick={onNewProduct}
@@ -158,6 +167,7 @@ export function ProductsToolbar({
           </Button>
         )}
       </div>
+      <BulkEditDialog open={edicionMasiva} onOpenChange={setEdicionMasiva} />
     </div>
   );
 }

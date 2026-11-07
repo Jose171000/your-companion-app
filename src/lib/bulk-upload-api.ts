@@ -16,6 +16,20 @@ export interface BulkUploadResponse {
   rejectedDetails?: string[];
 }
 
+export interface ResultadoEdicionMasiva {
+  aplicado: boolean;
+  totalFilas: number;
+  conCambios: number;
+  sinCambios: number;
+  columnas: string[];
+  noEncontrados: string[];
+  errores: { sku: string; mensaje: string }[];
+  cambios: { sku: string; nombre: string; cambios: { campo: 'nombre' | 'precio' | 'stock' | 'descripcion'; antes: string | number | null; despues: string | number }[] }[];
+  cambiosOmitidos: number;
+  actualizados?: number;
+  enRevision?: number;
+}
+
 export interface BulkProgress {
   total: number;
   processed: number;
@@ -70,6 +84,16 @@ export const bulkUploadApi = {
     // Cuentas elegidas por canal (cuando la tienda tiene varias): { mercadolibre: [idCuenta] }.
     if (Object.keys(cuentas).length) form.append('cuentas', JSON.stringify(cuentas));
     return apiRequestMultipart<BulkUploadResponse>('/bulk-upload/products', form);
+  },
+
+  /** Excel con los productos actuales de la tienda, para editarlos y volver a subirlos. */
+  downloadEditTemplate: () => apiDownload('/bulk-upload/products/bulk-edit/template', 'productos-para-editar.xlsx'),
+
+  /** Edición masiva: con aplicar=false solo muestra qué cambiaría; con true lo aplica (precio y stock siguen el modo revisión). */
+  bulkEdit: (file: File, aplicar: boolean) => {
+    const form = new FormData();
+    form.append('file', file);
+    return apiRequestMultipart<ResultadoEdicionMasiva>(`/bulk-upload/products/bulk-edit/${aplicar ? 'apply' : 'preview'}`, form);
   },
 
   /** Avance de una carga masiva: cuántos productos van listos y cuántos fallaron. */
