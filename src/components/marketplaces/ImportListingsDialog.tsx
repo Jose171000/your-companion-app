@@ -280,7 +280,7 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
                         ? `${preview.variantes.sinResolver.filter((g) => !manuales[g.parentSku]).length} grupo(s) no se pudieron armar y se importarán como productos sueltos${Object.keys(manuales).length > 0 ? " (salvo los que ya estructuraste)" : ""}:`
                         : "Todos los grupos pendientes ya están estructurados y se agruparán al importar:"}
                     </p>
-                    {preview.variantes.sinResolver.slice(0, 8).map((g) => {
+                    {[...preview.variantes.sinResolver].sort((x, y) => Number(!!manuales[x.parentSku]) - Number(!!manuales[y.parentSku])).map((g) => {
                       const hecho = manuales[g.parentSku];
                       return (
                         <div key={g.parentSku} className="flex items-start justify-between gap-2">
@@ -304,7 +304,6 @@ export function ImportListingsDialog({ open, onOpenChange, marketplace, accounts
                         Sugerir los colores con IA (mirando las fotos)
                       </Button>
                     )}
-                    {preview.variantes.sinResolver.length > 8 && <p>… y {preview.variantes.sinResolver.length - 8} más</p>}
                   </div>
                 )}
               </div>
