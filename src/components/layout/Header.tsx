@@ -51,6 +51,7 @@ const notifIcon: Record<AppNotification["type"], React.ReactNode> = {
   "connection":    <Link2Off className="w-4 h-4 text-destructive" />,
   "low-stock":     <AlertTriangle className="w-4 h-4 text-amber-500" />,
   "import":        <Upload className="w-4 h-4 text-primary" />,
+  "reconciliation": <AlertTriangle className="w-4 h-4 text-amber-500" />,
   "system":        <Bell className="w-4 h-4 text-muted-foreground" />,
 };
 

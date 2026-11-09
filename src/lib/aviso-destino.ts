@@ -52,7 +52,7 @@ export function destinoDe(n: AppNotification): DestinoDeAviso {
   }
   if (productId) return { storeId, seccion: 'products', partes: { products: { productId } } };
   if (n.type === 'sale') return { storeId, seccion: 'marketplaces', partes: { marketplaces: { pestana: 'ventas' } } };
-  if (n.type === 'publish' || n.type === 'publish-error') return { storeId, seccion: 'marketplaces', partes: { marketplaces: { pestana: 'tablero' } } };
+  if (n.type === 'publish' || n.type === 'publish-error' || n.type === 'reconciliation') return { storeId, seccion: 'marketplaces', partes: { marketplaces: { pestana: 'tablero' } } };
   if (n.type === 'connection' || n.type === 'import') return { storeId, seccion: 'marketplaces', partes: { marketplaces: { pestana: 'canales' } } };
   return { storeId, partes: {} };
 }

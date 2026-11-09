@@ -7,6 +7,7 @@ export type NotificationType =
   | 'connection'
   | 'low-stock'
   | 'import'
+  | 'reconciliation'
   | 'system';
 
 export type NotificationSeverity = 'info' | 'success' | 'warning' | 'error';
