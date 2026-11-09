@@ -221,6 +221,13 @@ export const productsApi = {
       body: JSON.stringify(dto),
     }),
 
+  /** Guarda lo común de un grupo de variantes en todas a la vez (descripción, categoría, subcategoría, marketplaces destino) */
+  updateGroup: (groupId: string, dto: { description?: string; category?: string; subCategory?: string; targetMarketplaces?: string[] }) =>
+    apiRequest<{ saved: boolean; variantes: number }>(`/products/groups/${groupId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
+    }),
+
   /** Generar contenido IA para un producto ya existente */
   generateAI: (id: string, dto: GenerateAIContentDto = {}) =>
     apiRequest<Product>(`/products/${id}/generate-ai`, {

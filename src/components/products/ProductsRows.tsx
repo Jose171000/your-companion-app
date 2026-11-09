@@ -84,10 +84,15 @@ function GroupActions({ product, ...handlers }: RowHandlers & { product: Product
       {can("productos.editar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-accent hover:bg-accent/10" onClick={() => handlers.onRegenerate(delGrupo)} title={`Regenerar con IA ${todas}`}><Sparkles className="w-4 h-4" /></Button>}
       {can("productos.editar") && <Popover open={eligiendo} onOpenChange={setEligiendo}>
         <PopoverTrigger asChild>
-          <Button variant="ghost" size="icon" className={btn} title="Editar: elige la variante"><Edit className="w-4 h-4" /></Button>
+          <Button variant="ghost" size="icon" className={btn} title="Editar: todas las variantes o una sola"><Edit className="w-4 h-4" /></Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-64 p-2 space-y-1">
-          <p className="text-xs text-muted-foreground px-1 pb-1">¿Qué variante quieres editar?</p>
+          <p className="text-xs text-muted-foreground px-1 pb-1">¿Qué quieres editar?</p>
+          <button type="button" className="w-full text-left text-sm px-2 py-1.5 rounded border border-primary/40 bg-primary/5 hover:bg-primary/10 flex items-center justify-between gap-2" onClick={() => { setEligiendo(false); handlers.onEdit(delGrupo); }}>
+            <span className="font-medium">Todas las variantes</span>
+            <span className="text-[10px] text-muted-foreground">información general</span>
+          </button>
+          <p className="text-[11px] text-muted-foreground px-1 pt-1">O una sola variante (nombre, precio, stock):</p>
           {isLoading && <Skeleton className="h-8 w-full" />}
           {variantes.map((v) => (
             <button key={v.id} type="button" className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-secondary/60 flex items-center justify-between gap-2" onClick={() => { setEligiendo(false); handlers.onEdit(v); }}>

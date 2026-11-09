@@ -60,6 +60,11 @@ export function ProductFormDialog({
   onSuccess,
 }: ProductFormDialogProps) {
   const isEdit = !!product;
+  // Desde la fila de un grupo se edita lo común de todas las variantes: descripción, categoría, subcategoría y marketplaces.
+  // El nombre, el SKU, el precio, el stock y las fotos son de cada variante y se editan eligiéndola.
+  const grupoId = product?.alGrupo ? product.group?.id : undefined;
+  const modoGrupo = !!grupoId;
+  const nVariantes = product?.groupSummary?.variantCount ?? 0;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { setDirty } = useFormDraft();
 
@@ -135,8 +140,8 @@ export function ProductFormDialog({
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!name.trim() || !description.trim()) {
-      toast.error("Nombre y descripción son obligatorios");
+    if (modoGrupo ? !description.trim() : !name.trim() || !description.trim()) {
+      toast.error(modoGrupo ? "La descripción es obligatoria" : "Nombre y descripción son obligatorios");
       return;
     }
     if (!isEdit && !sku.trim()) {
@@ -150,7 +155,18 @@ export function ProductFormDialog({
 
     setIsSubmitting(true);
     try {
-      if (isEdit && product) {
+      if (modoGrupo && grupoId && product) {
+        // Solo lo que cambió: así no se pisa lo que una variante tenía distinto y no se tocó.
+        const cambios: { description?: string; category?: string; subCategory?: string; targetMarketplaces?: string[] } = {};
+        if (description.trim() !== (product.description ?? "").trim()) cambios.description = description.trim();
+        if (category.trim() !== (product.category ?? "").trim() && category.trim()) cambios.category = category.trim();
+        if (subCategory.trim() !== (product.subCategory ?? "").trim() && subCategory.trim()) cambios.subCategory = subCategory.trim();
+        if (JSON.stringify([...selectedMps].sort()) !== JSON.stringify([...(product.targetMarketplaces ?? [])].sort()) && selectedMps.length) cambios.targetMarketplaces = selectedMps;
+        if (!Object.keys(cambios).length) { toast.info("No hay cambios que guardar."); return; }
+        const resp = await productsApi.updateGroup(grupoId, cambios);
+        if (resp.error) { toast.error(resp.error); return; }
+        toast.success(`Guardado en las ${resp.data?.variantes ?? nVariantes} variantes`);
+      } else if (isEdit && product) {
         const resp = await productsApi.update(product.id, {
           name:               name.trim() || undefined,
           description:        description.trim() || undefined,
@@ -194,7 +210,7 @@ export function ProductFormDialog({
    * lo visible daba por hecho que el botón estaba roto.
    */
   const faltantes: string[] = [];
-  if (name.trim() === "") faltantes.push("el nombre");
+  if (name.trim() === "" && !modoGrupo) faltantes.push("el nombre");
   if (description.trim() === "") faltantes.push("la descripción");
   if (!isEdit && sku.trim() === "") faltantes.push("el SKU");
   if (!isEdit && images.length === 0) faltantes.push("al menos una imagen");
@@ -266,9 +282,13 @@ export function ProductFormDialog({
             </div>
             <div className="min-w-0">
               <DialogTitle className="text-base">
-                {isEdit ? "Editar Producto" : "Crear Producto con IA"}
+                {modoGrupo ? "Editar información general" : isEdit ? "Editar Producto" : "Crear Producto con IA"}
               </DialogTitle>
-              {isEdit && (
+              {modoGrupo ? (
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words">
+                  {product?.name} · {nVariantes} variantes. Lo que cambies aquí se aplica a todas.
+                </p>
+              ) : isEdit && (
                 <p className="text-xs text-muted-foreground mt-0.5">
                   SKU:{" "}
                   <code className="font-mono bg-secondary px-1.5 py-0.5 rounded">
@@ -297,7 +317,8 @@ export function ProductFormDialog({
         */}
         <div className="flex-1 min-h-0 max-h-[calc(92vh-11rem)] overflow-y-auto px-6">
           <div className="space-y-5 py-5">
-            {/* Name */}
+            {/* Name (de cada variante: en el modo grupo no se edita aquí) */}
+            {!modoGrupo && (
             <div className="space-y-2">
               <Label htmlFor="pf-name">
                 Nombre <span className="text-destructive">*</span>
@@ -310,6 +331,14 @@ export function ProductFormDialog({
                 className="bg-secondary/50 border-border h-11"
               />
             </div>
+            )}
+            {modoGrupo && (
+              <p className="text-xs rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-muted-foreground">
+                <span className="font-medium text-foreground">Editas lo común de las {nVariantes} variantes.</span> Se aplica solo lo que cambies.
+                El nombre, el precio, el stock y las fotos son de cada variante: se editan eligiéndola en el botón de editar. El contenido que se envía a los canales
+                (título, HTML, atributos) se edita en la Ficha, en «Todas las variantes».
+              </p>
+            )}
 
             {/* Description */}
             <div className="space-y-2">
@@ -354,9 +383,10 @@ export function ProductFormDialog({
               </div>
             </div>
 
-            <Separator />
+            {!modoGrupo && <Separator />}
 
-            {/* SKU + Price + Stock */}
+            {/* SKU + Price + Stock (propios de cada variante) */}
+            {!modoGrupo && (
             <div className={cn("grid gap-4", isEdit ? "grid-cols-2" : "grid-cols-3")}>
               {!isEdit && (
                 <div className="space-y-2">
@@ -398,6 +428,7 @@ export function ProductFormDialog({
                 />
               </div>
             </div>
+            )}
 
             <Separator />
 
@@ -503,7 +534,7 @@ export function ProductFormDialog({
             )}
 
             {/* ── Images: edit mode (read-only preview) ─────────────────── */}
-            {isEdit && (product?.images?.length ?? 0) > 0 && (
+            {isEdit && !modoGrupo && (product?.images?.length ?? 0) > 0 && (
               <>
                 <Separator />
                 <div className="space-y-2">

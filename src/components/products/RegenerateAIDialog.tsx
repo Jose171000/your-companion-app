@@ -102,15 +102,16 @@ export function RegenerateAIDialog({
 
   return (
     <Dialog open={!!product} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="glass max-w-md">
+      {/* [&>*]:min-w-0: un nombre largo no debe estirar la cuadrícula del diálogo más allá de su ancho. */}
+      <DialogContent className="glass max-w-md overflow-x-hidden [&>*]:min-w-0">
         <DialogHeader>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl gradient-accent flex items-center justify-center shrink-0">
               <Sparkles className="w-5 h-5 text-accent-foreground" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <DialogTitle className="text-base">Regenerar con IA</DialogTitle>
-              <p className="text-xs text-muted-foreground mt-0.5 truncate">
+              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words" title={product?.name}>
                 {product?.name}{product?.alGrupo ? ` · ${product.groupSummary?.variantCount} variantes` : ""}
               </p>
             </div>
@@ -124,7 +125,7 @@ export function RegenerateAIDialog({
               Marketplaces destino{" "}
               <span className="text-destructive">*</span>
             </Label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 [&>*]:min-w-0">
               {MARKETPLACE_OPTIONS.map((mp) => {
                 const isSelected = selectedMarketplaces.includes(mp.id);
                 return (
@@ -135,7 +136,7 @@ export function RegenerateAIDialog({
                     className={cn(
                       "flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all duration-150 text-left",
                       isSelected
-                        ? "border-accent bg-accent/10 text-accent font-medium"
+                        ? "border-accent bg-accent/15 text-foreground font-medium ring-1 ring-accent/40"
                         : "border-border bg-secondary/30 text-muted-foreground hover:border-accent/50"
                     )}
                   >
