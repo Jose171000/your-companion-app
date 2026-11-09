@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { channelName } from "./format";
+import { cn } from "@/lib/utils";
+import { channelName, money } from "./format";
 
 /** Lo máximo que acepta el servidor en un envío. */
 const MAXIMO = 200;
@@ -21,29 +22,37 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   /** Publicaciones activas cuyo canal tiene un stock distinto al de Synkro. */
   candidatos: ReenvioCandidato[];
+  /** Ofertas de Ripley sin rebaja cuyo precio normal es distinto al de Synkro. */
+  candidatosPrecio?: ReenvioCandidato[];
 }
+
+type Campo = "stock" | "price";
 
 const etiquetaDeCanal = (l: UserListing) => `${channelName(l.marketplace)}${l.accountLabel ? ` · ${l.accountLabel}` : ""}`;
 
-/** Elegir a qué productos y canales se les vuelve a mandar el stock de Synkro, y enviarlo de una vez. */
-export function BulkResendStockDialog({ open, onOpenChange, candidatos }: Props) {
+/** Elegir a qué productos y canales se les vuelve a mandar el stock (o el precio, en Ripley) de Synkro, y enviarlo de una vez. */
+export function BulkResendStockDialog({ open, onOpenChange, candidatos, candidatosPrecio = [] }: Props) {
   const queryClient = useQueryClient();
+  const [campo, setCampo] = useState<Campo>("stock");
   const [busqueda, setBusqueda] = useState("");
   const [canal, setCanal] = useState("todos");
   const [elegidos, setElegidos] = useState<Set<string>>(new Set());
   const [resultado, setResultado] = useState<{ enviados: number; enRevision: number; omitidos: { listingId: string; motivo: string }[] } | null>(null);
 
   useEffect(() => {
-    if (open) { setBusqueda(""); setCanal("todos"); setElegidos(new Set()); setResultado(null); }
+    if (open) { setCampo("stock"); setBusqueda(""); setCanal("todos"); setElegidos(new Set()); setResultado(null); }
   }, [open]);
 
-  const canales = useMemo(() => [...new Set(candidatos.map((c) => etiquetaDeCanal(c.listing)))].sort(), [candidatos]);
+  const cambiarCampo = (c: Campo) => { setCampo(c); setCanal("todos"); setElegidos(new Set()); };
+
+  const lista = campo === "stock" ? candidatos : candidatosPrecio;
+  const canales = useMemo(() => [...new Set(lista.map((c) => etiquetaDeCanal(c.listing)))].sort(), [lista]);
   const visibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    return candidatos.filter(({ listing: l }) =>
+    return lista.filter(({ listing: l }) =>
       (canal === "todos" || etiquetaDeCanal(l) === canal) &&
       (!q || l.productName.toLowerCase().includes(q) || l.sku.toLowerCase().includes(q)));
-  }, [candidatos, busqueda, canal]);
+  }, [lista, busqueda, canal]);
 
   const idsVisibles = visibles.map((c) => c.listing.id);
   const todosMarcados = idsVisibles.length > 0 && idsVisibles.every((id) => elegidos.has(id));
@@ -56,9 +65,9 @@ export function BulkResendStockDialog({ open, onOpenChange, candidatos }: Props)
   });
 
   const enviar = useMutation({
-    mutationFn: () => syncApi.resendListingsStock([...elegidos]),
+    mutationFn: () => syncApi.resendListingsStock([...elegidos], campo),
     onSuccess: (res) => {
-      if (res.error || !res.data) { toast.error(res.error ?? "No se pudo reenviar el stock"); return; }
+      if (res.error || !res.data) { toast.error(res.error ?? "No se pudo reenviar"); return; }
       setResultado(res.data);
       queryClient.invalidateQueries({ queryKey: ["sync-listings"] });
       queryClient.invalidateQueries({ queryKey: ["sync-change-requests"] });
@@ -66,15 +75,27 @@ export function BulkResendStockDialog({ open, onOpenChange, candidatos }: Props)
     onError: () => toast.error("Error al conectar con el servidor"),
   });
 
-  const porId = useMemo(() => new Map(candidatos.map((c) => [c.listing.id, c.listing])), [candidatos]);
+  const porId = useMemo(() => new Map([...candidatos, ...candidatosPrecio].map((c) => [c.listing.id, c.listing])), [candidatos, candidatosPrecio]);
+  const pestana = (c: Campo, texto: string, n: number) => (
+    <button
+      type="button"
+      onClick={() => cambiarCampo(c)}
+      className={cn("rounded-md px-3 py-1.5 text-xs font-medium border", campo === c ? "bg-primary/10 text-primary border-primary/40" : "border-border text-muted-foreground hover:text-foreground")}
+    >
+      {texto} ({n})
+    </button>
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[720px] max-h-[88vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Reenviar stock a los canales</DialogTitle>
+          <DialogTitle>Reenviar a los canales</DialogTitle>
           <DialogDescription>
-            Productos cuyo canal tiene un stock distinto al de Synkro. Elige a cuáles les mandas el stock de Synkro. Con el modo revisión encendido quedan pendientes de aprobar.
+            {campo === "stock"
+              ? "Productos cuyo canal tiene un stock distinto al de Synkro. Elige a cuáles les mandas el stock de Synkro."
+              : "Ofertas de Ripley sin rebaja cuyo precio es distinto al de Synkro. Solo se cambia el precio; el stock de Ripley no se toca. Las ofertas con rebaja no aparecen."}{" "}
+            Con el modo revisión encendido quedan pendientes de aprobar.
           </DialogDescription>
         </DialogHeader>
 
@@ -94,6 +115,10 @@ export function BulkResendStockDialog({ open, onOpenChange, candidatos }: Props)
           </div>
         ) : (
           <div className="space-y-3">
+            <div className="flex gap-2">
+              {pestana("stock", "Stock", candidatos.length)}
+              {pestana("price", "Precio (Ripley)", candidatosPrecio.length)}
+            </div>
             <div className="flex flex-col sm:flex-row gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -110,8 +135,10 @@ export function BulkResendStockDialog({ open, onOpenChange, candidatos }: Props)
               </select>
             </div>
 
-            {candidatos.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Todos tus canales tienen el mismo stock que Synkro.</p>
+            {lista.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                {campo === "stock" ? "Todos tus canales tienen el mismo stock que Synkro." : "No hay ofertas de Ripley sin rebaja con un precio distinto al de Synkro."}
+              </p>
             ) : (
               <>
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -135,9 +162,19 @@ export function BulkResendStockDialog({ open, onOpenChange, candidatos }: Props)
                         </span>
                       </span>
                       <span className="text-xs tabular-nums text-right shrink-0">
-                        <span className="text-muted-foreground">{l.lastStockSynced ?? "—"} u.</span>
-                        <span className="mx-1 text-muted-foreground">→</span>
-                        <span className="font-semibold">{l.stock} u.</span>
+                        {campo === "stock" ? (
+                          <>
+                            <span className="text-muted-foreground">{l.lastStockSynced ?? "—"} u.</span>
+                            <span className="mx-1 text-muted-foreground">→</span>
+                            <span className="font-semibold">{l.stock} u.</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-muted-foreground">{money(l.lastPriceSynced, l.currency)}</span>
+                            <span className="mx-1 text-muted-foreground">→</span>
+                            <span className="font-semibold">{money(l.price, l.currency)}</span>
+                          </>
+                        )}
                       </span>
                     </label>
                   ))}
@@ -153,7 +190,7 @@ export function BulkResendStockDialog({ open, onOpenChange, candidatos }: Props)
           {!resultado && (
             <Button onClick={() => enviar.mutate()} disabled={!elegidos.size || enviar.isPending}>
               {enviar.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RotateCw className="w-4 h-4 mr-2" />}
-              Reenviar stock de {elegidos.size} publicación(es)
+              Reenviar {campo === "stock" ? "stock" : "precio"} de {elegidos.size} publicación(es)
             </Button>
           )}
         </DialogFooter>

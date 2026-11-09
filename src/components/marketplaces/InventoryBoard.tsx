@@ -271,6 +271,18 @@ function ChannelChip({ cell, canEdit, canResend, onAction }: { cell: ChannelCell
     },
     onError: () => toast.error("Error al conectar con el servidor"),
   });
+  // Ripley: el precio normal de la oferta es distinto al de Synkro (las ofertas con rebaja en Ripley no se tocan).
+  const puedeReenviarPrecio = canResend && estado === "published" && l.marketplace === "ripley" && cell.priceDrift && l.lastPriceSynced != null && l.salePrice == null;
+  const reenviarPrecio = useMutation({
+    mutationFn: () => syncApi.resendListingPrice(l.id),
+    onSuccess: (res) => {
+      if (res.error) { toast.error(res.error); return; }
+      toast.success(res.data?.message ?? "Reenvío programado");
+      queryClient.invalidateQueries({ queryKey: ["sync-listings"] });
+      queryClient.invalidateQueries({ queryKey: ["sync-change-requests"] });
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
   const chip = (
     <div
       className={cn(
@@ -305,6 +317,18 @@ function ChannelChip({ cell, canEdit, canResend, onAction }: { cell: ChannelCell
           title={`El canal tiene ${l.lastStockSynced} u. y Synkro tiene ${l.stock} u.`}
         >
           <RotateCw className={cn("w-3 h-3", reenviar.isPending && "animate-spin")} /> Reenviar {l.stock} u.
+        </Button>
+      )}
+      {puedeReenviarPrecio && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-6 w-full gap-1 px-2 text-[11px] text-foreground"
+          disabled={reenviarPrecio.isPending}
+          onClick={(e) => { e.stopPropagation(); reenviarPrecio.mutate(); }}
+          title={`El canal tiene ${money(l.lastPriceSynced, l.currency)} y Synkro tiene ${money(l.price, l.currency)}`}
+        >
+          <RotateCw className={cn("w-3 h-3", reenviarPrecio.isPending && "animate-spin")} /> Reenviar {money(l.price, l.currency)}
         </Button>
       )}
     </div>
@@ -348,6 +372,11 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
   // Publicaciones activas cuyo canal tiene un stock distinto al de Synkro (las mismas que muestran «Reenviar»).
   const desfasadas = useMemo(
     () => rows.flatMap((r) => r.channels.filter((c) => estadoVisible(c.listing) === "published" && c.stockDrift && c.listing.lastStockSynced != null)),
+    [rows],
+  );
+  // Ripley: ofertas sin rebaja cuyo precio normal es distinto al de Synkro.
+  const desfasadasPrecio = useMemo(
+    () => rows.flatMap((r) => r.channels.filter((c) => estadoVisible(c.listing) === "published" && c.listing.marketplace === "ripley" && c.priceDrift && c.listing.lastPriceSynced != null && c.listing.salePrice == null)),
     [rows],
   );
   const visible = useMemo(() => {
@@ -488,7 +517,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
         </div>
         {canEdit && (
           <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => setReenvioMasivo(true)}>
-            <RotateCw className="w-3.5 h-3.5" /> Reenviar stock{desfasadas.length > 0 ? ` (${desfasadas.length})` : ""}
+            <RotateCw className="w-3.5 h-3.5" /> Reenviar stock o precio{desfasadas.length + desfasadasPrecio.length > 0 ? ` (${desfasadas.length + desfasadasPrecio.length})` : ""}
           </Button>
         )}
         <ToggleGroup
@@ -583,7 +612,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
       <EditInventoryDialog product={editing} reviewMode={reviewMode} onClose={() => setEditing(null)} />
       <ProductSheetDialog product={sheetFor} onClose={() => setSheetFor(null)} />
       <ChannelActionDialog pending={channelAction} onClose={() => setChannelAction(null)} />
-      <BulkResendStockDialog open={reenvioMasivo} onOpenChange={setReenvioMasivo} candidatos={desfasadas} />
+      <BulkResendStockDialog open={reenvioMasivo} onOpenChange={setReenvioMasivo} candidatos={desfasadas} candidatosPrecio={desfasadasPrecio} />
     </div>
   );
 }

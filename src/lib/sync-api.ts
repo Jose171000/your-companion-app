@@ -642,11 +642,15 @@ export const syncApi = {
     apiRequest<{ message: string; pending?: number }>(`/sync/listings/${listingId}/resend-stock`, { method: 'POST' }),
 
   /** Lo mismo para varias publicaciones a la vez (hasta 200): cuántas se enviaron, cuántas quedaron en revisión y cuáles se omitieron */
-  resendListingsStock: (listingIds: string[]) =>
+  resendListingsStock: (listingIds: string[], campo: 'stock' | 'price' = 'stock') =>
     apiRequest<{ enviados: number; enRevision: number; omitidos: { listingId: string; motivo: string }[] }>('/sync/listings/resend-stock', {
       method: 'POST',
-      body: JSON.stringify({ listingIds }),
+      body: JSON.stringify({ listingIds, campo }),
     }),
+
+  /** Ripley: vuelve a mandar a ESA oferta el precio normal de Synkro (solo el precio; con el modo revisión, queda como solicitud) */
+  resendListingPrice: (listingId: string) =>
+    apiRequest<{ message: string; pending?: number }>(`/sync/listings/${listingId}/resend-price`, { method: 'POST' }),
 
   /** Actualiza stock/precio local y lo sincroniza con los canales publicados */
   updateInventory: (productId: string, dto: UpdateInventoryDto) =>
