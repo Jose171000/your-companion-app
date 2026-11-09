@@ -17,6 +17,7 @@ import { channelName, money } from "./format";
 import { EditInventoryDialog, EditableProduct } from "./EditInventoryDialog";
 import { ProductThumb } from "./ProductThumb";
 import { ChannelActionDialog, PendingChannelAction, estadoVisible } from "./ChannelActionDialog";
+import { BulkResendStockDialog } from "./BulkResendStockDialog";
 
 interface Props {
   listings: UserListing[];
@@ -257,8 +258,9 @@ function ChannelChip({ cell, canEdit, canResend, onAction }: { cell: ChannelCell
   const estado = estadoVisible(l);
   const drift = estado === "published" && (cell.priceDrift || cell.stockDrift);
   const queryClient = useQueryClient();
-  // El canal tiene un stock distinto al de Synkro: se puede volver a mandar el de Synkro a ESTA cuenta (Ripley todavía no recibe stock).
-  const puedeReenviar = canResend && estado === "published" && cell.stockDrift && l.lastStockSynced != null && l.marketplace !== "ripley";
+  // El canal tiene un stock distinto al de Synkro: se puede volver a mandar el de Synkro a ESTA cuenta.
+  // (En Ripley el envío está en piloto: el servidor avisa si ese SKU todavía no está habilitado.)
+  const puedeReenviar = canResend && estado === "published" && cell.stockDrift && l.lastStockSynced != null;
   const reenviar = useMutation({
     mutationFn: () => syncApi.resendListingStock(l.id),
     onSuccess: (res) => {
@@ -338,10 +340,16 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
   const [sheetFor, setSheetFor] = useState<Product | null>(null);
   const [channelAction, setChannelAction] = useState<PendingChannelAction | null>(null);
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
+  const [reenvioMasivo, setReenvioMasivo] = useState(false);
   const alternar = (id: string) => setAbiertos((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const rows = useMemo(() => buildRows(listings, pending), [listings, pending]);
   const items = useMemo(() => buildItems(rows), [rows]);
+  // Publicaciones activas cuyo canal tiene un stock distinto al de Synkro (las mismas que muestran «Reenviar»).
+  const desfasadas = useMemo(
+    () => rows.flatMap((r) => r.channels.filter((c) => estadoVisible(c.listing) === "published" && c.stockDrift && c.listing.lastStockSynced != null)),
+    [rows],
+  );
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     const coincide = (r: Row) => r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q) || (r.variantLabel ?? "").toLowerCase().includes(q);
@@ -478,6 +486,11 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        {canEdit && (
+          <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => setReenvioMasivo(true)}>
+            <RotateCw className="w-3.5 h-3.5" /> Reenviar stock{desfasadas.length > 0 ? ` (${desfasadas.length})` : ""}
+          </Button>
+        )}
         <ToggleGroup
           type="single"
           value={view}
@@ -570,6 +583,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
       <EditInventoryDialog product={editing} reviewMode={reviewMode} onClose={() => setEditing(null)} />
       <ProductSheetDialog product={sheetFor} onClose={() => setSheetFor(null)} />
       <ChannelActionDialog pending={channelAction} onClose={() => setChannelAction(null)} />
+      <BulkResendStockDialog open={reenvioMasivo} onOpenChange={setReenvioMasivo} candidatos={desfasadas} />
     </div>
   );
 }

@@ -641,6 +641,13 @@ export const syncApi = {
   resendListingStock: (listingId: string) =>
     apiRequest<{ message: string; pending?: number }>(`/sync/listings/${listingId}/resend-stock`, { method: 'POST' }),
 
+  /** Lo mismo para varias publicaciones a la vez (hasta 200): cuántas se enviaron, cuántas quedaron en revisión y cuáles se omitieron */
+  resendListingsStock: (listingIds: string[]) =>
+    apiRequest<{ enviados: number; enRevision: number; omitidos: { listingId: string; motivo: string }[] }>('/sync/listings/resend-stock', {
+      method: 'POST',
+      body: JSON.stringify({ listingIds }),
+    }),
+
   /** Actualiza stock/precio local y lo sincroniza con los canales publicados */
   updateInventory: (productId: string, dto: UpdateInventoryDto) =>
     apiRequest<{ message: string; pending?: number }>(`/sync/products/${productId}/inventory`, {
