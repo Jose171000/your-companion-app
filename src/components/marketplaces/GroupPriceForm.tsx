@@ -61,11 +61,14 @@ export function GroupPriceForm({ groupId, onDone }: { groupId: string; onDone?: 
     onError: () => toast.error("Error al conectar con el servidor"),
   });
 
+  // Lo que se ve de cada cuenta: lo editado o, mientras el estado se llena (primera pintura), lo que trae el servidor.
+  const valorDe = (id: string): PropioDeCanal => canales[id] ?? original[id] ?? { price: "", salePrice: "", saleStart: "", saleEnd: "" };
+
   // Solo las cuentas cuyo precio o descuento cambió.
   const cambiosDeCanal = (info?.canales ?? [])
-    .filter((c) => JSON.stringify(canales[c.connectionId]) !== JSON.stringify(original[c.connectionId]))
+    .filter((c) => JSON.stringify(valorDe(c.connectionId)) !== JSON.stringify(original[c.connectionId]))
     .map((c) => {
-      const v = canales[c.connectionId];
+      const v = valorDe(c.connectionId);
       return { connectionId: c.connectionId, price: numero(v.price), salePrice: numero(v.salePrice), saleStart: v.saleStart || null, saleEnd: v.saleEnd || null };
     });
   const canalInvalido = cambiosDeCanal.some((c) => [c.price, c.salePrice].some((x) => x !== null && (Number.isNaN(x) || x <= 0)));
@@ -85,7 +88,7 @@ export function GroupPriceForm({ groupId, onDone }: { groupId: string; onDone?: 
   if (isLoading) return <div className="space-y-3"><Skeleton className="h-10 w-full" /><Skeleton className="h-28 w-full" /></div>;
   if (isError || !info) return <p className="text-sm text-destructive">No se pudieron cargar los precios del grupo.</p>;
 
-  const set = (id: string, k: keyof PropioDeCanal, v: string) => setCanales((prev) => ({ ...prev, [id]: { ...prev[id], [k]: v } }));
+  const set = (id: string, k: keyof PropioDeCanal, v: string) => setCanales((prev) => ({ ...prev, [id]: { ...(prev[id] ?? original[id]), [k]: v } }));
 
   return (
     <div className="space-y-5">
@@ -113,7 +116,7 @@ export function GroupPriceForm({ groupId, onDone }: { groupId: string; onDone?: 
             <p className="text-[11px] text-muted-foreground">Vacío usa el precio del producto. Se aplican a las variantes publicadas en esa cuenta y salen al canal sin pasar por revisión.</p>
           </div>
           {info.canales.map((c) => {
-            const v = canales[c.connectionId] ?? propioDe(c.own);
+            const v = valorDe(c.connectionId);
             return (
               <div key={c.connectionId} className="rounded-lg border border-border p-3 space-y-2">
                 <div className="flex flex-wrap items-center gap-2 text-sm">

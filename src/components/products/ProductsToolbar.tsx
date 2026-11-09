@@ -132,11 +132,11 @@ export function ProductsToolbar({
       </div>
 
       {/* ── Export & New product buttons ───────────────────── */}
-      <div className="flex w-full lg:w-auto gap-2 shrink-0">
+      <div className="flex flex-wrap w-full lg:w-auto gap-2 lg:shrink-0 min-w-0">
         {can("productos.descargar") && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="w-full lg:w-auto font-semibold">
+              <Button variant="outline" className="flex-1 lg:flex-none font-semibold">
                 <Download className="w-4 h-4 mr-2" />
                 Exportar
               </Button>
@@ -150,7 +150,7 @@ export function ProductsToolbar({
         )}
 
         {can("productos.editar") && (
-          <Button variant="outline" className="w-full lg:w-auto font-semibold" onClick={() => setEdicionMasiva(true)}>
+          <Button variant="outline" className="flex-1 lg:flex-none font-semibold" onClick={() => setEdicionMasiva(true)}>
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Edición masiva
           </Button>
@@ -160,7 +160,7 @@ export function ProductsToolbar({
           <Button
             id="products-new-btn"
             onClick={onNewProduct}
-            className="w-full lg:w-auto gradient-primary glow-primary font-semibold"
+            className="flex-1 lg:flex-none gradient-primary glow-primary font-semibold"
           >
             <Plus className="w-4 h-4 mr-2" />
             Nuevo Producto
