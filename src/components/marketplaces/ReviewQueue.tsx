@@ -26,8 +26,18 @@ const RESOLVED_STYLES: Record<string, { label: string; className: string }> = {
   rejected: { label: "Rechazado", className: "bg-secondary text-muted-foreground border-border" },
 };
 
+const fmtFecha = (d: string) => d.split("-").reverse().join("/");
+
+/** «120|2026-11-09|2027-01-31» → «S/ 120.00 (09/11/2026 → 31/01/2027)»; «quitar» o vacío → «Sin descuento». */
+function fmtDescuento(v: string | null) {
+  if (v == null || v === "" || v === "quitar") return "Sin descuento";
+  const [precio, desde, hasta] = v.split("|");
+  const fechas = desde || hasta ? ` (${desde ? fmtFecha(desde) : "…"} → ${hasta ? fmtFecha(hasta) : "…"})` : "";
+  return `${money(precio)}${fechas}`;
+}
+
 const fmtValue = (r: ChangeRequest, v: string | null) =>
-  v == null ? "—" : r.field === "price" ? money(v) : `${v} u.`;
+  r.field === "promo" ? fmtDescuento(v) : v == null ? "—" : r.field === "price" ? money(v) : `${v} u.`;
 
 function ChangeLine({ r }: { r: ChangeRequest }) {
   return (
@@ -39,7 +49,7 @@ function ChangeLine({ r }: { r: ChangeRequest }) {
           {channelName(r.marketplace)}
           {(r.connection?.label || r.connection?.externalNickname) && ` · ${r.connection?.label || r.connection?.externalNickname}`}
         </Badge>
-        <span>{r.field === "price" ? "Precio" : "Stock"}:</span>
+        <span>{r.field === "price" ? "Precio" : r.field === "promo" ? "Descuento" : "Stock"}:</span>
         <span className="tabular-nums">{fmtValue(r, r.previousValue)}</span>
         <ArrowRight className="w-3 h-3" />
         <span className="tabular-nums font-semibold text-foreground">{fmtValue(r, r.newValue)}</span>

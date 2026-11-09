@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { syncApi } from "@/lib/sync-api";
+import { UserListing, syncApi } from "@/lib/sync-api";
+import { ChannelPromoBlock } from "./ChannelPromoBlock";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,8 @@ export interface EditableProduct {
   webPrice?: number | null;
   /** Precio con descuento y fechas de vigencia en Falabella */
   promo?: { price: number | null; start: string | null; end: string | null } | null;
+  /** Publicaciones del producto: de ahí salen los bloques de descuento por cuenta (Falabella y Ripley) */
+  channels?: { listing: UserListing }[];
 }
 
 interface Props {
@@ -52,6 +55,11 @@ export function EditInventoryDialog({ product, reviewMode, onClose }: Props) {
       setSaleEnd(product.promo?.end ?? "");
     }
   }, [product]);
+
+  // Solo las cuentas de Falabella y Ripley donde el producto está publicado (y que no pausaste tú).
+  const cuentasConDescuento = (product?.channels ?? [])
+    .map((c) => c.listing)
+    .filter((l) => (l.marketplace === "falabella" || l.marketplace === "ripley") && (l.syncStatus === "published" || l.syncStatus === "paused") && !l.pausedByUser);
 
   const priceNum = Number(price);
   const stockNum = Number(stock);
@@ -120,7 +128,7 @@ export function EditInventoryDialog({ product, reviewMode, onClose }: Props) {
 
   return (
     <Dialog open={product !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Editar precio y stock</DialogTitle>
           <DialogDescription>
@@ -154,7 +162,7 @@ export function EditInventoryDialog({ product, reviewMode, onClose }: Props) {
         </div>
 
         <div className="space-y-2 rounded-lg border border-border p-3">
-          <Label htmlFor="inv-sale">Precio con descuento en Falabella</Label>
+          <Label htmlFor="inv-sale">Descuento general del producto (Falabella)</Label>
           <Input
             id="inv-sale"
             type="number"
@@ -178,10 +186,22 @@ export function EditInventoryDialog({ product, reviewMode, onClose }: Props) {
             <p className="text-[11px] text-red-400">El descuento debe ser menor que el precio ({precioBase.toFixed(2)}) y la fecha final no puede ser anterior a la inicial.</p>
           ) : (
             <p className="text-[11px] text-muted-foreground">
-              Se envía a Falabella como precio especial, con sus fechas. No pasa por revisión. Para quitar un descuento ya enviado, hazlo en el Seller Center.
+              Se envía a Falabella como precio especial, con sus fechas, salvo en las cuentas con un descuento propio (abajo). No pasa por revisión. Para quitar un descuento ya enviado, hazlo en el Seller Center.
             </p>
           )}
         </div>
+
+        {cuentasConDescuento.length > 0 && (
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-semibold">Descuento por canal</p>
+              <p className="text-[11px] text-muted-foreground">Lo que cada canal muestra hoy y lo que quieres mandarle. Cada canal tiene su propio precio de lista.</p>
+            </div>
+            {cuentasConDescuento.map((l) => (
+              <ChannelPromoBlock key={l.id} listing={l} promoDelProducto={product?.promo} />
+            ))}
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="inv-web">Precio web (con descuento)</Label>

@@ -210,7 +210,8 @@ export interface ChangeRequest {
   id: string;
   marketplace: string;
   connection?: { id: string; label?: string | null; externalNickname?: string | null } | null;
-  field: 'price' | 'stock';
+  /** «promo»: un descuento por canal; el valor viaja como «precio|desde|hasta» o «quitar» */
+  field: 'price' | 'stock' | 'promo';
   previousValue: string | null;
   newValue: string;
   status: ChangeRequestStatus;
@@ -647,6 +648,10 @@ export const syncApi = {
       method: 'POST',
       body: JSON.stringify({ listingIds, campo }),
     }),
+
+  /** Descuento de UNA cuenta de Falabella o Ripley (sin precio, lo quita). Falabella sale al instante; Ripley, con revisión, queda como solicitud */
+  setListingPromo: (listingId: string, dto: { salePrice: number | null; saleStart?: string | null; saleEnd?: string | null }) =>
+    apiRequest<{ message: string; pending?: number }>(`/sync/listings/${listingId}/promo`, { method: 'POST', body: JSON.stringify(dto) }),
 
   /** Ripley: vuelve a mandar a ESA oferta el precio normal de Synkro (solo el precio; con el modo revisión, queda como solicitud) */
   resendListingPrice: (listingId: string) =>
