@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { GroupPriceForm } from "@/components/marketplaces/GroupPriceForm";
 
 const NOMBRE_CANAL: Record<string, string> = { falabella: "Falabella", mercadolibre: "Mercado Libre", woocommerce: "WooCommerce", shopify: "Shopify", ripley: "Ripley" };
 
@@ -400,7 +401,7 @@ function FichaDeProducto({
           <Tabs defaultValue="general">
             <TabsList className="flex-wrap h-auto">
               <TabsTrigger value="general">General</TabsTrigger>
-              {hoja.prices.length > 0 && !modoGrupo && <TabsTrigger value="precios">Precios</TabsTrigger>}
+              {((hoja.prices.length > 0 && !modoGrupo) || (modoGrupo && grupoId)) && <TabsTrigger value="precios">Precios</TabsTrigger>}
               {fal && <TabsTrigger value="falabella">Falabella</TabsTrigger>}
               {meli && <TabsTrigger value="mercadolibre">Mercado Libre</TabsTrigger>}
             </TabsList>
@@ -475,8 +476,15 @@ function FichaDeProducto({
               )}
             </TabsContent>
 
+            {/* ── Precios de todas las variantes ── */}
+            {modoGrupo && grupoId && (
+              <TabsContent value="precios" className="pt-4">
+                <GroupPriceForm groupId={grupoId} />
+              </TabsContent>
+            )}
+
             {/* ── Precios por canal ── */}
-            {hoja.prices.length > 0 && (
+            {hoja.prices.length > 0 && !modoGrupo && (
               <TabsContent value="precios" className="pt-4 space-y-4">
                 <p className="text-xs text-muted-foreground">
                   Cada canal usa el precio del producto salvo que fijes uno propio aquí. Actualizar el contenido con la IA nunca quita un descuento: se conserva el que el canal ya tiene.

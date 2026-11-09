@@ -218,7 +218,24 @@ export interface ChangeRequest {
   resultMessage: string | null;
   createdAt: string;
   resolvedAt: string | null;
-  product: { id: string; name: string; sku: string };
+  /** `group`: si el producto es una variante, su grupo (para mostrar «20 variantes» en vez de 20 filas) */
+  product: { id: string; name: string; sku: string; group?: { id: string; name: string } | null };
+}
+
+/** Los precios de un grupo de variantes, para editarlos todos a la vez. */
+export interface GroupPrices {
+  groupId: string;
+  variantes: number;
+  price: { min: number | null; max: number | null; distintos: number; comun: number | null };
+  canales: {
+    connectionId: string;
+    marketplace: string;
+    account: string;
+    canSetSale: boolean;
+    variantes: number;
+    own: { price: number | null; salePrice: number | null; saleStart: string | null; saleEnd: string | null };
+    differs: boolean;
+  }[];
 }
 
 export interface UpdateInventoryDto {
@@ -704,6 +721,36 @@ export const syncApi = {
 
   approveChange: (id: string) =>
     apiRequest<{ message: string }>(`/sync/change-requests/${id}/approve`, { method: 'POST' }),
+
+  /** Aprueba varias solicitudes de una vez (un grupo de variantes o todas las pendientes), hasta 200 */
+  approveManyChanges: (ids: string[]) =>
+    apiRequest<{ aprobadas: number; omitidas: { id: string; motivo: string }[] }>('/sync/change-requests/approve-many', {
+      method: 'POST',
+      body: JSON.stringify({ ids }),
+    }),
+
+  rejectManyChanges: (ids: string[], reason?: string) =>
+    apiRequest<{ rechazadas: number; omitidas: { id: string; motivo: string }[] }>('/sync/change-requests/reject-many', {
+      method: 'POST',
+      body: JSON.stringify({ ids, reason }),
+    }),
+
+  /** Precios de un grupo de variantes: el del producto y el propio de cada canal (para editarlos todos a la vez) */
+  getGroupPrices: (groupId: string) => apiRequest<GroupPrices>(`/sync/groups/${groupId}/prices`),
+
+  /** Precio y descuento propios de cada canal, para todas las variantes del grupo publicadas en esa cuenta */
+  saveGroupChannelPrices: (groupId: string, prices: { connectionId: string; price: number | null; salePrice: number | null; saleStart: string | null; saleEnd: string | null }[]) =>
+    apiRequest<{ saved: boolean; variantes: number; sinPublicar: number; errores: { sku: string; mensaje: string }[]; pricesSent: string[] }>(`/sync/groups/${groupId}/channel-prices`, {
+      method: 'PATCH',
+      body: JSON.stringify({ prices }),
+    }),
+
+  /** El precio del producto para todas las variantes de un grupo (con el modo revisión, una solicitud por variante y canal) */
+  updateGroupInventory: (groupId: string, price: number) =>
+    apiRequest<{ variantes: number; pending: number; message: string }>(`/sync/groups/${groupId}/inventory`, {
+      method: 'PATCH',
+      body: JSON.stringify({ price }),
+    }),
 
   rejectChange: (id: string, reason?: string) =>
     apiRequest<{ id: string }>(`/sync/change-requests/${id}/reject`, {

@@ -18,6 +18,8 @@ import { EditInventoryDialog, EditableProduct } from "./EditInventoryDialog";
 import { ProductThumb } from "./ProductThumb";
 import { ChannelActionDialog, PendingChannelAction, estadoVisible } from "./ChannelActionDialog";
 import { BulkResendStockDialog } from "./BulkResendStockDialog";
+import { GroupPriceForm } from "./GroupPriceForm";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Props {
   listings: UserListing[];
@@ -365,6 +367,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
   const [channelAction, setChannelAction] = useState<PendingChannelAction | null>(null);
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const [reenvioMasivo, setReenvioMasivo] = useState(false);
+  const [precioDeGrupo, setPrecioDeGrupo] = useState<{ groupId: string; name: string; n: number } | null>(null);
   const alternar = (id: string) => setAbiertos((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const rows = useMemo(() => buildRows(listings, pending), [listings, pending]);
@@ -567,6 +570,11 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
                     </div>
                   </div>
                   <div className="flex-1"><GroupChannels children={item.children} /></div>
+                  {canEdit && (
+                    <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={(e) => { e.stopPropagation(); setPrecioDeGrupo({ groupId: item.groupId, name: item.name, n: item.children.length }); }}>
+                      <Pencil className="w-3.5 h-3.5" /> Precio de todas
+                    </Button>
+                  )}
                   <span className="text-xs text-muted-foreground shrink-0">{abierto ? "Ocultar" : "Ver variantes"}</span>
                 </div>
                 {abierto && item.children.map((c) => renderRow(c, true))}
@@ -598,6 +606,11 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
                   <span className="text-muted-foreground">{item.children.reduce((n, c) => n + (c.stock ?? 0), 0)} u.</span>
                 </div>
                 <GroupChannels children={item.children} />
+                {canEdit && (
+                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setPrecioDeGrupo({ groupId: item.groupId, name: item.name, n: item.children.length })}>
+                    <Pencil className="w-3.5 h-3.5" /> Precio de todas las variantes
+                  </Button>
+                )}
                 {abierto && (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4 pt-1">
                     {item.children.map((c) => renderCard(c, true))}
@@ -609,6 +622,15 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
         </div>
       )}
 
+      <Dialog open={precioDeGrupo !== null} onOpenChange={(o) => !o && setPrecioDeGrupo(null)}>
+        <DialogContent className="sm:max-w-[760px] max-h-[92vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0">
+          <DialogHeader>
+            <DialogTitle>Precio de todas las variantes</DialogTitle>
+            <DialogDescription className="break-words">{precioDeGrupo?.name} · {precioDeGrupo?.n} variantes. Lo que cambies aquí se aplica a todas.</DialogDescription>
+          </DialogHeader>
+          {precioDeGrupo && <GroupPriceForm groupId={precioDeGrupo.groupId} />}
+        </DialogContent>
+      </Dialog>
       <EditInventoryDialog product={editing} reviewMode={reviewMode} onClose={() => setEditing(null)} />
       <ProductSheetDialog product={sheetFor} onClose={() => setSheetFor(null)} />
       <ChannelActionDialog pending={channelAction} onClose={() => setChannelAction(null)} />
