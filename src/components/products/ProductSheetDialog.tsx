@@ -44,13 +44,18 @@ interface PrecioPropio { price: string; salePrice: string; saleStart: string; sa
 
 const ORIGEN_PRECIO: Record<string, string> = { propio: "fijado para este canal", producto: "el del producto", canal: "el que el canal ya tenía" };
 
-function borradorDe(hoja: SheetData): Borrador {
+/** Atributos que cambian de una variante a otra (color, talla…): en el modo «todas las variantes» no se editan. */
+const claveDe = (t: string) => String(t ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const esPropioDeVariante = (nombre: string, ejes: string[]) => ["color", "colorbasico", "maincolor", "talla", "size", ...ejes.map(claveDe)].includes(claveDe(nombre));
+
+function borradorDe(hoja: SheetData, nombreDelGrupo?: string): Borrador {
   const fal = hoja.channels.find((c) => c.marketplace === "falabella");
   const meli = hoja.channels.find((c) => c.marketplace === "mercadolibre");
   const p = hoja.product;
   return {
     name: p.name,
-    aiTitle: p.aiTitle ?? "",
+    // En el modo grupo el título común es el del grupo (el de cada variante lleva su color y talla).
+    aiTitle: nombreDelGrupo ?? p.aiTitle ?? "",
     aiDescription: p.aiDescription ?? "",
     descriptionHtml: p.descriptionHtml ?? "",
     brand: p.brand ?? "",
@@ -174,8 +179,17 @@ function EtiquetaDeOrigen({ origen }: { origen: Origen }) {
 }
 
 function CampoDeAtributo({
-  etiqueta, descripcion, obligatorio, opciones, valor, onChange, origen,
-}: { etiqueta: string; descripcion?: string; obligatorio?: boolean; opciones?: string[]; valor: string; onChange: (v: string) => void; origen?: Origen }) {
+  etiqueta, descripcion, obligatorio, opciones, valor, onChange, origen, propio,
+}: { etiqueta: string; descripcion?: string; obligatorio?: boolean; opciones?: string[]; valor: string; onChange: (v: string) => void; origen?: Origen; propio?: boolean }) {
+  if (propio) {
+    return (
+      <div className="space-y-1 min-w-0 opacity-70">
+        <Label className="text-xs">{etiqueta}</Label>
+        <Input value={valor} disabled />
+        <p className="text-[11px] text-muted-foreground">Propio de cada variante: se edita en cada una.</p>
+      </div>
+    );
+  }
   return (
     <div className="space-y-1 min-w-0">
       <Label className="text-xs">
@@ -206,6 +220,8 @@ function CampoDeAtributo({
  * Desde la fila de un grupo la ficha se abre con todas sus variantes a la vista: se elige cuál se está viendo y, al guardar,
  * los cambios van a esa variante. Un producto simple se muestra como siempre.
  */
+const TODAS = "__todas__";
+
 export function ProductSheetDialog({ product, onClose }: { product: Product | null; onClose: () => void }) {
   const [elegida, setElegida] = useState<string | null>(null);
   const grupoId = product?.alGrupo ? product.group?.id : undefined;
@@ -217,11 +233,31 @@ export function ProductSheetDialog({ product, onClose }: { product: Product | nu
     staleTime: 30_000,
   });
   const variantes = grupoId ? data?.data?.data ?? [] : [];
-  const actual = product && variantes.length ? (variantes.find((v) => v.id === elegida) ?? variantes[0]) : product;
-  return <FichaDeProducto product={actual} onClose={onClose} variantes={variantes} variantId={actual?.id} onElegir={setElegida} />;
+  // Con varias variantes la ficha se abre en «Todas»: lo común se edita una sola vez y se aplica a todas.
+  const todas = variantes.length > 1 && (elegida === null || elegida === TODAS);
+  const actual = product && variantes.length ? (todas ? variantes[0] : variantes.find((v) => v.id === elegida) ?? variantes[0]) : product;
+  const grupo = product?.group;
+  return (
+    <FichaDeProducto
+      product={actual}
+      onClose={onClose}
+      variantes={variantes}
+      variantId={todas ? TODAS : actual?.id}
+      onElegir={setElegida}
+      modoGrupo={todas && !!grupoId}
+      grupoId={grupoId}
+      nombreDelGrupo={grupo?.name}
+      ejes={(grupo?.axes ?? []).map((e: { name: string }) => e.name)}
+    />
+  );
 }
 
-function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir }: { product: Product | null; onClose: () => void; variantes?: Product[]; variantId?: string; onElegir?: (id: string) => void }) {
+function FichaDeProducto({
+  product, onClose, variantes = [], variantId, onElegir, modoGrupo = false, grupoId, nombreDelGrupo, ejes = [],
+}: {
+  product: Product | null; onClose: () => void; variantes?: Product[]; variantId?: string; onElegir?: (id: string) => void;
+  modoGrupo?: boolean; grupoId?: string; nombreDelGrupo?: string; ejes?: string[];
+}) {
   const queryClient = useQueryClient();
   const open = product !== null;
   const [borrador, setBorrador] = useState<Borrador | null>(null);
@@ -234,7 +270,7 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
     staleTime: 0,
   });
   const hoja = data?.data ?? null;
-  const original = useMemo(() => (hoja ? borradorDe(hoja) : null), [hoja]);
+  const original = useMemo(() => (hoja ? borradorDe(hoja, modoGrupo ? nombreDelGrupo : undefined) : null), [hoja, modoGrupo, nombreDelGrupo]);
 
   useEffect(() => {
     if (original) setBorrador(original);
@@ -246,14 +282,16 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
   const cambios = useMemo(() => {
     if (!borrador || !original) return null;
     const c: Record<string, any> = {};
+    // En el modo «todas las variantes» el nombre interno y los precios son de cada variante: no se mandan.
     (["name", "aiTitle", "aiDescription", "descriptionHtml", "brand"] as const).forEach((k) => {
+      if (modoGrupo && k === "name") return;
       if (borrador[k] !== original[k]) c[k] = borrador[k];
     });
     const a: Record<string, string> = {};
-    for (const [k, v] of Object.entries(borrador.atributos)) if (v !== (original.atributos[k] ?? "")) a[k] = v;
+    for (const [k, v] of Object.entries(borrador.atributos)) if (v !== (original.atributos[k] ?? "") && !(modoGrupo && esPropioDeVariante(k, ejes))) a[k] = v;
     if (Object.keys(a).length) c.attributes = a;
     const m: Record<string, string> = {};
-    for (const [k, v] of Object.entries(borrador.atributosMeli)) if (v !== (original.atributosMeli[k] ?? "")) m[k] = v;
+    for (const [k, v] of Object.entries(borrador.atributosMeli)) if (v !== (original.atributosMeli[k] ?? "") && !(modoGrupo && esPropioDeVariante(k, ejes))) m[k] = v;
     if (Object.keys(m).length) c.mercadolibreAttributes = m;
     const med = borrador.medidas;
     if (JSON.stringify(med) !== JSON.stringify(original.medidas) && [med.width, med.length, med.height, med.weight].every((x) => Number(x) > 0)) {
@@ -261,32 +299,41 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
     }
     // Precios: se envía el estado completo de cada cuenta cuyo precio o descuento cambió.
     const numero = (v: string) => (v.trim() === "" ? null : Number(v));
-    const p = Object.entries(borrador.precios)
+    const p = modoGrupo ? [] : Object.entries(borrador.precios)
       .filter(([id, v]) => JSON.stringify(v) !== JSON.stringify(original.precios[id]))
       .map(([id, v]) => ({ connectionId: id, price: numero(v.price), salePrice: numero(v.salePrice), saleStart: v.saleStart || null, saleEnd: v.saleEnd || null }));
     if (p.length) c.prices = p;
     return Object.keys(c).length ? c : null;
-  }, [borrador, original]);
+  }, [borrador, original, modoGrupo, ejes]);
 
   const refrescar = () => {
-    queryClient.invalidateQueries({ queryKey: ["product-sheet", product?.id] });
+    queryClient.invalidateQueries({ queryKey: modoGrupo ? ["product-sheet"] : ["product-sheet", product?.id] });
     queryClient.invalidateQueries({ queryKey: ["products"] });
     queryClient.invalidateQueries({ queryKey: ["sync-listings"] });
   };
 
   const guardar = useMutation({
-    mutationFn: () => syncApi.saveProductSheet(product!.id, cambios!),
+    mutationFn: () => (modoGrupo && grupoId ? syncApi.saveGroupSheet(grupoId, cambios!) : syncApi.saveProductSheet(product!.id, cambios!)),
     onSuccess: (res) => {
       if (res.error || !res.data) return toast.error(res.error ?? "No se pudo guardar");
-      const destinos = res.data.willUpdate.map((m) => NOMBRE_CANAL[m] ?? m);
-      const precios = (res.data.pricesSent ?? []).map((m) => NOMBRE_CANAL[m] ?? m);
-      toast.success(
-        destinos.length
-          ? `Guardado. Se enviará solo a ${destinos.join(" y ")} en menos de un minuto.`
-          : precios.length
-            ? `Guardado. Los precios se enviarán a ${precios.join(" y ")} en unos minutos.`
-            : "Guardado. Este producto aún no está publicado en ningún canal, así que no hay nada que enviar.",
-      );
+      const data = res.data as { willUpdate: string[]; pricesSent?: string[]; variantes?: number };
+      const destinos = data.willUpdate.map((m) => NOMBRE_CANAL[m] ?? m);
+      const precios = (data.pricesSent ?? []).map((m) => NOMBRE_CANAL[m] ?? m);
+      if (modoGrupo) {
+        toast.success(
+          destinos.length
+            ? `Guardado en ${data.variantes ?? "todas las"} variantes. Se enviará a ${destinos.join(" y ")} de a una, en unos minutos.`
+            : `Guardado en ${data.variantes ?? "todas las"} variantes. Todavía no están publicadas en ningún canal, así que no hay nada que enviar.`,
+        );
+      } else {
+        toast.success(
+          destinos.length
+            ? `Guardado. Se enviará solo a ${destinos.join(" y ")} en menos de un minuto.`
+            : precios.length
+              ? `Guardado. Los precios se enviarán a ${precios.join(" y ")} en unos minutos.`
+              : "Guardado. Este producto aún no está publicado en ningún canal, así que no hay nada que enviar.",
+        );
+      }
       refrescar();
     },
     onError: () => toast.error("Error al conectar con el servidor"),
@@ -310,9 +357,11 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-[860px] max-h-[92vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-primary" /> Ficha del producto</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-primary" /> {modoGrupo ? "Ficha del grupo" : "Ficha del producto"}</DialogTitle>
           <DialogDescription className="break-words">
-            {hoja ? `${hoja.product.name} · SKU ${hoja.product.sku}` : product?.name}. Esto es lo que se envía a cada canal; al guardar, los cambios se envían solos a donde está publicado.
+            {modoGrupo
+              ? `${nombreDelGrupo ?? product?.name} · ${variantes.length} variantes. Lo que cambies aquí se aplica a todas.`
+              : `${hoja ? `${hoja.product.name} · SKU ${hoja.product.sku}` : product?.name}. Esto es lo que se envía a cada canal; al guardar, los cambios se envían solos a donde está publicado.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -325,12 +374,22 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
         {variantes.length > 1 && (
           <div className="flex flex-wrap items-center gap-1.5">
             <span className="text-xs text-muted-foreground mr-1">Variante:</span>
+            <button type="button" onClick={() => onElegir?.(TODAS)} className={`text-xs rounded-full border px-2.5 py-1 font-medium transition-colors ${variantId === TODAS ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}>
+              Todas las variantes ({variantes.length})
+            </button>
             {variantes.map((v) => (
               <button key={v.id} type="button" onClick={() => onElegir?.(v.id)} className={`text-xs rounded-full border px-2.5 py-1 transition-colors ${v.id === variantId ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}>
                 {v.variantValues ? Object.values(v.variantValues).join(" / ") : v.sku} <span className="font-mono opacity-70">{v.sku}</span>
               </button>
             ))}
           </div>
+        )}
+
+        {modoGrupo && (
+          <p className="text-xs rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-muted-foreground">
+            <span className="font-medium text-foreground">Editas lo común de las {variantes.length} variantes.</span> Se aplica solo lo que cambies, y cada variante conserva el resto.
+            Lo propio de cada una (nombre interno, precio, color, talla, fotos, stock) se edita eligiéndola arriba.
+          </p>
         )}
 
         {isLoading || !borrador ? (
@@ -341,7 +400,7 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
           <Tabs defaultValue="general">
             <TabsList className="flex-wrap h-auto">
               <TabsTrigger value="general">General</TabsTrigger>
-              {hoja.prices.length > 0 && <TabsTrigger value="precios">Precios</TabsTrigger>}
+              {hoja.prices.length > 0 && !modoGrupo && <TabsTrigger value="precios">Precios</TabsTrigger>}
               {fal && <TabsTrigger value="falabella">Falabella</TabsTrigger>}
               {meli && <TabsTrigger value="mercadolibre">Mercado Libre</TabsTrigger>}
             </TabsList>
@@ -356,7 +415,7 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
             <TabsContent value="general" className="pt-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1 sm:col-span-2">
-                  <Label className="text-xs">Título que se envía a los canales<EtiquetaDeOrigen origen={hoja.product.origin?.aiTitle} /></Label>
+                  <Label className="text-xs">{modoGrupo ? "Título común del grupo (sin color ni talla)" : "Título que se envía a los canales"}{!modoGrupo && <EtiquetaDeOrigen origen={hoja.product.origin?.aiTitle} />}</Label>
                   <Input value={borrador.aiTitle} onChange={(e) => cambia("aiTitle", e.target.value)} placeholder={borrador.name} />
                   <p className="text-[11px] text-muted-foreground">
                     {borrador.aiTitle.length || borrador.name.length} caracteres. Falabella pide entre 20 y 100; Mercado Libre recorta a 60. Si lo dejas vacío se usa el nombre.
@@ -364,7 +423,8 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Nombre del producto (interno)</Label>
-                  <Input value={borrador.name} onChange={(e) => cambia("name", e.target.value)} />
+                  <Input value={borrador.name} onChange={(e) => cambia("name", e.target.value)} disabled={modoGrupo} />
+                  {modoGrupo && <p className="text-[11px] text-muted-foreground">Cada variante lleva el suyo («… - Beige · 36»): se edita en cada una.</p>}
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Marca<EtiquetaDeOrigen origen={hoja.product.origin?.brand} /></Label>
@@ -466,6 +526,7 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
                         origen={a.origin}
                         opciones={a.options}
                         valor={borrador.atributos[a.name] ?? ""}
+                        propio={modoGrupo && (esPropioDeVariante(a.name, ejes) || esPropioDeVariante(a.label ?? "", ejes))}
                         onChange={(v) => cambia("atributos", { ...borrador.atributos, [a.name]: v })}
                       />
                     ))}
@@ -486,7 +547,7 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
                 <p className="text-xs text-muted-foreground">La descripción de texto se edita en la pestaña General. Aquí van los atributos que recibe Mercado Libre:</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {(meli.sent.attributes as any[]).map((a) => (
-                    <CampoDeAtributo key={a.id} etiqueta={a.id} origen={a.origin} valor={borrador.atributosMeli[a.id] ?? ""} onChange={(v) => cambia("atributosMeli", { ...borrador.atributosMeli, [a.id]: v })} />
+                    <CampoDeAtributo key={a.id} etiqueta={a.id} origen={a.origin} propio={modoGrupo && esPropioDeVariante(a.id, ejes)} valor={borrador.atributosMeli[a.id] ?? ""} onChange={(v) => cambia("atributosMeli", { ...borrador.atributosMeli, [a.id]: v })} />
                   ))}
                 </div>
               </TabsContent>
@@ -496,13 +557,15 @@ function FichaDeProducto({ product, onClose, variantes = [], variantId, onElegir
 
         <DialogFooter className="gap-2 sm:gap-2 flex-wrap">
           <Button variant="outline" onClick={onClose}>Cerrar</Button>
-          <Button variant="outline" onClick={() => enviarYa.mutate()} disabled={enviarYa.isPending || !hoja || hoja.channels.length === 0 || cambios !== null} title={cambios ? "Guarda primero los cambios" : "Envía ya, sin esperar"}>
-            {enviarYa.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Rocket className="w-4 h-4 mr-2" />}
-            Enviar ahora a los canales
-          </Button>
+          {!modoGrupo && (
+            <Button variant="outline" onClick={() => enviarYa.mutate()} disabled={enviarYa.isPending || !hoja || hoja.channels.length === 0 || cambios !== null} title={cambios ? "Guarda primero los cambios" : "Envía ya, sin esperar"}>
+              {enviarYa.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Rocket className="w-4 h-4 mr-2" />}
+              Enviar ahora a los canales
+            </Button>
+          )}
           <Button onClick={() => guardar.mutate()} disabled={!cambios || guardar.isPending}>
             {guardar.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-            Guardar y enviar a los canales
+            {modoGrupo ? `Guardar en las ${variantes.length} variantes` : "Guardar y enviar a los canales"}
           </Button>
         </DialogFooter>
       </DialogContent>

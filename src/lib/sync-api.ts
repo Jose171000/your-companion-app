@@ -596,6 +596,13 @@ export const syncApi = {
       body: JSON.stringify(cambios),
     }),
 
+  /** Guarda lo COMÚN de un grupo de variantes en todas a la vez (título, descripciones, HTML, marca, medidas, atributos de los canales) */
+  saveGroupSheet: (groupId: string, cambios: Record<string, any>) =>
+    apiRequest<{ saved: boolean; variantes: number; willUpdate: string[] }>(`/sync/groups/${groupId}/sheet`, {
+      method: 'PATCH',
+      body: JSON.stringify(cambios),
+    }),
+
   /** Envía ya el contenido actual a cada canal publicado. */
   syncProductSheetNow: (productId: string) =>
     apiRequest<{ results: { marketplace: string; ok: boolean; message: string }[] }>(`/sync/products/${productId}/sheet/sync`, { method: 'POST' }),
