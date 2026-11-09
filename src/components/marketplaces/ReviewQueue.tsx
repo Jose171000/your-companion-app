@@ -22,6 +22,7 @@ const RESOLVED_STYLES: Record<string, { label: string; className: string }> = {
   approved: { label: "Aprobado", className: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
   sent: { label: "Enviado", className: "bg-green-500/10 text-green-400 border-green-500/30" },
   error: { label: "Error", className: "bg-red-500/10 text-red-400 border-red-500/30" },
+  skipped: { label: "No enviado", className: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30" },
   rejected: { label: "Rechazado", className: "bg-secondary text-muted-foreground border-border" },
 };
 

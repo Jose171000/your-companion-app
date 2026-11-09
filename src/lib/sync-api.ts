@@ -204,7 +204,7 @@ export interface SalesQuery {
   offset?: number;
 }
 
-export type ChangeRequestStatus = 'pending' | 'approved' | 'rejected' | 'sent' | 'error';
+export type ChangeRequestStatus = 'pending' | 'approved' | 'rejected' | 'sent' | 'error' | 'skipped';
 
 export interface ChangeRequest {
   id: string;
