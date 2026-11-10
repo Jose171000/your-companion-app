@@ -145,6 +145,17 @@ export interface ProductsQueryParams {
   order?: 'asc' | 'desc';
 }
 
+/** Lo que devuelve la IA al preparar un producto para Ripley (no se envía nada a Ripley). */
+export interface RipleyPreview {
+  guardado: boolean;
+  categoria: { id: string | null; ruta: string | null; confianza: 'alta' | 'baja' | 'ninguna'; motivo: string | null };
+  contenido: { name?: string; shortDescription?: string; description?: string; brand?: string };
+  descripcionEsHtml: boolean;
+  marca: { valor: string; valida: boolean; canonica: string | null; sugerencias: string[]; listaCargada: boolean } | null;
+  atributos: Record<string, string>;
+  faltantes: { name: string; description: string; options?: string[] }[];
+}
+
 export interface GenerateAIContentDto {
   targetMarketplaces?: string[];
   tone?: string;
@@ -233,6 +244,13 @@ export const productsApi = {
     apiRequest<Product>(`/products/${id}/generate-ai`, {
       method: 'POST',
       body: JSON.stringify(dto),
+    }),
+
+  /** La IA prepara el producto para Ripley (categoría verificada, contenido y atributos). `guardar: false` es solo vista previa. */
+  prepareRipley: (id: string, guardar = false) =>
+    apiRequest<RipleyPreview>(`/products/${id}/prepare-ripley`, {
+      method: 'POST',
+      body: JSON.stringify({ guardar }),
     }),
 
   /** Regenerar con IA el contenido de un producto con variantes: UNA sola vez para todo el grupo */

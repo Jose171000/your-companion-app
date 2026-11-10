@@ -16,7 +16,8 @@ function useDebounced<T>(value: T, ms = 300): T {
 }
 
 interface Props {
-  productId: string;
+  /** Los productos a los que se aplica la marca (todas las variantes, si es un grupo). */
+  productIds: string[];
   /** Marca con la que está hoy el producto en Ripley. */
   value: string;
   /** Se llama con la marca ya guardada (tal como la escribe Ripley). */
@@ -27,7 +28,7 @@ interface Props {
  * Ripley solo acepta marcas de su catálogo aprobado (27.116) o «GENÉRICO». Se busca en ese catálogo y, al elegir una,
  * queda guardada en el producto; no se puede escribir una que no exista. No envía nada a Ripley.
  */
-export function RipleyBrandField({ productId, value, onSaved }: Props) {
+export function RipleyBrandField({ productIds, value, onSaved }: Props) {
   const [texto, setTexto] = useState("");
   const [abierto, setAbierto] = useState(false);
   const diferido = useDebounced(texto);
@@ -41,7 +42,14 @@ export function RipleyBrandField({ productId, value, onSaved }: Props) {
   const resultados = data?.data ?? [];
 
   const guardar = useMutation({
-    mutationFn: (brand: string) => syncApi.setRipleyBrand(productId, brand),
+    mutationFn: async (brand: string) => {
+      let ultima: Awaited<ReturnType<typeof syncApi.setRipleyBrand>> | null = null;
+      for (const id of productIds) {
+        ultima = await syncApi.setRipleyBrand(id, brand);
+        if (ultima.error) break;
+      }
+      return ultima!;
+    },
     onSuccess: (res) => {
       if (res.error || !res.data) return toast.error(res.error ?? "No se pudo guardar la marca");
       toast.success(`Marca guardada para Ripley: ${res.data.brand}`);

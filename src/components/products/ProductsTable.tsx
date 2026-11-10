@@ -18,6 +18,7 @@ interface ProductsTableProps {
   onRegenerate: (product: Product) => void;
   onPublish: (product: Product) => void;
   onPrepareFalabella: (product: Product) => void;
+  onPrepareRipley: (product: Product) => void;
   onSheet: (product: Product) => void;
 }
 
@@ -32,6 +33,7 @@ export function ProductsTable({
   onRegenerate,
   onPublish,
   onPrepareFalabella,
+  onPrepareRipley,
   onSheet,
 }: ProductsTableProps) {
   // ── Loading skeleton ──────────────────────────────────────────────────────
@@ -120,9 +122,9 @@ export function ProductsTable({
           <tbody className="divide-y divide-border/50">
             {products.map((product) =>
               product.group && product.groupSummary ? (
-                <GroupRows key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onSheet={onSheet} />
+                <GroupRows key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onPrepareRipley={onPrepareRipley} onSheet={onSheet} />
               ) : (
-                <ProductRow key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onSheet={onSheet} />
+                <ProductRow key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onPrepareRipley={onPrepareRipley} onSheet={onSheet} />
               ),
             )}
           </tbody>
@@ -132,7 +134,7 @@ export function ProductsTable({
       {/* ── Mobile cards ───────────────────────────────────────────────────── */}
       <div className="md:hidden divide-y divide-border/50">
         {products.map((product) => product.group && product.groupSummary ? (
-          <GroupCard key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onSheet={onSheet} />
+          <GroupCard key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onPrepareRipley={onPrepareRipley} onSheet={onSheet} />
         ) : (
           <ProductCard
             key={product.id}

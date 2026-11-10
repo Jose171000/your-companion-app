@@ -14,6 +14,7 @@ import { RegenerateAIDialog } from "./RegenerateAIDialog";
 import { PublishProductDialog } from "./PublishProductDialog";
 import { ProductSheetDialog } from "./ProductSheetDialog";
 import { PrepareFalabellaDialog } from "./PrepareFalabellaDialog";
+import { PrepareRipleyDialog } from "./PrepareRipleyDialog";
 import { toast } from "sonner";
 
 const TAMANOS_DE_PAGINA = [10, 25, 50, 100];
@@ -46,6 +47,7 @@ export function ProductsModule() {
     else setSheetTarget(res.data);
   });
   const [falabellaTarget, setFalabellaTarget] = useState<Product | null>(null);
+  const [ripleyTarget, setRipleyTarget] = useState<Product | null>(null);
 
   // ── Query ─────────────────────────────────────────────────────────────────
   const filters: ProductsQueryParams = {
@@ -172,6 +174,7 @@ export function ProductsModule() {
         onRegenerate={(p) => setRegenTarget(p)}
         onPublish={(p) => setPublishTarget(p)}
         onPrepareFalabella={(p) => setFalabellaTarget(p)}
+        onPrepareRipley={(p) => setRipleyTarget(p)}
         onSheet={(p) => setSheetTarget(p)}
       />
 
@@ -218,6 +221,12 @@ export function ProductsModule() {
         product={falabellaTarget}
         open={falabellaTarget !== null}
         onClose={() => setFalabellaTarget(null)}
+      />
+
+      <PrepareRipleyDialog
+        product={ripleyTarget}
+        open={ripleyTarget !== null}
+        onClose={() => setRipleyTarget(null)}
       />
 
       <PublishProductDialog

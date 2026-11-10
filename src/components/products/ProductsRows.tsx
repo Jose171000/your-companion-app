@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Edit, FileText, ImageOff, PackageCheck, Rocket, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Edit, FileText, ImageOff, PackageCheck, Rocket, Sparkles, Store, Trash2 } from "lucide-react";
 import { Product, ProductOverview, productsApi } from "@/lib/products-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ export interface RowHandlers {
   onRegenerate: (product: Product) => void;
   onPublish: (product: Product) => void;
   onPrepareFalabella: (product: Product) => void;
+  onPrepareRipley: (product: Product) => void;
   onSheet: (product: Product) => void;
 }
 
@@ -46,7 +47,7 @@ function Thumb({ product }: { product: Product }) {
   );
 }
 
-function RowActions({ product, onSheet, onPublish, onPrepareFalabella, onRegenerate, onEdit, onDelete }: RowHandlers & { product: Product }) {
+function RowActions({ product, onSheet, onPublish, onPrepareFalabella, onPrepareRipley, onRegenerate, onEdit, onDelete }: RowHandlers & { product: Product }) {
   const { can } = useStores();
   const btn = "h-8 w-8 hover:text-primary hover:bg-primary/10";
   return (
@@ -54,6 +55,7 @@ function RowActions({ product, onSheet, onPublish, onPrepareFalabella, onRegener
       <Button variant="ghost" size="icon" className={btn} onClick={() => onSheet(product)} title="Ficha: lo que se envía a cada canal"><FileText className="w-4 h-4" /></Button>
       {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => onPublish(product)} title="Publicar en marketplaces"><Rocket className="w-4 h-4" /></Button>}
       {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => onPrepareFalabella(product)} title="Preparar para Falabella (categoría, medidas y atributos)"><PackageCheck className="w-4 h-4" /></Button>}
+      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => onPrepareRipley(product)} title="Preparar para Ripley (categoría y atributos)"><Store className="w-4 h-4" /></Button>}
       {can("productos.editar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-accent hover:bg-accent/10" onClick={() => onRegenerate(product)} title="Regenerar con IA"><Sparkles className="w-4 h-4" /></Button>}
       {can("productos.editar") && <Button variant="ghost" size="icon" className={btn} onClick={() => onEdit(product)} title="Editar"><Edit className="w-4 h-4" /></Button>}
       {can("productos.eliminar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(product)} title="Eliminar"><Trash2 className="w-4 h-4" /></Button>}
@@ -81,6 +83,7 @@ function GroupActions({ product, ...handlers }: RowHandlers & { product: Product
       <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onSheet(delGrupo)} title="Ficha: lo que se envía a cada canal (elige la variante dentro)"><FileText className="w-4 h-4" /></Button>
       {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPublish(delGrupo)} title={`Publicar ${todas} en marketplaces`}><Rocket className="w-4 h-4" /></Button>}
       {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPrepareFalabella(delGrupo)} title={`Preparar ${todas} para Falabella (categoría, medidas y atributos)`}><PackageCheck className="w-4 h-4" /></Button>}
+      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPrepareRipley(delGrupo)} title={`Preparar ${todas} para Ripley (categoría y atributos)`}><Store className="w-4 h-4" /></Button>}
       {can("productos.editar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-accent hover:bg-accent/10" onClick={() => handlers.onRegenerate(delGrupo)} title={`Regenerar con IA ${todas}`}><Sparkles className="w-4 h-4" /></Button>}
       {can("productos.editar") && <Popover open={eligiendo} onOpenChange={setEligiendo}>
         <PopoverTrigger asChild>

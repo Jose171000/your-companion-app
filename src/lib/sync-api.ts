@@ -321,6 +321,31 @@ export interface LaunchReport {
   meliCategory?: { id?: string; path?: string; options?: { id: string; path: string }[] };
 }
 
+/** Un campo que pide una categoría de Ripley. */
+export interface RipleyCampo {
+  name: string;
+  label: string;
+  description: string;
+  required: boolean;
+  level: string;
+  /** El campo define la variante (color, talla…): en un grupo se toma de cada variante. */
+  isVariant: boolean;
+  type: string;
+  listCode: string | null;
+  /** Valores permitidos, si la lista es corta. */
+  options?: string[];
+  /** La lista es larga: se busca en `searchRipleyListValues`. */
+  listaLarga?: boolean;
+}
+
+export interface RipleyCategoryFields {
+  id: string;
+  path: string;
+  campos: RipleyCampo[];
+  ejesDeVariante: string[];
+  admiteVariantes: boolean;
+}
+
 export interface FalabellaPrepReport {
   listo: boolean;
   motivo?: string;
@@ -588,6 +613,25 @@ export const syncApi = {
     apiRequest<{ brand: string }>(`/sync/ripley/products/${productId}/brand`, {
       method: 'PATCH',
       body: JSON.stringify({ brand }),
+    }),
+
+  /** Categorías de Ripley donde se puede publicar, filtradas por texto (del catálogo ya importado). */
+  searchRipleyCategories: (search: string) =>
+    apiRequest<{ id: string; name: string; path: string }[]>(`/sync/ripley/categories?search=${encodeURIComponent(search)}`, { method: 'GET' }),
+
+  /** Los campos que pide una categoría de Ripley y si admite agrupar variantes. */
+  getRipleyCategoryFields: (categoryId: string) =>
+    apiRequest<RipleyCategoryFields>(`/sync/ripley/categories/${encodeURIComponent(categoryId)}/fields`, { method: 'GET' }),
+
+  /** Valores de una lista cerrada de Ripley que coinciden con lo escrito (para las listas largas). */
+  searchRipleyListValues: (code: string, search: string) =>
+    apiRequest<string[]>(`/sync/ripley/lists/${encodeURIComponent(code)}/values?search=${encodeURIComponent(search)}`, { method: 'GET' }),
+
+  /** Guarda la categoría, los atributos y el nombre de Ripley de un producto (solo en Synkro: no envía nada a Ripley). */
+  saveRipleyPreparation: (productId: string, body: { categoryId?: string; attributes?: Record<string, string>; content?: { name?: string; shortDescription?: string } }) =>
+    apiRequest<{ saved: boolean; categoryId: string | null; atributos: number }>(`/sync/ripley/products/${productId}/preparation`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
     }),
 
   /** Deja el producto listo para Falabella: categoría, marca, medidas y datos obligatorios. */
