@@ -373,13 +373,13 @@ function FichaDeProducto({
         )}
 
         {variantes.length > 1 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-muted-foreground mr-1">Variante:</span>
-            <button type="button" onClick={() => onElegir?.(TODAS)} className={`text-xs rounded-full border px-2.5 py-1 font-medium transition-colors ${variantId === TODAS ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}>
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+            <span className="text-xs text-muted-foreground mr-1 shrink-0">Variante:</span>
+            <button type="button" onClick={() => onElegir?.(TODAS)} className={`shrink-0 whitespace-nowrap text-xs rounded-full border px-2.5 py-1 font-medium transition-colors ${variantId === TODAS ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}>
               Todas las variantes ({variantes.length})
             </button>
             {variantes.map((v) => (
-              <button key={v.id} type="button" onClick={() => onElegir?.(v.id)} className={`text-xs rounded-full border px-2.5 py-1 transition-colors ${v.id === variantId ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}>
+              <button key={v.id} type="button" onClick={() => onElegir?.(v.id)} className={`shrink-0 whitespace-nowrap text-xs rounded-full border px-2.5 py-1 transition-colors ${v.id === variantId ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}>
                 {v.variantValues ? Object.values(v.variantValues).join(" / ") : v.sku} <span className="font-mono opacity-70">{v.sku}</span>
               </button>
             ))}
