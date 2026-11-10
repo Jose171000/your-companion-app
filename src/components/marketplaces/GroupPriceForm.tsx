@@ -102,7 +102,7 @@ export function GroupPriceForm({ groupId, onDone }: { groupId: string; onDone?: 
           {" "}Con el modo revisión encendido queda en Revisión, agrupado: apruebas las {n} con un clic.
         </p>
         <div className="flex justify-end">
-          <Button size="sm" className="gap-1.5" disabled={!precioCambia || precioInvalido || guardarPrecio.isPending} onClick={() => guardarPrecio.mutate()}>
+          <Button size="sm" className="gap-1.5 max-w-full h-auto min-h-8 whitespace-normal text-center" disabled={!precioCambia || precioInvalido || guardarPrecio.isPending} onClick={() => guardarPrecio.mutate()}>
             {guardarPrecio.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             Guardar precio en las {n} variantes
           </Button>
@@ -124,7 +124,7 @@ export function GroupPriceForm({ groupId, onDone }: { groupId: string; onDone?: 
                   <span className="text-xs text-muted-foreground">{c.account} · {c.variantes} variantes publicadas</span>
                 </div>
                 {c.differs && <p className="text-[11px] text-amber-500">Hoy las variantes tienen valores distintos aquí: al guardar se igualan al de abajo.</p>}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-1 min-[480px]:grid-cols-2 md:grid-cols-4 gap-2">
                   <div className="space-y-1">
                     <Label className="text-[11px] font-normal text-muted-foreground">Precio solo en este canal</Label>
                     <Input type="number" min="0" step="0.01" value={v.price} onChange={(e) => set(c.connectionId, "price", e.target.value)} />
@@ -150,7 +150,7 @@ export function GroupPriceForm({ groupId, onDone }: { groupId: string; onDone?: 
             );
           })}
           <div className="flex justify-end">
-            <Button size="sm" className="gap-1.5" disabled={!cambiosDeCanal.length || canalInvalido || guardarCanales.isPending} onClick={() => guardarCanales.mutate()}>
+            <Button size="sm" className="gap-1.5 max-w-full h-auto min-h-8 whitespace-normal text-center" disabled={!cambiosDeCanal.length || canalInvalido || guardarCanales.isPending} onClick={() => guardarCanales.mutate()}>
               {guardarCanales.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               Guardar precios de canal en las {n} variantes
             </Button>
