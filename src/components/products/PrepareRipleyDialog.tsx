@@ -87,6 +87,10 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
   const [marca, setMarca] = useState("GENÉRICO");
   const [busqueda, setBusqueda] = useState("");
   const [aviso, setAviso] = useState<string | null>(null);
+  /** Atributos que la IA estimó (no se pudieron deducir del producto): se marcan para revisarlos. */
+  const [estimados, setEstimados] = useState<string[]>([]);
+  /** Los vacíos que la IA no pudo deducir. */
+  const [sinValor, setSinValor] = useState<string[]>([]);
   const busquedaDiferida = useDebounced(busqueda);
   const esGrupo = !!product?.alGrupo;
 
@@ -108,8 +112,26 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
     onError: () => toast.error("Error al conectar con el servidor"),
   });
 
+  // «Llenar atributos»: con la categoría ya elegida, completa SOLO los vacíos; nunca cambia la categoría ni pisa lo escrito.
+  const rellenar = useMutation({
+    mutationFn: () => productsApi.fillRipleyAttributes(product!.id, { categoryId: categoria!.id, actuales: valores, alGrupo: esGrupo }),
+    onSuccess: (res) => {
+      if (res.error || !res.data) return toast.error(res.error ?? "La IA no pudo llenar los atributos");
+      const r = res.data;
+      // Lo escrito (por la persona o por una pasada anterior) tiene prioridad: solo entra lo que estaba vacío.
+      setValores((previos) => ({ ...r.values, ...Object.fromEntries(Object.entries(previos).filter(([, v]) => v?.trim())) }));
+      setEstimados((e) => [...new Set([...e, ...r.estimated])]);
+      setSinValor(r.sinValor);
+      if (r.filled === 0) toast.info(r.sinValor.length ? "La IA no pudo deducir los datos que faltan: complétalos a mano." : "No había atributos vacíos que llenar.");
+      else toast.success(`La IA llenó ${r.filled} atributo${r.filled === 1 ? "" : "s"} vacío${r.filled === 1 ? "" : "s"}.`);
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
+
   useEffect(() => {
     if (!open || !product) return;
+    setEstimados([]);
+    setSinValor([]);
     const ids = (product.marketplaceIds as any) ?? {};
     const attrs = (product.aiAttributes as any) ?? {};
     const guardadaId = ids.ripley_category_id ? String(ids.ripley_category_id) : null;
@@ -171,6 +193,7 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
       <Label htmlFor={`rp-attr-${campo.name}`} className="text-xs">
         {campo.label}
         {campo.required ? <span className="ml-1 text-[10px] text-destructive font-normal">obligatorio</span> : <span className="ml-1 text-[10px] text-muted-foreground font-normal">{campo.level === "RECOMMENDED" ? "recomendado" : "opcional"}</span>}
+        {estimados.includes(campo.name) && <span className="ml-1 text-[10px] text-amber-500 font-normal">estimado por la IA: revísalo</span>}
       </Label>
       {campo.options && campo.options.length > 0 ? (
         <Select value={valores[campo.name] ?? ""} onValueChange={(v) => poner(campo.name, v)}>
@@ -209,8 +232,9 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <Label>Categoría de Ripley</Label>
-              {product && !analizar.isPending && (
-                <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => analizar.mutate()}><Sparkles className="w-3 h-3 mr-1" /> Analizar con IA</Button>
+              {/* Sin categoría la IA la sugiere; con categoría elegida solo llena los atributos vacíos y NUNCA la cambia. */}
+              {product && !categoria && !analizar.isPending && (
+                <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => analizar.mutate()}><Sparkles className="w-3 h-3 mr-1" /> Sugerir categoría con IA</Button>
               )}
             </div>
             {categoria ? (
@@ -219,7 +243,8 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
                   <p className="text-sm font-medium break-words">{categoria.path}</p>
                   <p className="text-xs text-muted-foreground">Código {categoria.id}</p>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => { setCategoria(null); setValores({}); }}>Cambiar</Button>
+                {/* Cambiar la categoría de Ripley no borra lo escrito (ni toca los datos de otros canales): al guardar se descartan solo los campos que la nueva categoría no tenga. */}
+                <Button variant="ghost" size="sm" onClick={() => setCategoria(null)}>Cambiar</Button>
               </div>
             ) : (
               <>
@@ -277,7 +302,15 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
                 <Label>Datos que pide esta categoría</Label>
                 {!cargandoCampos && <Badge variant="outline" className="text-[10px]">{obligatorios.length} obligatorios · {otros.length} más</Badge>}
                 {!cargandoCampos && faltan.length > 0 && <Badge variant="outline" className="text-[10px] border-amber-500/50">faltan {faltan.length} obligatorios</Badge>}
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs ml-auto" disabled={rellenar.isPending || cargandoCampos} onClick={() => rellenar.mutate()}>
+                  {rellenar.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                  {rellenar.isPending ? "Llenando…" : "Llenar atributos vacíos"}
+                </Button>
               </div>
+              <p className="text-[11px] text-muted-foreground -mt-1">La IA completa solo lo que está vacío: no cambia la categoría ni lo que ya escribiste.</p>
+              {sinValor.length > 0 && !rellenar.isPending && (
+                <p className="text-[11px] text-muted-foreground">La IA no pudo deducir: {sinValor.map((n) => campos.find((c) => c.name === n)?.label ?? n).join(", ")}. Complétalos a mano.</p>
+              )}
               {cargandoCampos ? <Skeleton className="h-10 w-full" /> : <div className="space-y-3">{[...obligatorios, ...otros].map(dibujar)}</div>}
             </div>
           )}

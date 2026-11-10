@@ -253,6 +253,13 @@ export const productsApi = {
       body: JSON.stringify({ guardar }),
     }),
 
+  /** «Llenar atributos»: con la categoría de Ripley ya elegida, la IA devuelve solo los atributos VACÍOS (no cambia la categoría ni pisa lo escrito). No guarda. */
+  fillRipleyAttributes: (id: string, body: { categoryId: string; actuales: Record<string, string>; alGrupo?: boolean }) =>
+    apiRequest<{ values: Record<string, string>; estimated: string[]; filled: number; total: number; sinEquivalente: string[]; sinValor: string[] }>(
+      `/products/${id}/ripley/fill-attributes`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
   /** Regenerar con IA el contenido de un producto con variantes: UNA sola vez para todo el grupo */
   generateGroupAI: (groupId: string, dto: GenerateAIContentDto = {}) =>
     apiRequest<{ variantes: number; titulo: string | null }>(`/products/groups/${groupId}/generate-ai`, {
