@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Check, Loader2, PackageCheck, Search, Sparkles, X } from "lucide-react";
 import { RipleyBrandField } from "./RipleyBrandField";
+import { VariantCompatNotice } from "./VariantCompatNotice";
 
 interface Props {
   product: Product | null;
@@ -96,7 +97,7 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
 
   // Al abrir se parte de lo que el producto ya tenga guardado para Ripley; si no tiene nada, la IA lo analiza.
   const analizar = useMutation({
-    mutationFn: () => productsApi.prepareRipley(product!.id, false),
+    mutationFn: () => productsApi.prepareRipley(product!.id, false, esGrupo),
     onSuccess: (res) => {
       if (res.error || !res.data) return toast.error(res.error ?? "La IA no pudo preparar el producto para Ripley");
       const r = res.data;
@@ -270,11 +271,18 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
                 )}
               </>
             )}
-            {esGrupo && info && (
-              <p className={`text-xs rounded-lg border p-2.5 ${info.admiteVariantes ? "border-border text-muted-foreground" : "border-amber-500/40 bg-amber-500/10"}`}>
-                {info.admiteVariantes
-                  ? `Las variantes se agrupan en una sola publicación por: ${info.campos.filter((c) => c.isVariant).map((c) => c.label).join(" y ")}. Esos datos se toman de cada variante.`
-                  : "Esta categoría de Ripley no tiene ningún dato que defina la variante: las variantes no se podrán agrupar en una sola publicación."}
+            {/* En un grupo: si los ejes del producto caben en UNA publicación según esta categoría; si no, se publican separados y se recomienda otra categoría. */}
+            {esGrupo && categoria && product?.group?.id && (
+              <VariantCompatNotice
+                groupId={product.group.id}
+                marketplaces={["ripley"]}
+                categoryId={categoria.id}
+                onUseCategory={(_canal, c) => { setCategoria({ id: c.id, path: c.ruta }); setAviso(null); }}
+              />
+            )}
+            {esGrupo && info?.admiteVariantes && (
+              <p className="text-[11px] text-muted-foreground">
+                Las variantes se agrupan por: {info.campos.filter((c) => c.isVariant).map((c) => c.label).join(" y ")}. Esos datos se toman de cada variante.
               </p>
             )}
           </div>

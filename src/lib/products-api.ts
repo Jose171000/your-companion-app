@@ -156,6 +156,22 @@ export interface RipleyPreview {
   faltantes: { name: string; description: string; options?: string[] }[];
 }
 
+/** Resultado de revisar si las variantes de un grupo caben en una sola publicación de un canal. */
+export interface VariantCompatResult {
+  canal: string;
+  nombreDelCanal: string;
+  categoryId: string | null;
+  ruta: string | null;
+  publicaComo: 'una' | 'separadas';
+  mapeo: { eje: string; atributo: string }[];
+  ejesNoPermitidos: string[];
+  ejesQueFaltan: string[];
+  valoresSinEquivalente: { eje: string; valores: string[] }[];
+  avisos: string[];
+  /** Otra categoría, parecida y verificada, que sí admite las variantes: solo una recomendación. */
+  recomendada?: { id: string; ruta: string } | null;
+}
+
 export interface GenerateAIContentDto {
   targetMarketplaces?: string[];
   tone?: string;
@@ -247,11 +263,18 @@ export const productsApi = {
     }),
 
   /** La IA prepara el producto para Ripley (categoría verificada, contenido y atributos). `guardar: false` es solo vista previa. */
-  prepareRipley: (id: string, guardar = false) =>
+  prepareRipley: (id: string, guardar = false, alGrupo = false) =>
     apiRequest<RipleyPreview>(`/products/${id}/prepare-ripley`, {
       method: 'POST',
-      body: JSON.stringify({ guardar }),
+      body: JSON.stringify({ guardar, alGrupo }),
     }),
+
+  /** ¿Caben las variantes del grupo en UNA publicación de cada canal? Si no, se publican separadas (y puede venir una categoría recomendada). Solo consulta. */
+  variantCompat: (groupId: string, marketplaces: string[], categoryId?: string) =>
+    apiRequest<VariantCompatResult[]>(
+      `/products/groups/${groupId}/variant-compat?marketplace=${encodeURIComponent(marketplaces.join(','))}${categoryId ? `&categoryId=${encodeURIComponent(categoryId)}` : ''}`,
+      { method: 'GET' },
+    ),
 
   /** «Llenar atributos»: con la categoría de Ripley ya elegida, la IA devuelve solo los atributos VACÍOS (no cambia la categoría ni pisa lo escrito). No guarda. */
   fillRipleyAttributes: (id: string, body: { categoryId: string; actuales: Record<string, string>; alGrupo?: boolean }) =>

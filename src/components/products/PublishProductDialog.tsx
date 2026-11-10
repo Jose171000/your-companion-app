@@ -5,6 +5,7 @@ import { syncApi, FalabellaPrepReport } from "@/lib/sync-api";
 import { FalabellaBrandField } from "./FalabellaBrandField";
 import { PrepareFalabellaDialog } from "./PrepareFalabellaDialog";
 import { AccountChooser, CuentasPorCanal, useCuentasPorCanal } from "@/components/marketplaces/AccountChooser";
+import { VariantCompatNotice } from "./VariantCompatNotice";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -315,6 +316,11 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
           )}
 
           <AccountChooser canales={selected.filter((mp) => !publicados.has(mp))} value={cuentas} onChange={setCuentas} />
+
+          {/* Un producto con variantes: avisa, por canal, si caben en UNA publicación o se publicarán como productos separados. */}
+          {product?.alGrupo && product.group?.id && (
+            <VariantCompatNotice groupId={product.group.id} marketplaces={selected.filter((mp) => !publicados.has(mp))} />
+          )}
 
           {/* Al cerrar, `product` pasa a null un render antes de que se limpie `prep`: sin esta guarda la pantalla quedaba en negro. */}
           {product && falabellaElegido && !falabellaPublicado && isConnected("falabella") && (

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Check, Loader2, Package, Search } from "lucide-react";
 import { FalabellaBrandField } from "./FalabellaBrandField";
+import { VariantCompatNotice } from "./VariantCompatNotice";
 
 interface Props {
   product: Product | null;
@@ -252,6 +253,15 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
                   </div>
                 )}
               </>
+            )}
+            {/* En un grupo: si los ejes caben en UNA publicación según esta categoría; si no, se publican separados y se recomienda otra. */}
+            {product?.alGrupo && categoria && product.group?.id && (
+              <VariantCompatNotice
+                groupId={product.group.id}
+                marketplaces={["falabella"]}
+                categoryId={categoria.id}
+                onUseCategory={(_canal, c) => setCategoria({ id: c.id, path: c.ruta })}
+              />
             )}
           </div>
 
