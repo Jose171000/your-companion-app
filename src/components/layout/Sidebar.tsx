@@ -64,6 +64,9 @@ interface SidebarProps {
   allowedSections?: string[] | null;
   /** Además de las secciones del usuario, lo que permite su rol en la tienda activa (ver docs/roles-de-tienda.md) */
   storeAllows?: (sectionId: string) => boolean;
+  /** Estado de plegado controlado por el layout, para que el contenido ajuste su margen */
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
 export function Sidebar({
@@ -75,8 +78,15 @@ export function Sidebar({
   isAccountant,
   allowedSections,
   storeAllows,
+  collapsed: collapsedProp,
+  onCollapsedChange,
 }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsedLocal, setCollapsedLocal] = useState(false);
+  const collapsed = collapsedProp ?? collapsedLocal;
+  const setCollapsed = (v: boolean) => {
+    setCollapsedLocal(v);
+    onCollapsedChange?.(v);
+  };
   const isMobile = useIsMobile();
 
   const items = navItems

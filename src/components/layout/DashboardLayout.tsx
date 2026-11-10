@@ -62,7 +62,7 @@ const INITIAL_SECTION = new URLSearchParams(window.location.search).has("meli")
 
 function DashboardContent() {
   const [activeItem, setActiveItem]         = useState(INITIAL_SECTION);
-  const [sidebarCollapsed]                  = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [guardOpen, setGuardOpen]           = useState(false);
   const [pendingSection, setPendingSection] = useState<string | null>(null);
@@ -164,6 +164,8 @@ function DashboardContent() {
         isAccountant={isAccountant}
         allowedSections={allowed}
         storeAllows={storeAllows}
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
       />
 
       <main
