@@ -100,7 +100,7 @@ function LoteDeSolicitudes({
           </div>
         </div>
         {canManage ? (
-          <div className="flex gap-2 shrink-0">
+          <div className="flex flex-wrap gap-2 sm:shrink-0 max-w-full">
             <Button variant="outline" size="sm" className="gap-1.5" disabled={ocupado} onClick={onRechazar}><X className="w-3.5 h-3.5" /> Rechazar las {n}</Button>
             <Button size="sm" className="gap-1.5 gradient-primary" disabled={ocupado} onClick={onAprobar}><Check className="w-3.5 h-3.5" /> Aprobar las {n}</Button>
           </div>
@@ -267,7 +267,7 @@ export function ReviewQueue({ requests, reviewMode, canManage, isLoading }: Prop
               <div key={r.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
                 <ChangeLine r={r} />
                 {canManage ? (
-                <div className="flex gap-2 shrink-0">
+                <div className="flex flex-wrap gap-2 sm:shrink-0 max-w-full">
                   <Button
                     variant="outline"
                     size="sm"

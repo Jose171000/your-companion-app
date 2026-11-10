@@ -422,7 +422,7 @@ export function InventoryBoard({ listings, pending, reviewMode, canEdit, canPubl
                     <ChannelChip key={c.listing.id} cell={c} canEdit={canPublish} canResend={canEdit} onAction={askChannelAction(r)} />
                   ))}
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex flex-wrap gap-2 sm:shrink-0 max-w-full">
                   <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSheetFor({ id: r.productId, name: r.name } as Product)}>
                     <FileText className="w-3.5 h-3.5" /> Ficha
                   </Button>
