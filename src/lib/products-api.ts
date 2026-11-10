@@ -235,6 +235,13 @@ export const productsApi = {
       body: JSON.stringify(dto),
     }),
 
+  /** Regenerar con IA el contenido de un producto con variantes: UNA sola vez para todo el grupo */
+  generateGroupAI: (groupId: string, dto: GenerateAIContentDto = {}) =>
+    apiRequest<{ variantes: number; titulo: string | null }>(`/products/groups/${groupId}/generate-ai`, {
+      method: 'POST',
+      body: JSON.stringify({ targetMarketplaces: dto.targetMarketplaces, tone: dto.tone }),
+    }),
+
   /** Eliminar un producto */
   remove: (id: string) =>
     apiRequest<{ message: string }>(`/products/${id}`, { method: 'DELETE' }),

@@ -76,20 +76,17 @@ export function RegenerateAIDialog({
     }
     setIsLoading(true);
     try {
-      // Desde la fila de un grupo se regenera el contenido de todas sus variantes.
-      const ids = product.alGrupo ? (product.groupSummary?.variantIds ?? [product.id]) : [product.id];
-      let response: Awaited<ReturnType<typeof productsApi.generateAI>> | null = null;
-      for (const id of ids) {
-        response = await productsApi.generateAI(id, {
-          targetMarketplaces: selectedMarketplaces,
-          tone,
-        });
-        if (response.error) break;
-      }
+      // Desde la fila de un grupo la IA se llama UNA sola vez para todo el grupo (ejes, fotos de cada variante) y el resultado
+      // se aplica a todas sus variantes. Un producto suelto se regenera como siempre.
+      const grupoId = product.alGrupo ? product.group?.id : undefined;
+      const response = grupoId
+        ? await productsApi.generateGroupAI(grupoId, { targetMarketplaces: selectedMarketplaces, tone })
+        : await productsApi.generateAI(product.id, { targetMarketplaces: selectedMarketplaces, tone });
       if (response?.error) {
         toast.error(response.error);
       } else {
-        toast.success(ids.length > 1 ? `Contenido IA regenerado en las ${ids.length} variantes ✨` : "Contenido IA regenerado exitosamente ✨");
+        const n = (response as { data?: { variantes?: number } })?.data?.variantes ?? 0;
+        toast.success(grupoId ? `Contenido IA regenerado una vez para las ${n || product.groupSummary?.variantCount} variantes ✨` : "Contenido IA regenerado exitosamente ✨");
         onSuccess();
         onClose();
       }
