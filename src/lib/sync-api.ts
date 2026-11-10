@@ -579,6 +579,17 @@ export const syncApi = {
       body: JSON.stringify({ brand }),
     }),
 
+  /** Marcas del catálogo aprobado de Ripley (27.116 + GENÉRICO) que coinciden con lo escrito. */
+  searchRipleyBrands: (search: string) =>
+    apiRequest<string[]>(`/sync/ripley/brands?search=${encodeURIComponent(search)}`, { method: 'GET' }),
+
+  /** Cambia la marca con la que se publica un producto en Ripley (solo del catálogo; no envía nada a Ripley). */
+  setRipleyBrand: (productId: string, brand: string) =>
+    apiRequest<{ brand: string }>(`/sync/ripley/products/${productId}/brand`, {
+      method: 'PATCH',
+      body: JSON.stringify({ brand }),
+    }),
+
   /** Deja el producto listo para Falabella: categoría, marca, medidas y datos obligatorios. */
   autoPrepareFalabella: (productId: string) =>
     apiRequest<FalabellaPrepReport>(`/ai/products/${productId}/prepare-falabella`, { method: 'POST', body: JSON.stringify({}) }),
