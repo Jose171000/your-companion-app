@@ -148,7 +148,7 @@ export interface ProductsQueryParams {
 /** Lo que devuelve la IA al preparar un producto para Ripley (no se envía nada a Ripley). */
 export interface RipleyPreview {
   guardado: boolean;
-  categoria: { id: string | null; ruta: string | null; confianza: 'alta' | 'baja' | 'ninguna'; motivo: string | null };
+  categoria: { id: string | null; ruta: string | null; confianza: 'alta' | 'baja' | 'ninguna' | 'elegida'; motivo: string | null };
   contenido: { name?: string; shortDescription?: string; description?: string; brand?: string };
   descripcionEsHtml: boolean;
   marca: { valor: string; valida: boolean; canonica: string | null; sugerencias: string[]; listaCargada: boolean } | null;
