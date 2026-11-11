@@ -249,6 +249,9 @@ export interface UpdateInventoryDto {
 
 /** Un canal donde el producto está publicado, con lo que se le envía. */
 export interface SheetChannel {
+  /** La publicación (para pausarla, reanudarla o quitarla) y si la pausó la persona (no es lo mismo que «sin stock»). */
+  linkId?: string;
+  pausedByUser?: boolean;
   marketplace: string;
   connectionId: string;
   account: string;
@@ -802,6 +805,13 @@ export const syncApi = {
   /** Pausa, reanuda o quita un producto de uno o de todos sus canales (sin linkIds actúa sobre todos). */
   channelAction: (productId: string, action: ChannelActionType, opts: { linkIds?: string[]; confirm?: boolean } = {}) =>
     apiRequest<ChannelActionResult>(`/sync/products/${productId}/channels/${action}`, {
+      method: 'POST',
+      body: JSON.stringify(opts),
+    }),
+
+  /** Pausa, reanuda o quita TODAS las variantes de un producto en un canal (con connectionId, solo en esa cuenta). */
+  groupChannelAction: (productId: string, action: ChannelActionType, opts: { connectionId?: string; confirm?: boolean } = {}) =>
+    apiRequest<ChannelActionResult>(`/sync/products/${productId}/channels-group/${action}`, {
       method: 'POST',
       body: JSON.stringify(opts),
     }),

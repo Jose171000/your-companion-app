@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertCircle, CheckCircle2, Download, ExternalLink, FileText, Loader2, Plug, RefreshCw, Rocket, Save, Sparkles } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, ExternalLink, FileText, Loader2, MoreHorizontal, Pause, Play, Plug, RefreshCw, Rocket, Save, Sparkles, Trash2 } from "lucide-react";
 import { Product, productsApi } from "@/lib/products-api";
-import { SheetChannel, SheetData, SheetPrice, SheetSync, syncApi } from "@/lib/sync-api";
+import { SheetChannel, SheetData, SheetPrice, SheetSync, UserListing, syncApi } from "@/lib/sync-api";
+import { ChannelActionDialog, PendingChannelAction } from "@/components/marketplaces/ChannelActionDialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useStores } from "@/contexts/StoreContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +21,12 @@ import { cn } from "@/lib/utils";
 import { GroupPriceForm } from "@/components/marketplaces/GroupPriceForm";
 
 const NOMBRE_CANAL: Record<string, string> = { falabella: "Falabella", mercadolibre: "Mercado Libre", woocommerce: "WooCommerce", shopify: "Shopify", ripley: "Ripley" };
+
+/** «Pausado» es una decisión de la persona; una oferta que el canal dejó inactiva (por ejemplo sin stock) no es una pausa. */
+function estadoDeCanal(estado: string, pausedByUser: boolean | undefined, stock: number | null | undefined): { texto: string; clase: string } {
+  if (estado === "paused" && !pausedByUser) return { texto: Number(stock) === 0 ? "Sin stock" : "Inactivo", clase: "bg-secondary text-muted-foreground" };
+  return ESTADO[estado] ?? ESTADO.paused;
+}
 
 const ESTADO: Record<string, { texto: string; clase: string }> = {
   published: { texto: "Publicado", clase: "bg-green-500/10 text-green-500" },
@@ -141,8 +149,8 @@ function PrecioDeCanal({ precio, valor, onChange }: { precio: SheetPrice; valor:
   );
 }
 
-function EstadoDelCanal({ canal }: { canal: SheetChannel }) {
-  const e = ESTADO[canal.status] ?? ESTADO.paused;
+function EstadoDelCanal({ canal, stock }: { canal: SheetChannel; stock?: number | null }) {
+  const e = estadoDeCanal(canal.status, canal.pausedByUser, stock);
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs">
       <Badge className={cn("text-[10px]", e.clase)}>{e.texto}</Badge>
@@ -229,8 +237,9 @@ const CANALES_DE_PUBLICACION = ["falabella", "ripley", "mercadolibre"];
 interface AccionesDeCanal { onPublicar?: () => void; onPrepararFalabella?: () => void; onPrepararRipley?: () => void }
 
 /** Pestaña «Canales»: una tarjeta por cuenta conectada (solo las conectadas) con su estado y sus acciones. */
-function CanalesDelProducto({ hoja, acciones, onVer, modoGrupo }: { hoja: SheetData; acciones: AccionesDeCanal; onVer: (canal: string) => void; modoGrupo: boolean }) {
+function CanalesDelProducto({ hoja, acciones, onVer, modoGrupo, variantes = 1, nombreGrupo }: { hoja: SheetData; acciones: AccionesDeCanal; onVer: (canal: string) => void; modoGrupo: boolean; variantes?: number; nombreGrupo?: string }) {
   const { can } = useStores();
+  const [pendiente, setPendiente] = useState<PendingChannelAction | null>(null);
   const { data, isLoading } = useQuery({ queryKey: ["sync-connections"], queryFn: () => syncApi.getConnections(), staleTime: 30_000 });
   const conectadas = (data?.data ?? []).filter((c) => c.status === "active" && CANALES_DE_PUBLICACION.includes(c.marketplace));
   const sinConectar = CANALES_DE_PUBLICACION.filter((m) => !conectadas.some((c) => c.marketplace === m));
@@ -241,7 +250,7 @@ function CanalesDelProducto({ hoja, acciones, onVer, modoGrupo }: { hoja: SheetD
       {conectadas.length === 0 && <p className="text-sm text-muted-foreground">Esta tienda todavía no tiene canales conectados. Conéctalos en Marketplaces para publicar desde aquí.</p>}
       {conectadas.map((c) => {
         const ficha = hoja.channels.find((x) => x.connectionId === c.id);
-        const estado = ficha ? ESTADO[ficha.status] ?? ESTADO.paused : null;
+        const estado = ficha ? estadoDeCanal(ficha.status, ficha.pausedByUser, hoja.product.stock) : null;
         const publicado = ficha?.status === "published";
         const cuenta = c.label || c.externalNickname || "";
         return (
@@ -260,6 +269,38 @@ function CanalesDelProducto({ hoja, acciones, onVer, modoGrupo }: { hoja: SheetD
               {puede && c.marketplace === "falabella" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={acciones.onPrepararFalabella}>Preparar</Button>}
               {puede && c.marketplace === "ripley" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={acciones.onPrepararRipley}>{publicado ? "Revisar" : "Preparar"}</Button>}
               {puede && !publicado && c.marketplace !== "ripley" && <Button size="sm" className="h-8 text-xs" onClick={acciones.onPublicar}><Rocket className="w-3.5 h-3.5 mr-1" />Publicar</Button>}
+              {puede && ficha?.linkId && (() => {
+                const puedePausar = ficha.status === "published" && !ficha.pausedByUser;
+                const puedeReanudar = ficha.status === "paused" && !!ficha.pausedByUser;
+                const puedeQuitar = ["published", "paused", "error"].includes(ficha.status);
+                if (!puedePausar && !puedeReanudar && !puedeQuitar) return null;
+                const nombreCanal = NOMBRE_CANAL[c.marketplace] ?? c.marketplace;
+                const listing = { id: ficha.linkId, marketplace: ficha.marketplace, syncStatus: ficha.status, pausedByUser: !!ficha.pausedByUser } as unknown as UserListing;
+                const pedir = (action: "pause" | "resume" | "remove", todas: boolean) =>
+                  setPendiente({ productId: hoja.product.id, productName: todas ? (nombreGrupo ?? hoja.product.name) : hoja.product.name, action, listing, listings: [listing], ...(todas ? { grupo: { connectionId: c.id, variantes } } : {}) });
+                const conVariantes = variantes > 1;
+                const secciones: { todas: boolean; etiqueta: string }[] = [
+                  ...(modoGrupo ? [] : [{ todas: false, etiqueta: conVariantes ? "esta variante" : "" }]),
+                  ...(conVariantes ? [{ todas: true, etiqueta: `las ${variantes} variantes` }] : []),
+                ];
+                return (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`Más acciones en ${nombreCanal}`}><MoreHorizontal className="w-4 h-4" /></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64">
+                      {secciones.map((s, k) => (
+                        <div key={String(s.todas)}>
+                          {k > 0 && <DropdownMenuSeparator />}
+                          {puedePausar && <DropdownMenuItem onSelect={() => pedir("pause", s.todas)}><Pause className="w-3.5 h-3.5 mr-2" />Pausar {s.etiqueta ? `${s.etiqueta} ` : ""}en {nombreCanal}</DropdownMenuItem>}
+                          {puedeReanudar && <DropdownMenuItem onSelect={() => pedir("resume", s.todas)}><Play className="w-3.5 h-3.5 mr-2" />Reanudar {s.etiqueta ? `${s.etiqueta} ` : ""}en {nombreCanal}</DropdownMenuItem>}
+                          {puedeQuitar && <DropdownMenuItem className="text-red-400 focus:text-red-400" onSelect={() => pedir("remove", s.todas)}><Trash2 className="w-3.5 h-3.5 mr-2" />Quitar {s.etiqueta ? `${s.etiqueta} ` : ""}de {nombreCanal}</DropdownMenuItem>}
+                        </div>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              })()}
             </div>
           </div>
         );
@@ -271,7 +312,8 @@ function CanalesDelProducto({ hoja, acciones, onVer, modoGrupo }: { hoja: SheetD
           <p className="text-xs flex-1">Conéctalo en Marketplaces para publicar aquí.</p>
         </div>
       ))}
-      {modoGrupo && <p className="text-[11px] text-muted-foreground">Estás viendo todas las variantes juntas: lo que publiques o prepares aquí vale para todas.</p>}
+      {modoGrupo && <p className="text-[11px] text-muted-foreground">Estás viendo todas las variantes juntas: lo que publiques o prepares aquí vale para todas. Pausar o quitar desde el menú «⋯» de cada canal actúa sobre todas las variantes.</p>}
+      <ChannelActionDialog pending={pendiente} onClose={() => { setPendiente(null); }} />
     </div>
   );
 }
@@ -533,7 +575,7 @@ function FichaDeProducto({
 
             {/* ── Canales ── */}
             <TabsContent value="canales" className="pt-4">
-              <CanalesDelProducto hoja={hoja} acciones={acciones} onVer={setPestana} modoGrupo={modoGrupo} />
+              <CanalesDelProducto hoja={hoja} acciones={acciones} onVer={setPestana} modoGrupo={modoGrupo} variantes={variantes.length || 1} nombreGrupo={nombreDelGrupo} />
             </TabsContent>
 
             {/* ── General ── */}
@@ -628,7 +670,7 @@ function FichaDeProducto({
             {/* ── Falabella ── */}
             {fal && (
               <TabsContent value="falabella" className="pt-4 space-y-4">
-                <EstadoDelCanal canal={fal} />
+                <EstadoDelCanal canal={fal} stock={hoja.product.stock} />
                 {fal.lastError && <p className="text-xs text-red-400 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{fal.lastError}</p>}
                 {fal.listo ? (
                   <p className="text-xs text-green-500 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> La ficha cumple lo que pide Falabella.</p>
@@ -671,7 +713,7 @@ function FichaDeProducto({
             {/* ── Mercado Libre ── */}
             {meli && (
               <TabsContent value="mercadolibre" className="pt-4 space-y-4">
-                <EstadoDelCanal canal={meli} />
+                <EstadoDelCanal canal={meli} stock={hoja.product.stock} />
                 {meli.lastError && <p className="text-xs text-red-400 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{meli.lastError}</p>}
                 <div className="rounded-lg border border-border p-3 space-y-1 text-sm break-words">
                   <p><span className="text-muted-foreground">Título:</span> {meli.sent.title} <span className="text-[11px] text-muted-foreground">(Mercado Libre no deja cambiarlo en una publicación ya creada)</span></p>
@@ -689,7 +731,7 @@ function FichaDeProducto({
             {/* ── Ripley (solo lectura) ── */}
             {ripley && (
               <TabsContent value="ripley" className="pt-4 space-y-4">
-                <EstadoDelCanal canal={ripley} />
+                <EstadoDelCanal canal={ripley} stock={hoja.product.stock} />
                 {ripley.lastError && <p className="text-xs text-red-400 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{ripley.lastError}</p>}
                 {ripley.listo ? (
                   <p className="text-xs text-green-500 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Esto es lo que Synkro preparó y envió a Ripley.</p>

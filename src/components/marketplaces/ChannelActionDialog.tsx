@@ -21,6 +21,8 @@ export interface PendingChannelAction {
   listing?: UserListing;
   /** Publicaciones del producto, para listar lo que se va a tocar. */
   listings: UserListing[];
+  /** Actúa sobre TODAS las variantes del producto en esa cuenta del canal (el productId puede ser el de cualquiera de ellas). */
+  grupo?: { connectionId: string; variantes: number };
 }
 
 /** Lo que pasa en cada canal, dicho sin rodeos. */
@@ -30,6 +32,9 @@ function efecto(marketplace: string, action: ChannelActionType): string {
   }
   if (marketplace === "falabella") {
     return action === "pause" ? "queda con stock 0, sin poder venderse" : action === "resume" ? "vuelve a mostrar el stock real" : "se da de baja la ficha";
+  }
+  if (marketplace === "ripley") {
+    return action === "pause" ? "la oferta queda con stock 0, inactiva" : action === "resume" ? "vuelve a mostrar el stock real" : "se quita la oferta de Ripley (el producto sigue en su catálogo y se puede volver a ofertar)";
   }
   return "este canal todavía no se controla desde Synkro";
 }
@@ -42,14 +47,17 @@ const ADMITEN: Record<ChannelActionType, string[]> = { pause: ["published"], res
 export function ChannelActionDialog({ pending, onClose }: { pending: PendingChannelAction | null; onClose: () => void }) {
   const queryClient = useQueryClient();
 
-  const alcance = pending ? (pending.listing ? [pending.listing] : pending.listings).filter((l) => ADMITEN[pending.action].includes(estadoVisible(l))) : [];
+  // Con todas las variantes, cada una admite la acción según su propio estado: el servidor decide cuáles.
+  const alcance = pending ? (pending.listing ? [pending.listing] : pending.listings).filter((l) => pending.grupo || ADMITEN[pending.action].includes(estadoVisible(l))) : [];
 
   const mutation = useMutation({
     mutationFn: () =>
-      syncApi.channelAction(pending!.productId, pending!.action, {
-        linkIds: pending!.listing ? [pending!.listing.id] : alcance.map((l) => l.id),
-        confirm: pending!.action === "remove" ? true : undefined,
-      }),
+      pending!.grupo
+        ? syncApi.groupChannelAction(pending!.productId, pending!.action, { connectionId: pending!.grupo.connectionId, confirm: pending!.action === "remove" ? true : undefined })
+        : syncApi.channelAction(pending!.productId, pending!.action, {
+            linkIds: pending!.listing ? [pending!.listing.id] : alcance.map((l) => l.id),
+            confirm: pending!.action === "remove" ? true : undefined,
+          }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["sync-listings"] });
       if (res.error) {
@@ -72,7 +80,7 @@ export function ChannelActionDialog({ pending, onClose }: { pending: PendingChan
     <AlertDialog open={!!pending} onOpenChange={(open) => !open && !mutation.isPending && onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{pending && `${titulo} «${pending.productName}» ${pending.action === "remove" ? "de" : "en"} ${pending.listing ? channelName(pending.listing.marketplace) : "todos sus canales"}?`}</AlertDialogTitle>
+          <AlertDialogTitle>{pending && `${titulo} «${pending.productName}»${pending.grupo ? ` (las ${pending.grupo.variantes} variantes)` : ""} ${pending.action === "remove" ? "de" : "en"} ${pending.listing ? channelName(pending.listing.marketplace) : "todos sus canales"}?`}</AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-3 text-sm">
               {alcance.length ? (
@@ -83,7 +91,7 @@ export function ChannelActionDialog({ pending, onClose }: { pending: PendingChan
                         {channelName(l.marketplace)}
                         {l.accountLabel ? ` · ${l.accountLabel}` : ""}
                       </span>
-                      : {efecto(l.marketplace, pending!.action)}
+                      : {efecto(l.marketplace, pending!.action)}{pending?.grupo ? " (en todas las variantes publicadas ahí)" : ""}
                     </li>
                   ))}
                 </ul>
