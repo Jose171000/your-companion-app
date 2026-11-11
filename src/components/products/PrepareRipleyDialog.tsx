@@ -214,8 +214,12 @@ export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Prop
     onError: () => toast.error("Error al revisar el envío a Ripley"),
   });
 
+  // Si algún SKU ya está en Ripley, el envío actualizaría esa ficha: hace falta marcar que se entiende.
+  const [confirmaActualizar, setConfirmaActualizar] = useState(false);
+  useEffect(() => { setConfirmaActualizar(false); }, [vista]);
+
   const enviar = useMutation({
-    mutationFn: () => syncApi.ripleyPublish(product!.id, { alGrupo: esGrupo, confirmar: true }),
+    mutationFn: () => syncApi.ripleyPublish(product!.id, { alGrupo: esGrupo, confirmar: true, confirmarActualizacion: confirmaActualizar }),
     onSuccess: (res) => {
       setConfirmando(false);
       if (res.error || !res.data) return toast.error(res.error ?? "Ripley no recibió el envío");
@@ -402,6 +406,16 @@ export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Prop
                 {vista.bloqueo && (
                   <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 break-words">{vista.bloqueo.motivo}</p>
                 )}
+                {(vista.yaEnRipley?.length ?? 0) > 0 && (
+                  <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 space-y-1.5 break-words">
+                    <p className="font-medium">Estos productos ya están en Ripley: enviarlos actualizaría esas fichas en vez de crear nuevas.</p>
+                    {vista.yaEnRipley!.map((e) => <p key={e.sku} className="text-muted-foreground">• {e.sku}{e.titulo ? ` · «${e.titulo}»` : ""} (oferta {e.offerId ?? "—"})</p>)}
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input type="checkbox" className="mt-0.5" checked={confirmaActualizar} onChange={(e) => setConfirmaActualizar(e.target.checked)} />
+                      <span>Entiendo que se actualizará lo que ya existe en Ripley.</span>
+                    </label>
+                  </div>
+                )}
                 {!vista.envioEncendido && (
                   <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 break-words">La publicación en Ripley está apagada en el servidor, así que por ahora solo se puede revisar. Para enviar hay que encenderla (RIPLEY_PUBLISH_ENABLED).</p>
                 )}
@@ -411,7 +425,7 @@ export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Prop
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!vista.puedeEnviar || !vista.envioEncendido || vista.skusNoPermitidos.length > 0 || !!vista.bloqueo || enviar.isPending || !!envio}
+                  disabled={!vista.puedeEnviar || !vista.envioEncendido || vista.skusNoPermitidos.length > 0 || !!vista.bloqueo || ((vista.yaEnRipley?.length ?? 0) > 0 && !confirmaActualizar) || enviar.isPending || !!envio}
                   onClick={() => setConfirmando(true)}
                 >
                   <Send className="w-3.5 h-3.5 mr-2" /> Enviar a Ripley

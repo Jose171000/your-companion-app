@@ -340,6 +340,8 @@ export interface RipleyPublishPreview {
   publicaComo: 'sola' | 'una' | 'separadas';
   avisosDeVariantes: string[];
   productos: { sku: string; nombre: string; precio: number | null; stock: number | null; errores: string[]; avisos: string[] }[];
+  /** SKU que YA existen como oferta en Ripley: enviarlos actualizaría esas fichas en vez de crear nuevas. */
+  yaEnRipley?: { sku: string; offerId: string | number | null; productSku: string | null; titulo: string | null }[];
   errores: string[];
   puedeEnviar: boolean;
   /** El interruptor de publicación del servidor está encendido. */
@@ -657,7 +659,7 @@ export const syncApi = {
     apiRequest<RipleyPublishPreview>(`/sync/ripley/products/${productId}/publish-preview`, { method: 'POST', body: JSON.stringify({ alGrupo }) }),
 
   /** ENVÍA el producto a Ripley (crea su ficha y su oferta). Exige confirmación expresa; el servidor además pide su interruptor encendido. */
-  ripleyPublish: (productId: string, body: { alGrupo?: boolean; confirmar: boolean }) =>
+  ripleyPublish: (productId: string, body: { alGrupo?: boolean; confirmar: boolean; confirmarActualizacion?: boolean }) =>
     apiRequest<{ importId: string | number; productImportId: string | number | null; enviados: string[]; publicaComo: string }>(
       `/sync/ripley/products/${productId}/publish`,
       { method: 'POST', body: JSON.stringify(body) },
