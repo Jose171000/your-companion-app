@@ -684,7 +684,7 @@ export const syncApi = {
     apiRequest<string[]>(`/sync/ripley/lists/${encodeURIComponent(code)}/values?search=${encodeURIComponent(search)}`, { method: 'GET' }),
 
   /** Guarda la categoría, los atributos y el nombre de Ripley de un producto (solo en Synkro: no envía nada a Ripley). */
-  saveRipleyPreparation: (productId: string, body: { categoryId?: string; attributes?: Record<string, string>; content?: { name?: string; shortDescription?: string } }) =>
+  saveRipleyPreparation: (productId: string, body: { categoryId?: string; attributes?: Record<string, string>; content?: { name?: string; shortDescription?: string; description?: string } }) =>
     apiRequest<{ saved: boolean; categoryId: string | null; atributos: number }>(`/sync/ripley/products/${productId}/preparation`, {
       method: 'PATCH',
       body: JSON.stringify(body),

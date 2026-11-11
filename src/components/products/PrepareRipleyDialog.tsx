@@ -89,6 +89,8 @@ export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Prop
   const [valores, setValores] = useState<Record<string, string>>({});
   const [nombre, setNombre] = useState("");
   const [corta, setCorta] = useState("");
+  /** La ficha HTML que se envía a Ripley (la estándar de la agencia): la que ya tenga guardada o la que genera la IA. */
+  const [descripcion, setDescripcion] = useState("");
   const [marca, setMarca] = useState("GENÉRICO");
   const [busqueda, setBusqueda] = useState("");
   const [aviso, setAviso] = useState<string | null>(null);
@@ -111,6 +113,9 @@ export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Prop
       setValores((previos) => ({ ...r.atributos, ...Object.fromEntries(Object.entries(previos).filter(([, v]) => v?.trim())) }));
       setNombre((n) => n || r.contenido.name || "");
       setCorta((c) => c || r.contenido.shortDescription || "");
+      // Solo se guarda una ficha HTML para Ripley si el producto NO tiene la suya: la que ya tiene (la estándar con sus GIFs e imágenes, a veces puesta directo en un canal) se reutiliza tal cual.
+      const tieneFicha = !!String(((product?.aiAttributes as any) ?? {}).descriptionHtml ?? "").trim();
+      if (!tieneFicha) setDescripcion((d) => d || (r.descripcionEsHtml ? r.contenido.description || "" : ""));
       if (r.contenido.brand) setMarca((m) => (m && m !== "GENÉRICO" ? m : r.contenido.brand!));
       if (r.categoria.id && r.categoria.confianza === "baja") setAviso(`La IA no está segura de esta categoría${r.categoria.motivo ? ` (${r.categoria.motivo})` : ""}: revísala.`);
     },
@@ -144,6 +149,7 @@ export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Prop
     setValores(Object.fromEntries(Object.entries(attrs.ripley_attributes ?? {}).map(([k, v]) => [k, String(v)])));
     setNombre(String(attrs.ripley?.name ?? ""));
     setCorta(String(attrs.ripley?.shortDescription ?? ""));
+    setDescripcion(String(attrs.ripley?.description ?? ""));
     setMarca(String(attrs.ripley?.brand ?? "GENÉRICO"));
     setBusqueda("");
     setAviso(null);
@@ -176,7 +182,7 @@ export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Prop
     const atributos = Object.fromEntries(Object.entries(valores).filter(([k, v]) => v?.trim() && campos.some((c) => c.name === k)));
     let ultima: Awaited<ReturnType<typeof syncApi.saveRipleyPreparation>> | null = null;
     for (const id of idsDe(product!)) {
-      ultima = await syncApi.saveRipleyPreparation(id, { categoryId: categoria!.id, attributes: atributos, content: { name: nombre, shortDescription: corta } });
+      ultima = await syncApi.saveRipleyPreparation(id, { categoryId: categoria!.id, attributes: atributos, content: { name: nombre, shortDescription: corta, description: descripcion || undefined } });
       if (ultima.error) break;
     }
     return ultima!;
@@ -428,7 +434,7 @@ export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Prop
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!vista.puedeEnviar || !vista.envioEncendido || vista.skusNoPermitidos.length > 0 || !!vista.bloqueo || (vista.sinComprobar?.length ?? 0) > 0 || ((vista.yaEnRipley?.length ?? 0) > 0 && !confirmaActualizar) || enviar.isPending || !!envio}
+                  disabled={!vista.puedeEnviar || !vista.envioEncendido || vista.skusNoPermitidos.length > 0 || (!!vista.bloqueo && !(vista.bloqueo.situacion === "procesado" && vista.productos.length > 0 && (vista.yaEnRipley?.length ?? 0) === vista.productos.length && confirmaActualizar)) || (vista.sinComprobar?.length ?? 0) > 0 || ((vista.yaEnRipley?.length ?? 0) > 0 && !confirmaActualizar) || enviar.isPending || !!envio}
                   onClick={() => setConfirmando(true)}
                 >
                   <Send className="w-3.5 h-3.5 mr-2" /> Enviar a Ripley
