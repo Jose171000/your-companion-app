@@ -1,14 +1,13 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Edit, ImageOff, MoreHorizontal, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, ImageOff } from "lucide-react";
 import { Product, ProductOverview, productsApi } from "@/lib/products-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { useStores } from "@/contexts/StoreContext";
 import { ProductCard } from "./ProductCard";
+import { AccionesDeFila } from "./AccionesDeFila";
 import { CategoryCell, ChannelsCell, CompletenessCell, GroupChannelsCell, GroupCompletenessCell } from "./ProductStatusCells";
 
 export interface RowHandlers {
@@ -43,38 +42,6 @@ function Thumb({ product }: { product: Product }) {
   return (
     <div className="w-10 h-10 rounded-lg overflow-hidden bg-secondary/50 border border-border flex items-center justify-center shrink-0">
       {product.images?.[0] ? <img src={product.images[0].url} alt={product.name} className="w-full h-full object-cover" /> : <ImageOff className="w-4 h-4 text-muted-foreground" />}
-    </div>
-  );
-}
-
-/**
- * Una sola acción a la vista: «Gestionar» abre el panel del producto (canales, precios y stock, contenido). Lo menos frecuente
- * (editar, regenerar con IA, eliminar) queda en el menú «⋯».
- */
-function AccionesDeFila({ producto, etiqueta, onSheet, onRegenerate, onEdit, onDelete }: {
-  producto: Product; etiqueta?: string
-  onSheet: (p: Product) => void; onRegenerate: (p: Product) => void; onEdit: (p: Product) => void; onDelete: (p: Product) => void;
-}) {
-  const { can } = useStores();
-  const hayMenu = can("productos.editar") || can("productos.eliminar");
-  return (
-    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-      <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => onSheet(producto)} title="Canales, precios y stock, y lo que se envía a cada canal">
-        <SlidersHorizontal className="w-4 h-4" /> Gestionar
-      </Button>
-      {hayMenu && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Más opciones"><MoreHorizontal className="w-4 h-4" /></Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            {can("productos.editar") && <DropdownMenuItem onClick={() => onEdit(producto)}><Edit className="w-4 h-4 mr-2" />{etiqueta ? `Editar ${etiqueta}` : "Editar"}</DropdownMenuItem>}
-            {can("productos.editar") && <DropdownMenuItem onClick={() => onRegenerate(producto)}><Sparkles className="w-4 h-4 mr-2" />Regenerar con IA</DropdownMenuItem>}
-            {can("productos.eliminar") && can("productos.editar") && <DropdownMenuSeparator />}
-            {can("productos.eliminar") && <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(producto)}><Trash2 className="w-4 h-4 mr-2" />{etiqueta ? `Eliminar ${etiqueta}` : "Eliminar"}</DropdownMenuItem>}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
     </div>
   );
 }

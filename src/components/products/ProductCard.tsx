@@ -1,9 +1,9 @@
 import { Product, ProductOverview } from "@/lib/products-api";
 import { CategoryCell, ChannelsCell, CompletenessCell } from "./ProductStatusCells";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, Sparkles, ImageOff, Rocket, FileText } from "lucide-react";
+import { ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStores } from "@/contexts/StoreContext";
+import { AccionesDeFila } from "./AccionesDeFila";
 
 interface ProductCardProps {
   product: Product;
@@ -12,12 +12,11 @@ interface ProductCardProps {
   onEdit: (product: Product) => void;
   onDelete: (product: Product) => void;
   onRegenerate: (product: Product) => void;
-  onPublish: (product: Product) => void;
+  onPublish?: (product: Product) => void;
   onSheet?: (product: Product) => void;
 }
 
-export function ProductCard({ product, overview, overviewLoading, onEdit, onDelete, onRegenerate, onPublish, onSheet }: ProductCardProps) {
-  const { can } = useStores();
+export function ProductCard({ product, overview, overviewLoading, onEdit, onDelete, onRegenerate, onSheet }: ProductCardProps) {
   const marketplaces = product.targetMarketplaces ?? [];
 
   return (
@@ -45,64 +44,6 @@ export function ProductCard({ product, overview, overviewLoading, onEdit, onDele
             </code>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-0.5 shrink-0">
-            {onSheet && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-primary"
-                onClick={() => onSheet(product)}
-                title="Ficha: lo que se envía a cada canal"
-              >
-                <FileText className="w-3.5 h-3.5" />
-              </Button>
-            )}
-            {can("canales.publicar") && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-primary"
-                onClick={() => onPublish(product)}
-                title="Publicar en marketplaces"
-              >
-                <Rocket className="w-3.5 h-3.5" />
-              </Button>
-            )}
-            {can("productos.editar") && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-accent"
-                onClick={() => onRegenerate(product)}
-                title="Regenerar con IA"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-              </Button>
-            )}
-            {can("productos.editar") && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-primary"
-                onClick={() => onEdit(product)}
-                title="Editar"
-              >
-                <Edit className="w-3.5 h-3.5" />
-              </Button>
-            )}
-            {can("productos.eliminar") && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                onClick={() => onDelete(product)}
-                title="Eliminar"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </Button>
-            )}
-          </div>
         </div>
 
         {/* Price + Stock */}
@@ -132,6 +73,9 @@ export function ProductCard({ product, overview, overviewLoading, onEdit, onDele
           <ChannelsCell overview={overview} intended={marketplaces} loading={overviewLoading} />
           <CompletenessCell overview={overview} loading={overviewLoading} />
         </div>
+
+        {/* Una sola acción a la vista, igual que en el escritorio */}
+        {onSheet && <div className="mt-3"><AccionesDeFila producto={product} onSheet={onSheet} onRegenerate={onRegenerate} onEdit={onEdit} onDelete={onDelete} /></div>}
       </div>
     </div>
   );
