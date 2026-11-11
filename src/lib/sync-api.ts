@@ -335,6 +335,8 @@ export interface RipleyPublishPreview {
   skusNoPermitidos: string[];
   columnas: number;
   csv: string;
+  /** El producto ya se envió a Ripley y está pendiente de aprobación o ya procesado: no se puede reenviar (evita duplicados). */
+  bloqueo: { situacion: 'pendiente' | 'procesado' | 'libre'; motivo: string; importId: string | number; productImportId: string | number | null } | null;
 }
 
 export interface RipleyImportStatus {

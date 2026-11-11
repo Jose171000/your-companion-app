@@ -395,6 +395,9 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
                     {!p.errores.length && <p className="text-green-600 dark:text-green-400">Listo para enviar</p>}
                   </div>
                 ))}
+                {vista.bloqueo && (
+                  <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 break-words">{vista.bloqueo.motivo}</p>
+                )}
                 {!vista.envioEncendido && (
                   <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 break-words">La publicación en Ripley está apagada en el servidor, así que por ahora solo se puede revisar. Para enviar hay que encenderla (RIPLEY_PUBLISH_ENABLED).</p>
                 )}
@@ -404,7 +407,7 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!vista.puedeEnviar || !vista.envioEncendido || vista.skusNoPermitidos.length > 0 || enviar.isPending || !!envio}
+                  disabled={!vista.puedeEnviar || !vista.envioEncendido || vista.skusNoPermitidos.length > 0 || !!vista.bloqueo || enviar.isPending || !!envio}
                   onClick={() => setConfirmando(true)}
                 >
                   <Send className="w-3.5 h-3.5 mr-2" /> Enviar a Ripley
