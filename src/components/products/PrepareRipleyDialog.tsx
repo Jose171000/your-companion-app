@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { syncApi, RipleyCampo } from "@/lib/sync-api";
+import { syncApi, RipleyCampo, RipleyPublishPreview } from "@/lib/sync-api";
 import { Product, productsApi } from "@/lib/products-api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Check, Loader2, PackageCheck, Search, Sparkles, X } from "lucide-react";
+import { AlertTriangle, Check, Loader2, PackageCheck, Search, Send, Sparkles, X } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { RipleyBrandField } from "./RipleyBrandField";
 import { VariantCompatNotice } from "./VariantCompatNotice";
 
@@ -168,16 +169,18 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
   const faltan = obligatorios.filter((c) => !valores[c.name]?.trim());
   const listo = !!categoria && faltan.length === 0;
 
+  const guardarTodo = async () => {
+    const atributos = Object.fromEntries(Object.entries(valores).filter(([k, v]) => v?.trim() && campos.some((c) => c.name === k)));
+    let ultima: Awaited<ReturnType<typeof syncApi.saveRipleyPreparation>> | null = null;
+    for (const id of idsDe(product!)) {
+      ultima = await syncApi.saveRipleyPreparation(id, { categoryId: categoria!.id, attributes: atributos, content: { name: nombre, shortDescription: corta } });
+      if (ultima.error) break;
+    }
+    return ultima!;
+  };
+
   const guardar = useMutation({
-    mutationFn: async () => {
-      const atributos = Object.fromEntries(Object.entries(valores).filter(([k, v]) => v?.trim() && campos.some((c) => c.name === k)));
-      let ultima: Awaited<ReturnType<typeof syncApi.saveRipleyPreparation>> | null = null;
-      for (const id of idsDe(product!)) {
-        ultima = await syncApi.saveRipleyPreparation(id, { categoryId: categoria!.id, attributes: atributos, content: { name: nombre, shortDescription: corta } });
-        if (ultima.error) break;
-      }
-      return ultima!;
-    },
+    mutationFn: guardarTodo,
     onSuccess: (res) => {
       if (res.error) return toast.error(res.error);
       toast.success("Guardado para Ripley. No se envió nada a Ripley todavía.");
@@ -188,6 +191,45 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
   });
 
   const poner = (nombreCampo: string, v: string) => setValores((a) => ({ ...a, [nombreCampo]: v }));
+
+  // ── Envío a Ripley: guardar → revisar (vista previa, no envía) → enviar (con confirmación) → seguir la importación ──
+  const [vista, setVista] = useState<RipleyPublishPreview | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
+  const [envio, setEnvio] = useState<{ importId: string | number; productImportId: string | number | null; enviados: string[] } | null>(null);
+
+  const revisar = useMutation({
+    mutationFn: async () => {
+      const g = await guardarTodo();
+      if (g.error) return { error: g.error } as { error: string; data?: undefined };
+      return syncApi.ripleyPublishPreview(product!.id, esGrupo);
+    },
+    onSuccess: (res) => {
+      if (res.error || !res.data) return toast.error(res.error ?? "No se pudo revisar el envío");
+      setVista(res.data);
+      setEnvio(null);
+    },
+    onError: () => toast.error("Error al revisar el envío a Ripley"),
+  });
+
+  const enviar = useMutation({
+    mutationFn: () => syncApi.ripleyPublish(product!.id, { alGrupo: esGrupo, confirmar: true }),
+    onSuccess: (res) => {
+      setConfirmando(false);
+      if (res.error || !res.data) return toast.error(res.error ?? "Ripley no recibió el envío");
+      setEnvio({ importId: res.data.importId, productImportId: res.data.productImportId, enviados: res.data.enviados });
+      toast.success("Enviado a Ripley. Ahora Ripley lo procesa: abajo ves cómo va.");
+    },
+    onError: () => { setConfirmando(false); toast.error("Error al enviar a Ripley"); },
+  });
+
+  // Mientras Ripley procesa se consulta cada 20 s (Mirakl pide no consultar una importación más de una vez por minuto; para un piloto basta).
+  const { data: seguimiento } = useQuery({
+    queryKey: ["ripley-import", envio?.importId, envio?.productImportId],
+    queryFn: () => syncApi.ripleyImportStatus(envio!.importId, envio!.productImportId),
+    enabled: !!envio,
+    refetchInterval: (q) => (q.state.data?.data?.resumen === "en-curso" || !q.state.data ? 20_000 : false),
+  });
+  const estadoDeEnvio = seguimiento?.data ?? null;
 
   const dibujar = (campo: RipleyCampo) => (
     <div key={campo.name} className="space-y-1">
@@ -323,6 +365,87 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
             </div>
           )}
         </div>
+
+        {/* ── Enviar a Ripley ───────────────────────────────────────── */}
+        {categoria && (
+          <div className="rounded-xl border border-border p-3 space-y-3 min-w-0">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-sm font-medium flex items-center gap-1.5"><Send className="w-4 h-4" /> Enviar a Ripley</p>
+              <Button type="button" variant="outline" size="sm" className="h-8 text-xs" disabled={revisar.isPending || guardar.isPending || !listo} onClick={() => revisar.mutate()}>
+                {revisar.isPending ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Check className="w-3 h-3 mr-1" />}
+                {revisar.isPending ? "Revisando…" : "Guardar y revisar envío"}
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">Primero se guarda lo de arriba y se revisa qué se enviaría y si Ripley lo aceptaría. Revisar no envía nada.</p>
+
+            {vista && (
+              <div className="space-y-2 text-xs min-w-0">
+                {vista.errores.map((e, i) => <p key={i} className="rounded-lg border border-destructive/40 bg-destructive/10 p-2 break-words">{e}</p>)}
+                {vista.publicaComo !== "sola" && (
+                  <p className="rounded-lg border border-border p-2 text-muted-foreground break-words">
+                    {vista.publicaComo === "una" ? "Las variantes se enviarán en UNA sola publicación de Ripley." : "Las variantes se enviarán como productos separados."} {vista.avisosDeVariantes.join(" ")}
+                  </p>
+                )}
+                {vista.productos.map((p) => (
+                  <div key={p.sku} className={`rounded-lg border p-2 space-y-1 min-w-0 ${p.errores.length ? "border-destructive/40" : "border-border"}`}>
+                    <p className="font-medium break-words">{p.sku} · {p.nombre || "(sin nombre)"}</p>
+                    <p className="text-muted-foreground">Precio S/ {p.precio ?? "—"} · Stock {p.stock ?? "—"}</p>
+                    {p.errores.map((e, i) => <p key={i} className="text-destructive break-words">• {e}</p>)}
+                    {p.avisos.map((a, i) => <p key={i} className="text-amber-600 dark:text-amber-400 break-words">• {a}</p>)}
+                    {!p.errores.length && <p className="text-green-600 dark:text-green-400">Listo para enviar</p>}
+                  </div>
+                ))}
+                {!vista.envioEncendido && (
+                  <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 break-words">La publicación en Ripley está apagada en el servidor, así que por ahora solo se puede revisar. Para enviar hay que encenderla (RIPLEY_PUBLISH_ENABLED).</p>
+                )}
+                {vista.envioEncendido && vista.skusNoPermitidos.length > 0 && (
+                  <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 break-words">Estos SKU no están en la lista permitida del servidor (RIPLEY_PUBLISH_SKUS): {vista.skusNoPermitidos.join(", ")}.</p>
+                )}
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!vista.puedeEnviar || !vista.envioEncendido || vista.skusNoPermitidos.length > 0 || enviar.isPending || !!envio}
+                  onClick={() => setConfirmando(true)}
+                >
+                  <Send className="w-3.5 h-3.5 mr-2" /> Enviar a Ripley
+                </Button>
+              </div>
+            )}
+
+            {envio && (
+              <div className="rounded-lg border border-border p-2.5 text-xs space-y-1 min-w-0">
+                <p className="font-medium flex items-center gap-1.5">
+                  {!estadoDeEnvio || estadoDeEnvio.resumen === "en-curso" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : estadoDeEnvio.resumen === "listo" ? <Check className="w-3.5 h-3.5 text-green-500" /> : <AlertTriangle className="w-3.5 h-3.5 text-destructive" />}
+                  {!estadoDeEnvio || estadoDeEnvio.resumen === "en-curso" ? "Ripley está procesando lo enviado…" : estadoDeEnvio.resumen === "listo" ? "Ripley lo procesó sin errores" : "Ripley encontró errores"}
+                </p>
+                {estadoDeEnvio && (
+                  <p className="text-muted-foreground">
+                    Productos: {estadoDeEnvio.productos?.estado ?? "—"} ({estadoDeEnvio.productos?.correctas ?? 0} bien, {estadoDeEnvio.productos?.conError ?? 0} con error) · Ofertas: {estadoDeEnvio.ofertas.estado ?? "—"} ({estadoDeEnvio.ofertas.correctas ?? 0} bien, {estadoDeEnvio.ofertas.conError ?? 0} con error)
+                  </p>
+                )}
+                {[...(estadoDeEnvio?.errores.productos ?? []), ...(estadoDeEnvio?.errores.ofertas ?? [])].map((e, i) => <p key={i} className="text-destructive break-words">• {e}</p>)}
+                {estadoDeEnvio?.resumen === "listo" && <p className="text-muted-foreground">Ripley puede tardar en mostrarlo en su sitio. Luego actualiza Marketplaces para que Synkro lo reconozca.</p>}
+              </div>
+            )}
+          </div>
+        )}
+
+        <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Enviar a Ripley?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Se creará la ficha y la oferta de {vista?.productos.length ?? 0} producto(s) en el catálogo REAL de tu tienda en Ripley: {vista?.productos.map((p) => p.sku).join(", ")}. Esto no se puede deshacer desde Synkro.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={enviar.isPending}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction disabled={enviar.isPending} onClick={(e) => { e.preventDefault(); enviar.mutate(); }}>
+                {enviar.isPending ? "Enviando…" : "Sí, enviar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose} disabled={guardar.isPending}>Cancelar</Button>

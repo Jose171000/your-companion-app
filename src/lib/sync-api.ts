@@ -321,6 +321,29 @@ export interface LaunchReport {
   meliCategory?: { id?: string; path?: string; options?: { id: string; path: string }[] };
 }
 
+/** Lo que se enviaría a Ripley, con sus problemas (la vista previa no envía nada). */
+export interface RipleyPublishPreview {
+  categoria: { id: string; ruta: string } | null;
+  /** sola: sin variantes · una: variantes en UNA publicación · separadas: cada variante como producto aparte */
+  publicaComo: 'sola' | 'una' | 'separadas';
+  avisosDeVariantes: string[];
+  productos: { sku: string; nombre: string; precio: number | null; stock: number | null; errores: string[]; avisos: string[] }[];
+  errores: string[];
+  puedeEnviar: boolean;
+  /** El interruptor de publicación del servidor está encendido. */
+  envioEncendido: boolean;
+  skusNoPermitidos: string[];
+  columnas: number;
+  csv: string;
+}
+
+export interface RipleyImportStatus {
+  resumen: 'en-curso' | 'listo' | 'con-errores';
+  ofertas: { estado: string | null; leidas: number | null; correctas: number | null; conError: number | null };
+  productos: { estado: string | null; leidas: number | null; correctas: number | null; conError: number | null } | null;
+  errores: { ofertas: string[]; productos: string[] };
+}
+
 /** Un campo que pide una categoría de Ripley. */
 export interface RipleyCampo {
   name: string;
@@ -614,6 +637,21 @@ export const syncApi = {
       method: 'PATCH',
       body: JSON.stringify({ brand }),
     }),
+
+  /** Vista previa de lo que se enviaría a Ripley (valida y arma el archivo). NO envía nada. */
+  ripleyPublishPreview: (productId: string, alGrupo = false) =>
+    apiRequest<RipleyPublishPreview>(`/sync/ripley/products/${productId}/publish-preview`, { method: 'POST', body: JSON.stringify({ alGrupo }) }),
+
+  /** ENVÍA el producto a Ripley (crea su ficha y su oferta). Exige confirmación expresa; el servidor además pide su interruptor encendido. */
+  ripleyPublish: (productId: string, body: { alGrupo?: boolean; confirmar: boolean }) =>
+    apiRequest<{ importId: string | number; productImportId: string | number | null; enviados: string[]; publicaComo: string }>(
+      `/sync/ripley/products/${productId}/publish`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
+
+  /** Cómo va lo enviado a Ripley (ofertas y productos) y sus errores. Solo consulta. */
+  ripleyImportStatus: (importId: string | number, productImportId?: string | number | null) =>
+    apiRequest<RipleyImportStatus>(`/sync/ripley/imports/${importId}${productImportId ? `?productImportId=${productImportId}` : ''}`, { method: 'GET' }),
 
   /** Categorías de Ripley donde se puede publicar, filtradas por texto (del catálogo ya importado). */
   searchRipleyCategories: (search: string) =>
