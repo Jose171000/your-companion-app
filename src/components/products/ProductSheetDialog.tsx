@@ -353,6 +353,7 @@ function FichaDeProducto({
 
   const fal = hoja?.channels.find((c) => c.marketplace === "falabella");
   const meli = hoja?.channels.find((c) => c.marketplace === "mercadolibre");
+  const ripley = hoja?.channels.find((c) => c.marketplace === "ripley");
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -404,6 +405,7 @@ function FichaDeProducto({
               {((hoja.prices.length > 0 && !modoGrupo) || (modoGrupo && grupoId)) && <TabsTrigger value="precios">Precios</TabsTrigger>}
               {fal && <TabsTrigger value="falabella">Falabella</TabsTrigger>}
               {meli && <TabsTrigger value="mercadolibre">Mercado Libre</TabsTrigger>}
+              {ripley && <TabsTrigger value="ripley">Ripley</TabsTrigger>}
             </TabsList>
 
             {hoja.channels.length === 0 && (
@@ -560,13 +562,50 @@ function FichaDeProducto({
                 </div>
               </TabsContent>
             )}
+
+            {/* ── Ripley (solo lectura) ── */}
+            {ripley && (
+              <TabsContent value="ripley" className="pt-4 space-y-4">
+                <EstadoDelCanal canal={ripley} />
+                {ripley.lastError && <p className="text-xs text-red-400 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{ripley.lastError}</p>}
+                {ripley.listo ? (
+                  <p className="text-xs text-green-500 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Esto es lo que Synkro preparó y envió a Ripley.</p>
+                ) : (
+                  <p className="text-xs text-amber-500 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{ripley.motivo ?? "Todavía falta preparar este producto para Ripley."}</p>
+                )}
+                <div className="rounded-lg border border-border p-3 space-y-1 text-sm break-words">
+                  <p><span className="text-muted-foreground">Nombre que se envió:</span> {ripley.sent.name ?? "—"}</p>
+                  {ripley.sent.shortDescription && <p><span className="text-muted-foreground">Descripción corta:</span> {ripley.sent.shortDescription}</p>}
+                  <p><span className="text-muted-foreground">Categoría:</span> {ripley.sent.categoryPath ?? ripley.sent.categoryId ?? "sin asignar"}</p>
+                  <p><span className="text-muted-foreground">Marca:</span> {ripley.sent.brand ?? "—"}</p>
+                  <p><span className="text-muted-foreground">Descripción:</span> {ripley.sent.description ? (ripley.sent.isHtml ? "HTML estándar de la agencia" : "texto plano") : "—"}</p>
+                  <p><span className="text-muted-foreground">Oferta en Ripley:</span> {ripley.sent.offerId ?? "—"}{ripley.sent.channelPrice != null ? ` · S/ ${ripley.sent.channelPrice}` : ""}{ripley.sent.channelStock != null ? ` · stock ${ripley.sent.channelStock}` : ""}</p>
+                </div>
+                {(ripley.sent.attributes as any[]).length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="text-xs">Atributos de la categoría que se enviaron ({(ripley.sent.attributes as any[]).length})</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {(ripley.sent.attributes as any[]).map((a) => (
+                        <div key={a.name} className="rounded-lg border border-border px-3 py-2 text-sm break-words">
+                          <p className="text-[11px] text-muted-foreground">{a.label}{a.required ? " · obligatorio" : ""}</p>
+                          <p>{a.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Por ahora esta pestaña es solo de lectura. Para cambiar la categoría, los atributos o la marca usa Publicar → Preparar para Ripley. El stock y el precio de Ripley se sincronizan solos.
+                </p>
+              </TabsContent>
+            )}
           </Tabs>
         )}
 
         <DialogFooter className="gap-2 sm:gap-2 flex-wrap">
           <Button variant="outline" onClick={onClose}>Cerrar</Button>
           {!modoGrupo && (
-            <Button variant="outline" onClick={() => enviarYa.mutate()} disabled={enviarYa.isPending || !hoja || hoja.channels.length === 0 || cambios !== null} title={cambios ? "Guarda primero los cambios" : "Envía ya, sin esperar"}>
+            <Button variant="outline" onClick={() => enviarYa.mutate()} disabled={enviarYa.isPending || !hoja || hoja.channels.filter((c) => c.marketplace !== "ripley").length === 0 || cambios !== null} title={cambios ? "Guarda primero los cambios" : "Envía ya, sin esperar"}>
               {enviarYa.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Rocket className="w-4 h-4 mr-2" />}
               Enviar ahora a los canales
             </Button>
