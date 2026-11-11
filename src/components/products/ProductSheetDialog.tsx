@@ -490,7 +490,7 @@ function FichaDeProducto({
         )}
 
         {variantes.length > 1 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
             <span className="text-xs text-muted-foreground mr-1 shrink-0">Variante:</span>
             <button type="button" onClick={() => onElegir?.(TODAS)} className={`shrink-0 whitespace-nowrap text-xs rounded-full border px-2.5 py-1 font-medium transition-colors ${variantId === TODAS ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:border-primary/50"}`}>
               Todas las variantes ({variantes.length})
