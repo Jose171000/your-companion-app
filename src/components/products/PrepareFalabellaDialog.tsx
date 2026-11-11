@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Check, Loader2, Package, Search } from "lucide-react";
+import { VolverALaFicha } from "./VolverALaFicha";
 import { FalabellaBrandField } from "./FalabellaBrandField";
 import { VariantCompatNotice } from "./VariantCompatNotice";
 
@@ -31,6 +32,8 @@ interface Props {
   product: Product | null;
   open: boolean;
   onClose: () => void;
+  /** Se abrió desde la ficha del producto: muestra la flecha para volver a ella. */
+  desdeFicha?: boolean;
 }
 
 /** Espera a que el usuario deje de escribir antes de consultar. */
@@ -51,7 +54,7 @@ function useDebounced<T>(value: T, ms = 350): T {
  * En vez de mostrar un formulario fijo con todo lo imaginable, se le pregunta
  * a Falabella qué exige la categoría elegida y se dibujan solo esos campos.
  */
-export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
+export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: Props) {
   const queryClient = useQueryClient();
 
   const [busqueda, setBusqueda] = useState("");
@@ -168,6 +171,7 @@ export function PrepareFalabellaDialog({ product, open, onClose }: Props) {
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
         <DialogHeader>
+          {desdeFicha && <VolverALaFicha onClick={onClose} />}
           <DialogTitle className="flex items-center gap-2">
             <Package className="w-4 h-4" />
             Preparar para Falabella

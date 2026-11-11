@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Check, Loader2, PackageCheck, Search, Send, Sparkles, X } from "lucide-react";
+import { VolverALaFicha } from "./VolverALaFicha";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { RipleyBrandField } from "./RipleyBrandField";
 import { VariantCompatNotice } from "./VariantCompatNotice";
@@ -19,6 +20,8 @@ interface Props {
   product: Product | null;
   open: boolean;
   onClose: () => void;
+  /** Se abrió desde la ficha del producto: muestra la flecha para volver a ella. */
+  desdeFicha?: boolean;
 }
 
 function useDebounced<T>(value: T, ms = 350): T {
@@ -80,7 +83,7 @@ function CampoDeListaLarga({ campo, valor, onChange }: { campo: RipleyCampo; val
  * La IA propone la categoría y rellena lo que se puede deducir; aquí se revisa y se completa lo que falte. Solo guarda en
  * Synkro: no envía nada a Ripley.
  */
-export function PrepareRipleyDialog({ product, open, onClose }: Props) {
+export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Props) {
   const queryClient = useQueryClient();
   const [categoria, setCategoria] = useState<{ id: string; path: string } | null>(null);
   const [valores, setValores] = useState<Record<string, string>>({});
@@ -257,6 +260,7 @@ export function PrepareRipleyDialog({ product, open, onClose }: Props) {
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="sm:max-w-[640px] max-h-[88vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0">
         <DialogHeader>
+          {desdeFicha && <VolverALaFicha onClick={onClose} />}
           <DialogTitle className="flex items-center gap-2"><PackageCheck className="w-4 h-4" /> Preparar para Ripley</DialogTitle>
           <DialogDescription className="break-words">
             {product?.name}{esGrupo ? ` (las ${product?.groupSummary?.variantCount} variantes)` : ""}. Ripley pide una categoría de su catálogo y los datos propios de esa categoría. Esto solo guarda en Synkro: no envía nada a Ripley.

@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { AlertCircle, Check, ExternalLink, Loader2, Rocket, Sparkles } from "lucide-react";
+import { VolverALaFicha } from "./VolverALaFicha";
 import { toast } from "sonner";
 
 // Solo Mercado Libre tiene sincronización real por ahora
@@ -29,9 +30,11 @@ const PUBLISHABLE = [
 interface PublishProductDialogProps {
   product: Product | null;
   onClose: () => void;
+  /** Se abrió desde la ficha del producto: muestra la flecha para volver a ella. */
+  desdeFicha?: boolean;
 }
 
-export function PublishProductDialog({ product, onClose }: PublishProductDialogProps) {
+export function PublishProductDialog({ product, onClose, desdeFicha }: PublishProductDialogProps) {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<string[]>(["mercadolibre"]);
 
@@ -228,6 +231,7 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0">
         <DialogHeader>
+          {desdeFicha && <VolverALaFicha onClick={onClose} />}
           <DialogTitle className="flex items-center gap-2">
             <Rocket className="w-5 h-5 text-primary" />
             Publicar en marketplaces

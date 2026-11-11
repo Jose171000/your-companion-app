@@ -74,6 +74,7 @@ export interface ProductOverview {
   categories: {
     falabella: { id: string; path: string | null } | null;
     mercadolibre: { id: string } | null;
+    ripley?: { id: string; path: string | null } | null;
     internal: string | null;
   };
   channels: { linkId: string; marketplace: string; channel: string; account: string | null; status: string; statusLabel: string; error: string | null; permalink: string | null }[];

@@ -325,12 +325,16 @@ function SincronizarCanales({ filas, onHecho }: { filas: SheetSync[]; onHecho: (
 export interface ProductSheetDialogProps {
   product: Product | null;
   onClose: () => void;
+  /** Mientras otra ventana (Preparar, Publicar) está abierta encima, la ficha se oculta sin perder lo que se editaba. */
+  oculta?: boolean;
+  /** Pide ocultar la ficha para abrir otra ventana; al cerrarla, la ficha vuelve. */
+  onOcultar?: () => void;
   onPublish?: (p: Product) => void;
   onPrepareFalabella?: (p: Product) => void;
   onPrepareRipley?: (p: Product) => void;
 }
 
-export function ProductSheetDialog({ product, onClose, onPublish, onPrepareFalabella, onPrepareRipley }: ProductSheetDialogProps) {
+export function ProductSheetDialog({ product, onClose, oculta = false, onOcultar, onPublish, onPrepareFalabella, onPrepareRipley }: ProductSheetDialogProps) {
   const [elegida, setElegida] = useState<string | null>(null);
   const grupoId = product?.alGrupo ? product.group?.id : undefined;
   useEffect(() => setElegida(null), [product?.id, product?.alGrupo]);
@@ -345,9 +349,10 @@ export function ProductSheetDialog({ product, onClose, onPublish, onPrepareFalab
   const todas = variantes.length > 1 && (elegida === null || elegida === TODAS);
   const actual = product && variantes.length ? (todas ? variantes[0] : variantes.find((v) => v.id === elegida) ?? variantes[0]) : product;
   const grupo = product?.group;
-  const alAbrir = (f?: (p: Product) => void) => (f && product ? () => { onClose(); f(product); } : undefined);
+  const alAbrir = (f?: (p: Product) => void) => (f && product ? () => { (onOcultar ?? onClose)(); f(product); } : undefined);
   return (
     <FichaDeProducto
+      oculta={oculta}
       acciones={{ onPublicar: alAbrir(onPublish), onPrepararFalabella: alAbrir(onPrepareFalabella), onPrepararRipley: alAbrir(onPrepareRipley) }}
       product={actual}
       onClose={onClose}
@@ -363,9 +368,9 @@ export function ProductSheetDialog({ product, onClose, onPublish, onPrepareFalab
 }
 
 function FichaDeProducto({
-  product, onClose, variantes = [], variantId, onElegir, modoGrupo = false, grupoId, nombreDelGrupo, ejes = [], acciones = {},
+  product, onClose, variantes = [], variantId, onElegir, modoGrupo = false, grupoId, nombreDelGrupo, ejes = [], acciones = {}, oculta = false,
 }: {
-  acciones?: AccionesDeCanal; product: Product | null; onClose: () => void; variantes?: Product[]; variantId?: string; onElegir?: (id: string) => void;
+  oculta?: boolean; acciones?: AccionesDeCanal; product: Product | null; onClose: () => void; variantes?: Product[]; variantId?: string; onElegir?: (id: string) => void;
   modoGrupo?: boolean; grupoId?: string; nombreDelGrupo?: string; ejes?: string[];
 }) {
   const queryClient = useQueryClient();
@@ -467,7 +472,7 @@ function FichaDeProducto({
   const ripley = hoja?.channels.find((c) => c.marketplace === "ripley");
 
   return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+    <Dialog open={open && !oculta} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-[860px] max-h-[92vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><FileText className="w-5 h-5 text-primary" /> {modoGrupo ? "Ficha del grupo" : "Ficha del producto"}</DialogTitle>

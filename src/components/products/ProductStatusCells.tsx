@@ -16,7 +16,8 @@ const ESTADO_ESTILO: Record<string, string> = {
 export function CategoryCell({ overview, loading }: { overview?: ProductOverview; loading?: boolean }) {
   if (!overview) return <span className="text-sm text-muted-foreground">{loading ? "…" : "—"}</span>;
   const { falabella, mercadolibre, internal } = overview.categories;
-  if (!falabella && !mercadolibre && !internal) {
+  const ripley = overview.categories.ripley ?? null;
+  if (!falabella && !mercadolibre && !ripley && !internal) {
     return <span className="text-xs font-medium text-red-400">Sin categoría</span>;
   }
   return (
@@ -25,6 +26,12 @@ export function CategoryCell({ overview, loading }: { overview?: ProductOverview
         <p className="truncate" title={falabella.path ?? `Categoría ${falabella.id}`}>
           <span className="text-muted-foreground">Falabella: </span>
           {falabella.path ?? `ID ${falabella.id}`}
+        </p>
+      )}
+      {ripley && (
+        <p className="truncate" title={ripley.path ?? `Categoría ${ripley.id}`}>
+          <span className="text-muted-foreground">Ripley: </span>
+          {ripley.path ?? `ID ${ripley.id}`}
         </p>
       )}
       {mercadolibre && (

@@ -39,6 +39,13 @@ export function ProductsModule() {
   const [regenTarget, setRegenTarget]   = useState<Product | null>(null);
   const [publishTarget, setPublishTarget] = useState<Product | null>(null);
   const [sheetTarget, setSheetTarget] = useState<Product | null>(null);
+  // La ficha se oculta (sin cerrarse) mientras se abre Preparar o Publicar desde ella; al cerrarlos vuelve tal como estaba.
+  const [sheetOculta, setSheetOculta] = useState(false);
+  const volverALaFicha = () => {
+    if (!sheetOculta) return;
+    setSheetOculta(false);
+    queryClient.invalidateQueries({ queryKey: ["product-sheet"] });
+  };
 
   // Clic en un aviso de la campana: abre la ficha del producto.
   useDestinoPendiente("products", async ({ productId }) => {
@@ -220,23 +227,28 @@ export function ProductsModule() {
       <PrepareFalabellaDialog
         product={falabellaTarget}
         open={falabellaTarget !== null}
-        onClose={() => setFalabellaTarget(null)}
+        desdeFicha={sheetOculta}
+        onClose={() => { setFalabellaTarget(null); volverALaFicha(); }}
       />
 
       <PrepareRipleyDialog
         product={ripleyTarget}
         open={ripleyTarget !== null}
-        onClose={() => setRipleyTarget(null)}
+        desdeFicha={sheetOculta}
+        onClose={() => { setRipleyTarget(null); volverALaFicha(); }}
       />
 
       <PublishProductDialog
         product={publishTarget}
-        onClose={() => setPublishTarget(null)}
+        desdeFicha={sheetOculta}
+        onClose={() => { setPublishTarget(null); volverALaFicha(); }}
       />
 
       <ProductSheetDialog
         product={sheetTarget}
-        onClose={() => setSheetTarget(null)}
+        onClose={() => { setSheetTarget(null); setSheetOculta(false); }}
+        oculta={sheetOculta}
+        onOcultar={() => setSheetOculta(true)}
         onPublish={(p) => setPublishTarget(p)}
         onPrepareFalabella={(p) => setFalabellaTarget(p)}
         onPrepareRipley={(p) => setRipleyTarget(p)}
