@@ -172,9 +172,19 @@ export interface VariantCompatResult {
   renombresSugeridos?: { eje: string; a: string }[];
   ejesQueFaltan: string[];
   valoresSinEquivalente: { eje: string; valores: string[] }[];
+  /** Valores distintos que el canal llevaría a la misma opción (dos variantes con el mismo dato). */
+  colisiones?: { eje: string; atributo: string; opcion: string; valores: string[] }[];
   avisos: string[];
   /** Otra categoría, parecida y verificada, que sí admite las variantes: solo una recomendación. */
   recomendada?: { id: string; ruta: string } | null;
+}
+
+/** Valores de un dato del canal (color, talla, tamaño) que no encajan, con la opción válida que propone la IA para cada uno. La persona confirma. */
+export interface SugerenciaDeAjustes {
+  eje: string;
+  atributo: string;
+  opciones: string[];
+  items: { valor: string; opcion: string | null; motivo: string; origen: 'ia' | 'foto' | 'actual' | null; conflicto: boolean }[];
 }
 
 export interface GenerateAIContentDto {
@@ -280,6 +290,14 @@ export const productsApi = {
       `/products/groups/${groupId}/variant-compat?marketplace=${encodeURIComponent(marketplaces.join(','))}${categoryId ? `&categoryId=${encodeURIComponent(categoryId)}` : ''}`,
       { method: 'GET' },
     ),
+
+  /** La IA propone a qué opción válida de un canal corresponde cada color/talla/tamaño que su lista no tiene. Solo consulta. */
+  suggestChannelValues: (groupId: string, marketplace: string) =>
+    apiRequest<SugerenciaDeAjustes[]>(`/products/groups/${groupId}/channel-values/suggest`, { method: 'POST', body: JSON.stringify({ marketplace }) }),
+
+  /** Guarda, solo para ese canal, a qué opción corresponde cada valor confirmado. El valor de la persona no cambia en Synkro ni en otros canales. */
+  applyChannelValues: (groupId: string, marketplace: string, cambios: { eje: string; valor: string; opcion: string }[]) =>
+    apiRequest<{ aplicados: number; variantes: number }>(`/products/groups/${groupId}/channel-values/apply`, { method: 'POST', body: JSON.stringify({ marketplace, cambios }) }),
 
   /** Cambia el NOMBRE de un eje de variación del grupo («Talla» → «Tamaño cama») en el grupo y en todas sus variantes; los valores no se tocan. */
   renameGroupAxis: (groupId: string, from: string, to: string) =>

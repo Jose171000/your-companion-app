@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Info, Lightbulb } from "lucide-react";
+import { AlertTriangle, Info, Lightbulb, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { productsApi } from "@/lib/products-api";
+import { productsApi, type SugerenciaDeAjustes } from "@/lib/products-api";
 import { useStores } from "@/contexts/StoreContext";
 
 const CANALES_REVISABLES = ["ripley", "falabella", "mercadolibre", "shopify", "woocommerce"];
@@ -74,6 +74,90 @@ function RenombrarEje({ groupId, eje, opciones, sugerido }: { groupId: string; e
   );
 }
 
+/**
+ * Cuando un color, una talla o un tamaño que escribió la persona no existe en la lista del canal (o dos caen en la misma opción), la IA propone
+ * la opción válida más cercana (por el nombre del producto y, si hace falta, mirando la foto de la variante). La persona revisa y confirma;
+ * solo vale para ese canal: lo que escribió no cambia en Synkro ni en los demás canales.
+ */
+function ResolverValores({ groupId, canal, nombreDelCanal }: { groupId: string; canal: string; nombreDelCanal: string }) {
+  const queryClient = useQueryClient();
+  const { can } = useStores();
+  const [propuestas, setPropuestas] = useState<SugerenciaDeAjustes[] | null>(null);
+  const [elegidas, setElegidas] = useState<Record<string, string>>({});
+  const clave = (eje: string, valor: string) => `${eje}\u0000${valor}`;
+
+  const sugerir = useMutation({
+    mutationFn: () => productsApi.suggestChannelValues(groupId, canal),
+    onSuccess: (res) => {
+      if (res.error || !res.data) return toast.error(res.error ?? "No se pudo consultar a la IA");
+      setPropuestas(res.data);
+      setElegidas(Object.fromEntries(res.data.flatMap((p) => p.items.map((i) => [clave(p.eje, i.valor), i.opcion ?? ""]))));
+      if (!res.data.length) toast.info("No hay nada que resolver en este canal.");
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
+
+  const aplicar = useMutation({
+    mutationFn: () => productsApi.applyChannelValues(
+      groupId, canal,
+      (propuestas ?? []).flatMap((p) => p.items.map((i) => ({ eje: p.eje, valor: i.valor, opcion: elegidas[clave(p.eje, i.valor)] }))).filter((c) => !!c.opcion),
+    ),
+    onSuccess: (res) => {
+      if (res.error || !res.data) return toast.error(res.error ?? "No se pudo guardar");
+      toast.success(`Listo: ${res.data.aplicados} valor(es) ajustados para ${nombreDelCanal} en las ${res.data.variantes} variantes.`);
+      setPropuestas(null);
+      queryClient.invalidateQueries({ queryKey: ["variant-compat"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
+
+  if (!can("canales.publicar")) return null;
+  const sinElegir = (propuestas ?? []).some((p) => p.items.some((i) => !elegidas[clave(p.eje, i.valor)]));
+  return (
+    <div className="space-y-2 pt-1 border-t border-amber-500/30">
+      {!propuestas?.length && (
+        <div className="space-y-1">
+          <p className="break-words">Que ningún valor quede sin opción: la IA propone la opción válida de {nombreDelCanal} más cercana a lo que escribiste. Tú confirmas; lo que escribiste no cambia.</p>
+          <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1.5" disabled={sugerir.isPending} onClick={() => sugerir.mutate()}>
+            <Sparkles className="w-3.5 h-3.5" /> {sugerir.isPending ? "Consultando a la IA…" : "Resolver con IA"}
+          </Button>
+        </div>
+      )}
+      {propuestas?.map((p) => (
+        <div key={p.eje} className="space-y-1.5">
+          <p className="font-medium">{p.eje} → {p.atributo.replace(/\s*variant$/i, "")} de {nombreDelCanal}</p>
+          {p.items.map((i) => (
+            <div key={i.valor} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-0.5 items-center">
+              <span className="break-words">«{i.valor}»{i.conflicto && <span className="text-amber-700 dark:text-amber-400"> · repetida</span>}</span>
+              <select
+                value={elegidas[clave(p.eje, i.valor)] ?? ""}
+                onChange={(e) => setElegidas((x) => ({ ...x, [clave(p.eje, i.valor)]: e.target.value }))}
+                className="h-7 max-w-[11rem] rounded-md border border-border bg-background px-2 text-xs"
+              >
+                <option value="">Elige…</option>
+                {p.opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+              <span className="col-span-2 text-[11px] text-muted-foreground break-words">
+                {i.origen === "foto" ? "Según la foto de esa variante · " : i.origen === "ia" ? "Por el nombre del producto · " : ""}{i.motivo}
+              </span>
+            </div>
+          ))}
+        </div>
+      ))}
+      {!!propuestas?.length && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button type="button" size="sm" className="h-7 text-xs" disabled={aplicar.isPending || sinElegir} onClick={() => aplicar.mutate()}>
+            {aplicar.isPending ? "Guardando…" : "Confirmar y aplicar"}
+          </Button>
+          <button type="button" className="underline text-muted-foreground" onClick={() => setPropuestas(null)}>Cancelar</button>
+          {sinElegir && <span className="text-[11px] text-muted-foreground">Elige una opción para cada valor.</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function VariantCompatNotice({ groupId, marketplaces, categoryId, onUseCategory }: Props) {
   const canales = marketplaces.filter((m) => CANALES_REVISABLES.includes(m));
   const { data } = useQuery({
@@ -96,6 +180,7 @@ export function VariantCompatNotice({ groupId, marketplaces, categoryId, onUseCa
               {r.nombreDelCanal}: {separadas ? "se publicarán como productos separados" : "revisa estos detalles"}
             </p>
             {r.avisos.map((a, i) => <p key={i} className="break-words">{a}</p>)}
+            {(r.valoresSinEquivalente.length > 0 || (r.colisiones?.length ?? 0) > 0) && <ResolverValores groupId={groupId} canal={r.canal} nombreDelCanal={r.nombreDelCanal} />}
             {separadas && (r.ejesDisponibles?.length ?? 0) > 0 && r.ejesNoPermitidos.map((eje) => <RenombrarEje key={eje} groupId={groupId} eje={eje} opciones={r.ejesDisponibles!} sugerido={r.renombresSugeridos?.find((s) => s.eje === eje)?.a} />)}
             {separadas && r.recomendada && (
               <div className="flex items-start gap-1.5 pt-1 border-t border-amber-500/30">

@@ -634,10 +634,11 @@ function FichaDeProducto({
 
               {hoja.product.images.length > 0 && (
                 <div className="space-y-1">
-                  <Label className="text-xs">Fotos</Label>
+                  <Label className="text-xs">{modoGrupo ? "Fotos de la primera variante" : "Fotos"}</Label>
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {hoja.product.images.map((u) => <img key={u} src={u} alt="" className="h-20 w-20 object-cover rounded-lg border border-border shrink-0" />)}
                   </div>
+                  {modoGrupo && <p className="text-[11px] text-muted-foreground">Aquí solo se muestran las fotos de la primera variante. Las de cada una se revisan y cambian eligiendo esa variante en el selector de arriba.</p>}
                 </div>
               )}
             </TabsContent>
