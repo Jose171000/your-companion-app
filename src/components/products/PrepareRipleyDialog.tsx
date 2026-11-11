@@ -406,6 +406,9 @@ export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Prop
                 {vista.bloqueo && (
                   <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 break-words">{vista.bloqueo.motivo}</p>
                 )}
+                {(vista.sinComprobar?.length ?? 0) > 0 && (
+                  <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 break-words">No se pudo comprobar si estos SKU ya existen en Ripley ({vista.sinComprobar!.slice(0, 5).join(", ")}). Ripley limita las consultas: vuelve a pulsar «Guardar y revisar envío» en unos segundos.</p>
+                )}
                 {(vista.yaEnRipley?.length ?? 0) > 0 && (
                   <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 space-y-1.5 break-words">
                     <p className="font-medium">Estos productos ya están en Ripley: enviarlos actualizaría esas fichas en vez de crear nuevas.</p>
@@ -425,7 +428,7 @@ export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Prop
                 <Button
                   type="button"
                   size="sm"
-                  disabled={!vista.puedeEnviar || !vista.envioEncendido || vista.skusNoPermitidos.length > 0 || !!vista.bloqueo || ((vista.yaEnRipley?.length ?? 0) > 0 && !confirmaActualizar) || enviar.isPending || !!envio}
+                  disabled={!vista.puedeEnviar || !vista.envioEncendido || vista.skusNoPermitidos.length > 0 || !!vista.bloqueo || (vista.sinComprobar?.length ?? 0) > 0 || ((vista.yaEnRipley?.length ?? 0) > 0 && !confirmaActualizar) || enviar.isPending || !!envio}
                   onClick={() => setConfirmando(true)}
                 >
                   <Send className="w-3.5 h-3.5 mr-2" /> Enviar a Ripley

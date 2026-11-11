@@ -342,6 +342,8 @@ export interface RipleyPublishPreview {
   productos: { sku: string; nombre: string; precio: number | null; stock: number | null; errores: string[]; avisos: string[] }[];
   /** SKU que YA existen como oferta en Ripley: enviarlos actualizaría esas fichas en vez de crear nuevas. */
   yaEnRipley?: { sku: string; offerId: string | number | null; productSku: string | null; titulo: string | null }[];
+  /** SKU para los que no se pudo comprobar si ya existen en Ripley (límite de peticiones): hay que revisar de nuevo antes de enviar. */
+  sinComprobar?: string[];
   errores: string[];
   puedeEnviar: boolean;
   /** El interruptor de publicación del servidor está encendido. */
