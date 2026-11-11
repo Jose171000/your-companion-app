@@ -234,7 +234,13 @@ export function ProductsModule() {
         onClose={() => setPublishTarget(null)}
       />
 
-      <ProductSheetDialog product={sheetTarget} onClose={() => setSheetTarget(null)} />
+      <ProductSheetDialog
+        product={sheetTarget}
+        onClose={() => setSheetTarget(null)}
+        onPublish={(p) => setPublishTarget(p)}
+        onPrepareFalabella={(p) => setFalabellaTarget(p)}
+        onPrepareRipley={(p) => setRipleyTarget(p)}
+      />
     </div>
   );
 }

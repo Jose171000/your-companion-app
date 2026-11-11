@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertCircle, CheckCircle2, Download, ExternalLink, FileText, Loader2, Rocket, Save, Sparkles } from "lucide-react";
+import { AlertCircle, CheckCircle2, Download, ExternalLink, FileText, Loader2, Plug, RefreshCw, Rocket, Save, Sparkles } from "lucide-react";
 import { Product, productsApi } from "@/lib/products-api";
-import { SheetChannel, SheetData, SheetPrice, syncApi } from "@/lib/sync-api";
+import { SheetChannel, SheetData, SheetPrice, SheetSync, syncApi } from "@/lib/sync-api";
+import { useStores } from "@/contexts/StoreContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -223,7 +224,113 @@ function CampoDeAtributo({
  */
 const TODAS = "__todas__";
 
-export function ProductSheetDialog({ product, onClose }: { product: Product | null; onClose: () => void }) {
+const CANALES_DE_PUBLICACION = ["falabella", "ripley", "mercadolibre"];
+
+interface AccionesDeCanal { onPublicar?: () => void; onPrepararFalabella?: () => void; onPrepararRipley?: () => void }
+
+/** Pestaña «Canales»: una tarjeta por cuenta conectada (solo las conectadas) con su estado y sus acciones. */
+function CanalesDelProducto({ hoja, acciones, onVer, modoGrupo }: { hoja: SheetData; acciones: AccionesDeCanal; onVer: (canal: string) => void; modoGrupo: boolean }) {
+  const { can } = useStores();
+  const { data, isLoading } = useQuery({ queryKey: ["sync-connections"], queryFn: () => syncApi.getConnections(), staleTime: 30_000 });
+  const conectadas = (data?.data ?? []).filter((c) => c.status === "active" && CANALES_DE_PUBLICACION.includes(c.marketplace));
+  const sinConectar = CANALES_DE_PUBLICACION.filter((m) => !conectadas.some((c) => c.marketplace === m));
+  const puede = can("canales.publicar");
+  if (isLoading) return <div className="space-y-2"><Skeleton className="h-16 w-full" /><Skeleton className="h-16 w-full" /></div>;
+  return (
+    <div className="space-y-3">
+      {conectadas.length === 0 && <p className="text-sm text-muted-foreground">Esta tienda todavía no tiene canales conectados. Conéctalos en Marketplaces para publicar desde aquí.</p>}
+      {conectadas.map((c) => {
+        const ficha = hoja.channels.find((x) => x.connectionId === c.id);
+        const estado = ficha ? ESTADO[ficha.status] ?? ESTADO.paused : null;
+        const publicado = ficha?.status === "published";
+        const cuenta = c.label || c.externalNickname || "";
+        return (
+          <div key={c.id} className="rounded-xl border border-border p-3 flex items-center gap-3 flex-wrap">
+            <div className="min-w-[120px]">
+              <p className="font-medium text-sm">{NOMBRE_CANAL[c.marketplace] ?? c.marketplace}</p>
+              {cuenta && <p className="text-[11px] text-muted-foreground">{cuenta}</p>}
+            </div>
+            {estado ? <Badge className={cn("text-[10px]", estado.clase)}>{estado.texto}</Badge> : <Badge className="bg-secondary text-muted-foreground text-[10px]">Sin publicar</Badge>}
+            <p className="flex-1 min-w-[160px] text-xs text-muted-foreground break-words">
+              {ficha?.lastError ? ficha.lastError : ficha ? (ficha.sent?.categoryPath ?? ficha.sent?.categoryId ?? "") : "Todavía no está en este canal."}
+            </p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {ficha?.permalink && <a href={ficha.permalink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="w-3 h-3" />Ver en el canal</a>}
+              {ficha && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => onVer(c.marketplace)}>Ver ficha</Button>}
+              {puede && c.marketplace === "falabella" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={acciones.onPrepararFalabella}>Preparar</Button>}
+              {puede && c.marketplace === "ripley" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={acciones.onPrepararRipley}>{publicado ? "Revisar" : "Preparar"}</Button>}
+              {puede && !publicado && c.marketplace !== "ripley" && <Button size="sm" className="h-8 text-xs" onClick={acciones.onPublicar}><Rocket className="w-3.5 h-3.5 mr-1" />Publicar</Button>}
+            </div>
+          </div>
+        );
+      })}
+      {sinConectar.map((m) => (
+        <div key={m} className="rounded-xl border border-dashed border-border p-3 flex items-center gap-3 flex-wrap text-muted-foreground">
+          <p className="font-medium text-sm min-w-[120px]">{NOMBRE_CANAL[m]}</p>
+          <Badge className="bg-secondary text-muted-foreground text-[10px]"><Plug className="w-3 h-3 mr-1" />No conectado</Badge>
+          <p className="text-xs flex-1">Conéctalo en Marketplaces para publicar aquí.</p>
+        </div>
+      ))}
+      {modoGrupo && <p className="text-[11px] text-muted-foreground">Estás viendo todas las variantes juntas: lo que publiques o prepares aquí vale para todas.</p>}
+    </div>
+  );
+}
+
+/** Precio y stock de Synkro frente a los de cada canal, con un botón para sincronizar cuando difieren. */
+function SincronizarCanales({ filas, onHecho }: { filas: SheetSync[]; onHecho: () => void }) {
+  const { can } = useStores();
+  const puede = can("canales.publicar");
+  const enviar = useMutation({
+    mutationFn: async (f: SheetSync) => {
+      const difierePrecio = f.price.channel == null || f.price.synkro !== f.price.channel;
+      const difiereStock = f.stock.channel == null || f.stock.synkro !== f.stock.channel;
+      const mensajes: string[] = [];
+      if (difierePrecio) { const r = await syncApi.resendListingPrice(f.listingId); if (r.error) throw new Error(r.error); mensajes.push(r.data?.message ?? "Precio enviado"); }
+      if (difiereStock) { const r = await syncApi.resendListingStock(f.listingId); if (r.error) throw new Error(r.error); mensajes.push(r.data?.message ?? "Stock enviado"); }
+      return mensajes;
+    },
+    onSuccess: (m, f) => { toast.success(`${NOMBRE_CANAL[f.marketplace] ?? f.marketplace}: ${m.join(" · ") || "ya estaba al día"}`); onHecho(); },
+    onError: (e: Error) => toast.error(e.message || "No se pudo sincronizar"),
+  });
+  const diferenteStock = (f: SheetSync) => f.stock.channel != null && f.stock.synkro !== f.stock.channel;
+  if (!filas.length) return null;
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">Lo que Synkro tiene y lo que cada canal muestra. Si no coinciden, sincroniza para enviar el valor de Synkro.</p>
+      {filas.map((f) => {
+        const pDif = f.price.channel != null && f.price.synkro !== f.price.channel;
+        const sDif = diferenteStock(f);
+        const alDia = !pDif && !sDif && f.price.channel != null && f.stock.channel != null;
+        return (
+          <div key={f.listingId} className="rounded-xl border border-border p-3 flex items-center gap-3 flex-wrap text-sm">
+            <div className="min-w-[120px]"><p className="font-medium">{NOMBRE_CANAL[f.marketplace] ?? f.marketplace}</p><p className="text-[11px] text-muted-foreground">{f.account}</p></div>
+            <div className="min-w-[150px]"><p className="text-[11px] text-muted-foreground">Precio</p><p className={cn(pDif && "text-amber-500")}>Synkro S/ {dinero(f.price.synkro)} · canal S/ {dinero(f.price.channel)}</p></div>
+            <div className="min-w-[130px]"><p className="text-[11px] text-muted-foreground">Stock</p><p className={cn(sDif && "text-amber-500")}>Synkro {f.stock.synkro} · canal {f.stock.channel ?? "—"}</p></div>
+            <div className="flex-1 flex justify-end items-center gap-2">
+              {alDia ? <Badge className="bg-green-500/10 text-green-500 text-[10px]">Al día</Badge> : null}
+              {puede && (
+                <Button size="sm" variant={alDia ? "ghost" : "outline"} className="h-8 text-xs" onClick={() => enviar.mutate(f)} disabled={enviar.isPending}>
+                  {enviar.isPending && enviar.variables?.listingId === f.listingId ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5 mr-1" />}
+                  Sincronizar
+                </Button>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export interface ProductSheetDialogProps {
+  product: Product | null;
+  onClose: () => void;
+  onPublish?: (p: Product) => void;
+  onPrepareFalabella?: (p: Product) => void;
+  onPrepareRipley?: (p: Product) => void;
+}
+
+export function ProductSheetDialog({ product, onClose, onPublish, onPrepareFalabella, onPrepareRipley }: ProductSheetDialogProps) {
   const [elegida, setElegida] = useState<string | null>(null);
   const grupoId = product?.alGrupo ? product.group?.id : undefined;
   useEffect(() => setElegida(null), [product?.id, product?.alGrupo]);
@@ -238,8 +345,10 @@ export function ProductSheetDialog({ product, onClose }: { product: Product | nu
   const todas = variantes.length > 1 && (elegida === null || elegida === TODAS);
   const actual = product && variantes.length ? (todas ? variantes[0] : variantes.find((v) => v.id === elegida) ?? variantes[0]) : product;
   const grupo = product?.group;
+  const alAbrir = (f?: (p: Product) => void) => (f && product ? () => { onClose(); f(product); } : undefined);
   return (
     <FichaDeProducto
+      acciones={{ onPublicar: alAbrir(onPublish), onPrepararFalabella: alAbrir(onPrepareFalabella), onPrepararRipley: alAbrir(onPrepareRipley) }}
       product={actual}
       onClose={onClose}
       variantes={variantes}
@@ -254,15 +363,17 @@ export function ProductSheetDialog({ product, onClose }: { product: Product | nu
 }
 
 function FichaDeProducto({
-  product, onClose, variantes = [], variantId, onElegir, modoGrupo = false, grupoId, nombreDelGrupo, ejes = [],
+  product, onClose, variantes = [], variantId, onElegir, modoGrupo = false, grupoId, nombreDelGrupo, ejes = [], acciones = {},
 }: {
-  product: Product | null; onClose: () => void; variantes?: Product[]; variantId?: string; onElegir?: (id: string) => void;
+  acciones?: AccionesDeCanal; product: Product | null; onClose: () => void; variantes?: Product[]; variantId?: string; onElegir?: (id: string) => void;
   modoGrupo?: boolean; grupoId?: string; nombreDelGrupo?: string; ejes?: string[];
 }) {
   const queryClient = useQueryClient();
   const open = product !== null;
   const [borrador, setBorrador] = useState<Borrador | null>(null);
   const [verHtml, setVerHtml] = useState(true);
+  const [pestana, setPestana] = useState("canales");
+  useEffect(() => { if (product !== null) setPestana("canales"); }, [product === null]);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ["product-sheet", product?.id],
@@ -399,10 +510,11 @@ function FichaDeProducto({
         ) : isError || !hoja ? (
           <p className="text-sm text-destructive">No se pudo cargar la ficha.</p>
         ) : (
-          <Tabs defaultValue="general">
+          <Tabs value={pestana} onValueChange={setPestana}>
             <TabsList className="flex-wrap h-auto">
-              <TabsTrigger value="general">General</TabsTrigger>
-              {((hoja.prices.length > 0 && !modoGrupo) || (modoGrupo && grupoId)) && <TabsTrigger value="precios">Precios</TabsTrigger>}
+              <TabsTrigger value="canales">Canales</TabsTrigger>
+              <TabsTrigger value="general">Contenido</TabsTrigger>
+              {((((hoja.prices.length > 0) || ((hoja.sync ?? []).length > 0)) && !modoGrupo) || (modoGrupo && grupoId)) && <TabsTrigger value="precios">Precios y stock</TabsTrigger>}
               {fal && <TabsTrigger value="falabella">Falabella</TabsTrigger>}
               {meli && <TabsTrigger value="mercadolibre">Mercado Libre</TabsTrigger>}
               {ripley && <TabsTrigger value="ripley">Ripley</TabsTrigger>}
@@ -413,6 +525,11 @@ function FichaDeProducto({
                 Este producto todavía no está publicado en Falabella ni en Mercado Libre. Puedes editar su ficha; cuando lo publiques se enviará con estos datos.
               </p>
             )}
+
+            {/* ── Canales ── */}
+            <TabsContent value="canales" className="pt-4">
+              <CanalesDelProducto hoja={hoja} acciones={acciones} onVer={setPestana} modoGrupo={modoGrupo} />
+            </TabsContent>
 
             {/* ── General ── */}
             <TabsContent value="general" className="pt-4 space-y-4">
@@ -486,11 +603,12 @@ function FichaDeProducto({
             )}
 
             {/* ── Precios por canal ── */}
-            {hoja.prices.length > 0 && !modoGrupo && (
+            {(hoja.prices.length > 0 || (hoja.sync ?? []).length > 0) && !modoGrupo && (
               <TabsContent value="precios" className="pt-4 space-y-4">
-                <p className="text-xs text-muted-foreground">
+                <SincronizarCanales filas={hoja.sync ?? []} onHecho={refrescar} />
+                {hoja.prices.length > 0 && <p className="text-xs text-muted-foreground">
                   Cada canal usa el precio del producto salvo que fijes uno propio aquí. Actualizar el contenido con la IA nunca quita un descuento: se conserva el que el canal ya tiene.
-                </p>
+                </p>}
                 {hoja.prices.map((x) => (
                   <PrecioDeCanal
                     key={x.connectionId}

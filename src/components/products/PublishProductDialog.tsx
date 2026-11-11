@@ -96,6 +96,9 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
   const connections = connectionsResult?.data ?? [];
   const missingPrice = product?.price == null;
 
+  // Solo se ofrecen los canales conectados a esta tienda (o donde el producto ya está publicado).
+  const visibles = PUBLISHABLE.filter((mp) => connections.some((c) => c.marketplace === mp.id && c.status === "active") || listings.some((l) => l.marketplace === mp.id));
+
   const listingFor = (marketplace: string) =>
     listings.find((l) => l.marketplace === marketplace);
 
@@ -127,6 +130,15 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
     setSelected((prev) => (prev.some((id) => publicados.has(id)) ? prev.filter((id) => !publicados.has(id)) : prev));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listings]);
+
+  // Al abrir (o cargar las conexiones) se marca el primer canal conectado que aún no está publicado.
+  useEffect(() => {
+    setSelected((prev) => {
+      const validos = prev.filter((id) => visibles.some((v) => v.id === id));
+      return validos.length ? validos : visibles.filter((v) => !publicados.has(v.id)).slice(0, 1).map((v) => v.id);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id, connections.length]);
 
   const publishMutation = useMutation({
     // Una orden por cuenta elegida: así cada publicación va a la cuenta que la persona marcó.
@@ -224,7 +236,8 @@ export function PublishProductDialog({ product, onClose }: PublishProductDialogP
         </DialogHeader>
 
         <div className="space-y-3">
-          {PUBLISHABLE.map((mp) => {
+          {visibles.length === 0 && <p className="text-sm text-muted-foreground">Esta tienda todavía no tiene Mercado Libre ni Falabella conectados. Conéctalos en Marketplaces para publicar.</p>}
+          {visibles.map((mp) => {
             const listing   = listings.find((l) => l.marketplace === mp.id && l.syncStatus === "published") ?? listingFor(mp.id);
             const connected = isConnected(mp.id);
             const isSelected = selected.includes(mp.id);

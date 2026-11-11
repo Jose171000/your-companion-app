@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronRight, Edit, FileText, ImageOff, PackageCheck, Rocket, Sparkles, Store, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Edit, ImageOff, MoreHorizontal, SlidersHorizontal, Sparkles, Trash2 } from "lucide-react";
 import { Product, ProductOverview, productsApi } from "@/lib/products-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useStores } from "@/contexts/StoreContext";
 import { ProductCard } from "./ProductCard";
@@ -47,67 +47,51 @@ function Thumb({ product }: { product: Product }) {
   );
 }
 
-function RowActions({ product, onSheet, onPublish, onPrepareFalabella, onPrepareRipley, onRegenerate, onEdit, onDelete }: RowHandlers & { product: Product }) {
+/**
+ * Una sola acción a la vista: «Gestionar» abre el panel del producto (canales, precios y stock, contenido). Lo menos frecuente
+ * (editar, regenerar con IA, eliminar) queda en el menú «⋯».
+ */
+function AccionesDeFila({ producto, etiqueta, onSheet, onRegenerate, onEdit, onDelete }: {
+  producto: Product; etiqueta?: string
+  onSheet: (p: Product) => void; onRegenerate: (p: Product) => void; onEdit: (p: Product) => void; onDelete: (p: Product) => void;
+}) {
   const { can } = useStores();
-  const btn = "h-8 w-8 hover:text-primary hover:bg-primary/10";
+  const hayMenu = can("productos.editar") || can("productos.eliminar");
   return (
-    <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-      <Button variant="ghost" size="icon" className={btn} onClick={() => onSheet(product)} title="Ficha: lo que se envía a cada canal"><FileText className="w-4 h-4" /></Button>
-      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => onPublish(product)} title="Publicar en marketplaces"><Rocket className="w-4 h-4" /></Button>}
-      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => onPrepareFalabella(product)} title="Preparar para Falabella (categoría, medidas y atributos)"><PackageCheck className="w-4 h-4" /></Button>}
-      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => onPrepareRipley(product)} title="Preparar para Ripley (categoría y atributos)"><Store className="w-4 h-4" /></Button>}
-      {can("productos.editar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-accent hover:bg-accent/10" onClick={() => onRegenerate(product)} title="Regenerar con IA"><Sparkles className="w-4 h-4" /></Button>}
-      {can("productos.editar") && <Button variant="ghost" size="icon" className={btn} onClick={() => onEdit(product)} title="Editar"><Edit className="w-4 h-4" /></Button>}
-      {can("productos.eliminar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => onDelete(product)} title="Eliminar"><Trash2 className="w-4 h-4" /></Button>}
+    <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+      <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={() => onSheet(producto)} title="Canales, precios y stock, y lo que se envía a cada canal">
+        <SlidersHorizontal className="w-4 h-4" /> Gestionar
+      </Button>
+      {hayMenu && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Más opciones"><MoreHorizontal className="w-4 h-4" /></Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            {can("productos.editar") && <DropdownMenuItem onClick={() => onEdit(producto)}><Edit className="w-4 h-4 mr-2" />{etiqueta ? `Editar ${etiqueta}` : "Editar"}</DropdownMenuItem>}
+            {can("productos.editar") && <DropdownMenuItem onClick={() => onRegenerate(producto)}><Sparkles className="w-4 h-4 mr-2" />Regenerar con IA</DropdownMenuItem>}
+            {can("productos.eliminar") && can("productos.editar") && <DropdownMenuSeparator />}
+            {can("productos.eliminar") && <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => onDelete(producto)}><Trash2 className="w-4 h-4 mr-2" />{etiqueta ? `Eliminar ${etiqueta}` : "Eliminar"}</DropdownMenuItem>}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
 }
 
+function RowActions({ product, ...handlers }: RowHandlers & { product: Product }) {
+  return <AccionesDeFila producto={product} {...handlers} />;
+}
+
 /**
- * Acciones de la fila de un grupo: valen para TODAS sus variantes juntas. Publicar, preparar Falabella, regenerar con IA y
- * eliminar actúan sobre el grupo entero; la ficha deja elegir variante dentro de su ventana, y editar pide elegir cuál.
+ * Acciones de la fila de un grupo: valen para TODAS sus variantes juntas. «Gestionar» abre el panel del grupo (dentro se elige
+ * una variante); para editar una sola, se despliega el grupo y se usa el menú de su fila.
  */
 function GroupActions({ product, ...handlers }: RowHandlers & { product: Product }) {
-  const { can } = useStores();
-  const grupo = product.group!;
   const resumen = product.groupSummary!;
-  const [eligiendo, setEligiendo] = useState(false);
-  const { data, isLoading } = usarVariantes(grupo.id, eligiendo);
-  const variantes = data?.data?.data ?? [];
-  // Un producto «de grupo»: lleva el nombre del grupo y la marca para que cada ventana sepa que vale para todas las variantes.
-  const delGrupo: Product = { ...product, name: grupo.name, alGrupo: true };
-  const btn = "h-8 w-8 hover:text-primary hover:bg-primary/10";
-  const todas = `las ${resumen.variantCount} variantes`;
-  return (
-    <div className="flex items-center justify-end gap-1 opacity-60 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-      <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onSheet(delGrupo)} title="Ficha: lo que se envía a cada canal (elige la variante dentro)"><FileText className="w-4 h-4" /></Button>
-      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPublish(delGrupo)} title={`Publicar ${todas} en marketplaces`}><Rocket className="w-4 h-4" /></Button>}
-      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPrepareFalabella(delGrupo)} title={`Preparar ${todas} para Falabella (categoría, medidas y atributos)`}><PackageCheck className="w-4 h-4" /></Button>}
-      {can("canales.publicar") && <Button variant="ghost" size="icon" className={btn} onClick={() => handlers.onPrepareRipley(delGrupo)} title={`Preparar ${todas} para Ripley (categoría y atributos)`}><Store className="w-4 h-4" /></Button>}
-      {can("productos.editar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-accent hover:bg-accent/10" onClick={() => handlers.onRegenerate(delGrupo)} title={`Regenerar con IA ${todas}`}><Sparkles className="w-4 h-4" /></Button>}
-      {can("productos.editar") && <Popover open={eligiendo} onOpenChange={setEligiendo}>
-        <PopoverTrigger asChild>
-          <Button variant="ghost" size="icon" className={btn} title="Editar: todas las variantes o una sola"><Edit className="w-4 h-4" /></Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-64 p-2 space-y-1">
-          <p className="text-xs text-muted-foreground px-1 pb-1">¿Qué quieres editar?</p>
-          <button type="button" className="w-full text-left text-sm px-2 py-1.5 rounded border border-primary/40 bg-primary/5 hover:bg-primary/10 flex items-center justify-between gap-2" onClick={() => { setEligiendo(false); handlers.onEdit(delGrupo); }}>
-            <span className="font-medium">Todas las variantes</span>
-            <span className="text-[10px] text-muted-foreground">información general</span>
-          </button>
-          <p className="text-[11px] text-muted-foreground px-1 pt-1">O una sola variante (nombre, precio, stock):</p>
-          {isLoading && <Skeleton className="h-8 w-full" />}
-          {variantes.map((v) => (
-            <button key={v.id} type="button" className="w-full text-left text-sm px-2 py-1.5 rounded hover:bg-secondary/60 flex items-center justify-between gap-2" onClick={() => { setEligiendo(false); handlers.onEdit(v); }}>
-              <span className="truncate">{etiquetaDeVariante(v)}</span>
-              <code className="text-[10px] font-mono text-muted-foreground">{v.sku}</code>
-            </button>
-          ))}
-        </PopoverContent>
-      </Popover>}
-      {can("productos.eliminar") && <Button variant="ghost" size="icon" className="h-8 w-8 hover:text-destructive hover:bg-destructive/10" onClick={() => handlers.onDelete(delGrupo)} title={`Eliminar ${todas}`}><Trash2 className="w-4 h-4" /></Button>}
-    </div>
-  );
+  // Un producto «de grupo»: lleva el nombre del grupo para que cada ventana sepa que vale para todas las variantes.
+  const delGrupo: Product = { ...product, name: product.group!.name, alGrupo: true };
+  return <AccionesDeFila producto={delGrupo} etiqueta={`las ${resumen.variantCount} variantes`} {...handlers} />;
 }
 
 /** Fila de un producto simple, o de una variante dentro de su grupo desplegado. */

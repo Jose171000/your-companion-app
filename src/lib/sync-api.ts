@@ -277,6 +277,17 @@ export interface SheetPrice {
   canSetSale: boolean;
 }
 
+/** Precio y stock de Synkro frente a los del canal, por oferta enlazada: sirve para sincronizar cuando difieren. */
+export interface SheetSync {
+  listingId: string;
+  marketplace: string;
+  connectionId: string;
+  account: string;
+  status: string;
+  price: { synkro: number | null; channel: number | null };
+  stock: { synkro: number; channel: number | null };
+}
+
 export interface SheetData {
   product: {
     id: string;
@@ -299,6 +310,7 @@ export interface SheetData {
   };
   channels: SheetChannel[];
   prices: SheetPrice[];
+  sync?: SheetSync[];
 }
 
 export interface FalabellaField {
