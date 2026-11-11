@@ -166,6 +166,8 @@ export interface VariantCompatResult {
   publicaComo: 'una' | 'separadas';
   mapeo: { eje: string; atributo: string }[];
   ejesNoPermitidos: string[];
+  /** Datos de variante del canal que ningún eje del producto usa: a qué se podría renombrar un eje que el canal no acepta. */
+  ejesDisponibles?: string[];
   ejesQueFaltan: string[];
   valoresSinEquivalente: { eje: string; valores: string[] }[];
   avisos: string[];
@@ -276,6 +278,10 @@ export const productsApi = {
       `/products/groups/${groupId}/variant-compat?marketplace=${encodeURIComponent(marketplaces.join(','))}${categoryId ? `&categoryId=${encodeURIComponent(categoryId)}` : ''}`,
       { method: 'GET' },
     ),
+
+  /** Cambia el NOMBRE de un eje de variación del grupo («Talla» → «Tamaño cama») en el grupo y en todas sus variantes; los valores no se tocan. */
+  renameGroupAxis: (groupId: string, from: string, to: string) =>
+    apiRequest<{ eje: string; variantes: number }>(`/products/groups/${groupId}/axes`, { method: 'PATCH', body: JSON.stringify({ from, to }) }),
 
   /** «Llenar atributos»: con la categoría de Ripley ya elegida, la IA devuelve solo los atributos VACÍOS (no cambia la categoría ni pisa lo escrito). No guarda. */
   fillRipleyAttributes: (id: string, body: { categoryId: string; actuales: Record<string, string>; alGrupo?: boolean }) =>

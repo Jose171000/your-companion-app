@@ -1,7 +1,10 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { AlertTriangle, Info, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { productsApi } from "@/lib/products-api";
+import { useStores } from "@/contexts/StoreContext";
 
 const CANALES_REVISABLES = ["ripley", "falabella", "mercadolibre", "shopify", "woocommerce"];
 
@@ -21,6 +24,40 @@ interface Props {
  * (la categoría no admite variantes o no admite alguno de los ejes) dice que se publicarán como productos SEPARADOS, y ofrece
  * otra categoría que sí las admite. La categoría que manda es la que mejor encaja con el producto: esto solo la recomienda.
  */
+/**
+ * Cuando el canal no acepta un eje tal como se llama (por ejemplo «Talla» y Falabella pide «Tamaño cama»), deja renombrarlo a uno de los datos de
+ * variante que el canal ofrece. Solo sale en ese caso: si todo encaja tal como se manda, no hay nada que cambiar.
+ */
+function RenombrarEje({ groupId, eje, opciones }: { groupId: string; eje: string; opciones: string[] }) {
+  const queryClient = useQueryClient();
+  const { can } = useStores();
+  const [nuevo, setNuevo] = useState(opciones.length === 1 ? opciones[0] : "");
+  const renombrar = useMutation({
+    mutationFn: () => productsApi.renameGroupAxis(groupId, eje, nuevo),
+    onSuccess: (res) => {
+      if (res.error || !res.data) return toast.error(res.error ?? "No se pudo renombrar el eje");
+      toast.success(`Eje renombrado: «${eje}» ahora se llama «${res.data.eje}» en las ${res.data.variantes} variantes.`);
+      queryClient.invalidateQueries({ queryKey: ["variant-compat"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["product-sheet"] });
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
+  if (!can("productos.editar")) return null;
+  return (
+    <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-amber-500/30">
+      <span className="break-words">¿«{eje}» es lo mismo que uno de estos datos? Renómbralo para que coincida:</span>
+      <select value={nuevo} onChange={(e) => setNuevo(e.target.value)} className="h-7 rounded-md border border-border bg-background px-2 text-xs">
+        <option value="">Elige…</option>
+        {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <Button type="button" variant="outline" size="sm" className="h-7 text-xs" disabled={!nuevo || renombrar.isPending} onClick={() => renombrar.mutate()}>
+        {renombrar.isPending ? "Renombrando…" : "Renombrar eje"}
+      </Button>
+    </div>
+  );
+}
+
 export function VariantCompatNotice({ groupId, marketplaces, categoryId, onUseCategory }: Props) {
   const canales = marketplaces.filter((m) => CANALES_REVISABLES.includes(m));
   const { data } = useQuery({
@@ -43,6 +80,7 @@ export function VariantCompatNotice({ groupId, marketplaces, categoryId, onUseCa
               {r.nombreDelCanal}: {separadas ? "se publicarán como productos separados" : "revisa estos detalles"}
             </p>
             {r.avisos.map((a, i) => <p key={i} className="break-words">{a}</p>)}
+            {separadas && (r.ejesDisponibles?.length ?? 0) > 0 && r.ejesNoPermitidos.map((eje) => <RenombrarEje key={eje} groupId={groupId} eje={eje} opciones={r.ejesDisponibles!} />)}
             {separadas && r.recomendada && (
               <div className="flex items-start gap-1.5 pt-1 border-t border-amber-500/30">
                 <Lightbulb className="w-3.5 h-3.5 mt-0.5 shrink-0" />
