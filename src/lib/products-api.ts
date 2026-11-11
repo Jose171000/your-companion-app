@@ -168,6 +168,8 @@ export interface VariantCompatResult {
   ejesNoPermitidos: string[];
   /** Datos de variante del canal que ningún eje del producto usa: a qué se podría renombrar un eje que el canal no acepta. */
   ejesDisponibles?: string[];
+  /** Renombres que la IA recomienda (uno por eje no aceptado). La persona solo confirma; nada se cambia solo. */
+  renombresSugeridos?: { eje: string; a: string }[];
   ejesQueFaltan: string[];
   valoresSinEquivalente: { eje: string; valores: string[] }[];
   avisos: string[];

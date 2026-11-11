@@ -28,12 +28,13 @@ interface Props {
  * Cuando el canal no acepta un eje tal como se llama (por ejemplo «Talla» y Falabella pide «Tamaño cama»), deja renombrarlo a uno de los datos de
  * variante que el canal ofrece. Solo sale en ese caso: si todo encaja tal como se manda, no hay nada que cambiar.
  */
-function RenombrarEje({ groupId, eje, opciones }: { groupId: string; eje: string; opciones: string[] }) {
+function RenombrarEje({ groupId, eje, opciones, sugerido }: { groupId: string; eje: string; opciones: string[]; sugerido?: string }) {
   const queryClient = useQueryClient();
   const { can } = useStores();
-  const [nuevo, setNuevo] = useState(opciones.length === 1 ? opciones[0] : "");
+  const [nuevo, setNuevo] = useState(sugerido ?? (opciones.length === 1 ? opciones[0] : ""));
+  const [otra, setOtra] = useState(false);
   const renombrar = useMutation({
-    mutationFn: () => productsApi.renameGroupAxis(groupId, eje, nuevo),
+    mutationFn: (a: string) => productsApi.renameGroupAxis(groupId, eje, a),
     onSuccess: (res) => {
       if (res.error || !res.data) return toast.error(res.error ?? "No se pudo renombrar el eje");
       toast.success(`Eje renombrado: «${eje}» ahora se llama «${res.data.eje}» en las ${res.data.variantes} variantes.`);
@@ -45,15 +46,30 @@ function RenombrarEje({ groupId, eje, opciones }: { groupId: string; eje: string
   });
   if (!can("productos.editar")) return null;
   return (
-    <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-amber-500/30">
-      <span className="break-words">¿«{eje}» es lo mismo que uno de estos datos? Renómbralo para que coincida:</span>
-      <select value={nuevo} onChange={(e) => setNuevo(e.target.value)} className="h-7 rounded-md border border-border bg-background px-2 text-xs">
-        <option value="">Elige…</option>
-        {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
-      </select>
-      <Button type="button" variant="outline" size="sm" className="h-7 text-xs" disabled={!nuevo || renombrar.isPending} onClick={() => renombrar.mutate()}>
-        {renombrar.isPending ? "Renombrando…" : "Renombrar eje"}
-      </Button>
+    <div className="space-y-1.5 pt-1 border-t border-amber-500/30">
+      {sugerido && (
+        <div className="space-y-1">
+          <p className="break-words">Parece que «{eje}» es el <span className="font-medium">{sugerido}</span> que pide el canal. Solo confirma y se renombra (los valores no cambian):</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button type="button" size="sm" className="h-7 text-xs" disabled={renombrar.isPending} onClick={() => renombrar.mutate(sugerido)}>
+              {renombrar.isPending ? "Renombrando…" : `Renombrar «${eje}» a «${sugerido}»`}
+            </Button>
+            {!otra && opciones.length > 1 && <button type="button" className="underline text-muted-foreground" onClick={() => setOtra(true)}>Elegir otro nombre</button>}
+          </div>
+        </div>
+      )}
+      {(!sugerido || otra) && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="break-words">{sugerido ? "Renombrar a:" : `¿«${eje}» es lo mismo que uno de estos datos? Renómbralo para que coincida:`}</span>
+          <select value={nuevo} onChange={(e) => setNuevo(e.target.value)} className="h-7 rounded-md border border-border bg-background px-2 text-xs">
+            <option value="">Elige…</option>
+            {opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
+          <Button type="button" variant="outline" size="sm" className="h-7 text-xs" disabled={!nuevo || renombrar.isPending} onClick={() => renombrar.mutate(nuevo)}>
+            {renombrar.isPending ? "Renombrando…" : "Renombrar eje"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -80,7 +96,7 @@ export function VariantCompatNotice({ groupId, marketplaces, categoryId, onUseCa
               {r.nombreDelCanal}: {separadas ? "se publicarán como productos separados" : "revisa estos detalles"}
             </p>
             {r.avisos.map((a, i) => <p key={i} className="break-words">{a}</p>)}
-            {separadas && (r.ejesDisponibles?.length ?? 0) > 0 && r.ejesNoPermitidos.map((eje) => <RenombrarEje key={eje} groupId={groupId} eje={eje} opciones={r.ejesDisponibles!} />)}
+            {separadas && (r.ejesDisponibles?.length ?? 0) > 0 && r.ejesNoPermitidos.map((eje) => <RenombrarEje key={eje} groupId={groupId} eje={eje} opciones={r.ejesDisponibles!} sugerido={r.renombresSugeridos?.find((s) => s.eje === eje)?.a} />)}
             {separadas && r.recomendada && (
               <div className="flex items-start gap-1.5 pt-1 border-t border-amber-500/30">
                 <Lightbulb className="w-3.5 h-3.5 mt-0.5 shrink-0" />
