@@ -70,6 +70,8 @@ export function MarketplacesModule() {
   const verVentas = can("ventas.ver");
   const pestanasPermitidas = [...(verCanales ? ["canales", "tablero"] : []), ...(verVentas ? ["ventas"] : []), ...(verCanales ? ["revision"] : [])];
   const [pestana, setPestana] = useState("canales");
+  // Dentro del Tablero: el stock y los precios se editan y se aprueban por separado.
+  const [subTablero, setSubTablero] = useState("stock");
   // Clic en un aviso de la campana: abre la pestaña que corresponde.
   useDestinoPendiente("marketplaces", (p) => setPestana(p.pestana));
   useEffect(() => {
@@ -144,6 +146,12 @@ export function MarketplacesModule() {
   const listings    = listingsResult?.data ?? [];
   const changes     = changesResult?.data ?? [];
   const pendingChanges = changes.filter((c) => c.status === "pending");
+  const pendientesDeStock = pendingChanges.filter((c) => c.field === "stock").length;
+  const pendientesDePrecio = pendingChanges.filter((c) => c.field === "price" || c.field === "promo").length;
+  // Las cuentas conectadas de la tienda: de ahí sale el porcentaje de calidad de cada producto.
+  const cuentasConectadas = connections
+    .filter((c) => c.status === "active")
+    .map((c) => ({ id: c.id, marketplace: c.marketplace, label: c.label ?? c.externalNickname ?? null }));
   const falabellaAccounts = connections.filter((c) => c.marketplace === "falabella" && c.status === "active");
   const meliAccounts = connections.filter((c) => c.marketplace === "mercadolibre" && c.status === "active");
   const wooAccounts = connections.filter((c) => c.marketplace === "woocommerce" && c.status === "active");
@@ -235,15 +243,37 @@ export function MarketplacesModule() {
         </TabsList>
 
         <TabsContent value="tablero" className="pt-6">
-          <InventoryBoard
-            listings={listings}
-            pending={pendingChanges}
-            reviewMode={reviewMode}
-            canEdit={can("inventario.editar")}
-            canPublish={can("canales.publicar")}
-            isLoading={loadingListings}
-            isError={listingsError}
-          />
+          <Tabs value={subTablero} onValueChange={setSubTablero}>
+            <TabsList>
+              <TabsTrigger value="stock">Stock{pendientesDeStock > 0 ? ` (${pendientesDeStock})` : ""}</TabsTrigger>
+              <TabsTrigger value="precios">Precios{pendientesDePrecio > 0 ? ` (${pendientesDePrecio})` : ""}</TabsTrigger>
+            </TabsList>
+            {(["stock", "precios"] as const).map((modo) => (
+              <TabsContent key={modo} value={modo} className="pt-4 space-y-6">
+                {/* Lo que espera aprobación de esta pestaña, arriba: se aprueba aquí mismo. */}
+                <ReviewQueue
+                  requests={changes}
+                  campos={modo === "stock" ? ["stock"] : ["price", "promo"]}
+                  compacto
+                  titulo={modo === "stock" ? "Stock por aprobar" : "Precios por aprobar"}
+                  reviewMode={reviewMode}
+                  canManage={can("cambios.aprobar")}
+                  isLoading={loadingChanges}
+                />
+                <InventoryBoard
+                  modo={modo}
+                  cuentas={cuentasConectadas}
+                  listings={listings}
+                  pending={pendingChanges}
+                  reviewMode={reviewMode}
+                  canEdit={can("inventario.editar")}
+                  canPublish={can("canales.publicar")}
+                  isLoading={loadingListings}
+                  isError={listingsError}
+                />
+              </TabsContent>
+            ))}
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="ventas" className="pt-6">

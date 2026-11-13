@@ -16,6 +16,11 @@ interface Props {
   /** Solo el dueño aprueba, rechaza y cambia el modo revisión */
   canManage: boolean;
   isLoading: boolean;
+  /** Solo estos campos («stock», «price», «promo»); sin esto salen todos. */
+  campos?: string[];
+  /** Dentro del Tablero: solo la lista de pendientes, sin el interruptor ni el historial, y nada si no hay pendientes. */
+  compacto?: boolean;
+  titulo?: string;
 }
 
 const RESOLVED_STYLES: Record<string, { label: string; className: string }> = {
@@ -118,7 +123,8 @@ function LoteDeSolicitudes({
 }
 
 /** Cola de aprobación: cambios de precio y stock que esperan luz verde. */
-export function ReviewQueue({ requests, reviewMode, canManage, isLoading }: Props) {
+export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading, campos, compacto, titulo }: Props) {
+  const requests = campos ? todas.filter((r) => campos.includes(r.field)) : todas;
   const queryClient = useQueryClient();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
@@ -201,8 +207,12 @@ export function ReviewQueue({ requests, reviewMode, canManage, isLoading }: Prop
   const history = requests.filter((r) => r.status !== "pending");
   const lotes = agrupar(pending);
 
+  // Dentro del Tablero no se muestra nada hasta que haya algo por aprobar.
+  if (compacto && !isLoading && !pending.length) return null;
+
   return (
     <div className="space-y-6">
+      {!compacto && (
       <div className="glass rounded-2xl p-4 flex items-center justify-between gap-4">
         <div>
           <p className="font-semibold text-sm">Revisar antes de enviar</p>
@@ -220,10 +230,11 @@ export function ReviewQueue({ requests, reviewMode, canManage, isLoading }: Prop
           aria-label="Modo revisión"
         />
       </div>
+      )}
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h3 className="font-semibold text-base">Pendientes ({pending.length})</h3>
+          <h3 className="font-semibold text-base">{titulo ?? "Pendientes"} ({pending.length})</h3>
           {canManage && pending.length > 1 && (
             confirmarTodas ? (
               <div className="flex items-center gap-2 text-xs">
@@ -295,7 +306,7 @@ export function ReviewQueue({ requests, reviewMode, canManage, isLoading }: Prop
         )}
       </section>
 
-      {history.length > 0 && (
+      {!compacto && history.length > 0 && (
         <section className="space-y-3">
           <h3 className="font-semibold text-base">Historial</h3>
           <div className="glass rounded-2xl overflow-hidden divide-y divide-border/50">

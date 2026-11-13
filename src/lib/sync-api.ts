@@ -824,7 +824,7 @@ export const syncApi = {
 
   /** Precio con descuento y fechas para Falabella; salePrice null lo quita de Synkro. No pasa por revisión. */
   setPromo: (productId: string, dto: { salePrice: number | null; saleStartDate?: string | null; saleEndDate?: string | null }) =>
-    apiRequest<{ message: string }>(`/sync/products/${productId}/promo`, {
+    apiRequest<{ message: string; pending?: number }>(`/sync/products/${productId}/promo`, {
       method: 'PATCH',
       body: JSON.stringify(dto),
     }),
