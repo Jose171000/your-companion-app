@@ -21,11 +21,13 @@ import { BulkResendStockDialog } from "./BulkResendStockDialog";
 import { GroupPriceForm } from "./GroupPriceForm";
 import { GroupStockForm } from "./GroupStockForm";
 import { Calidad, CuentaConectada, calidadDelCatalogo, calidadDelProducto, colorDeCalidad } from "./calidad";
+import { CalidadAbierta, CalidadDialog } from "./CalidadDialog";
+import { FiltrosDelTableroPanel } from "./FiltrosDelTablero";
+import { FILTROS_INICIALES, FiltrosDelTablero, comparador, cumpleFiltros } from "./filtros";
+import { mejorasDeCalidad } from "./mejoras";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Props {
-  /** «stock»: lo que se ve y se edita es el stock. «precios»: precio, descuentos y precio web. */
-  modo: "stock" | "precios";
   /** Cuentas de canal conectadas a la tienda: de ahí sale el porcentaje de calidad. */
   cuentas: CuentaConectada[];
   listings: UserListing[];
@@ -261,16 +263,14 @@ function AllChannelsMenu({ channels, onAction }: { channels: ChannelCell[]; onAc
   );
 }
 
-function ChannelChip({ cell, modo, canEdit, canResend, onAction }: { cell: ChannelCell; modo: "stock" | "precios"; canEdit: boolean; canResend: boolean; onAction: OnChannelAction }) {
+function ChannelChip({ cell, className, canEdit, canResend, onAction }: { cell: ChannelCell; className?: string; canEdit: boolean; canResend: boolean; onAction: OnChannelAction }) {
   const { listing: l } = cell;
   const estado = estadoVisible(l);
-  const enStock = modo === "stock";
-  // Cada pestaña resalta solo su propio desfase: el del stock en «Stock» y el del precio en «Precios».
-  const drift = estado === "published" && (enStock ? cell.stockDrift : cell.priceDrift);
+  const drift = estado === "published" && (cell.priceDrift || cell.stockDrift);
   const queryClient = useQueryClient();
   // El canal tiene un stock distinto al de Synkro: se puede volver a mandar el de Synkro a ESTA cuenta.
   // (En Ripley el envío está en piloto: el servidor avisa si ese SKU todavía no está habilitado.)
-  const puedeReenviar = enStock && canResend && estado === "published" && cell.stockDrift && l.lastStockSynced != null;
+  const puedeReenviar = canResend && estado === "published" && cell.stockDrift && l.lastStockSynced != null;
   const reenviar = useMutation({
     mutationFn: () => syncApi.resendListingStock(l.id),
     onSuccess: (res) => {
@@ -282,7 +282,7 @@ function ChannelChip({ cell, modo, canEdit, canResend, onAction }: { cell: Chann
     onError: () => toast.error("Error al conectar con el servidor"),
   });
   // Ripley: el precio normal de la oferta es distinto al de Synkro (las ofertas con rebaja en Ripley no se tocan).
-  const puedeReenviarPrecio = !enStock && canResend && estado === "published" && l.marketplace === "ripley" && cell.priceDrift && l.lastPriceSynced != null && l.salePrice == null;
+  const puedeReenviarPrecio = canResend && estado === "published" && l.marketplace === "ripley" && cell.priceDrift && l.lastPriceSynced != null && l.salePrice == null;
   const reenviarPrecio = useMutation({
     mutationFn: () => syncApi.resendListingPrice(l.id),
     onSuccess: (res) => {
@@ -298,6 +298,7 @@ function ChannelChip({ cell, modo, canEdit, canResend, onAction }: { cell: Chann
       className={cn(
         "rounded-xl border px-3 py-2 text-xs space-y-1 min-w-[132px] max-w-[220px]",
         drift ? "border-yellow-500/40 bg-yellow-500/5" : "border-border bg-secondary/20",
+        className,
       )}
     >
       <div className="flex items-center justify-between gap-2">
@@ -327,7 +328,8 @@ function ChannelChip({ cell, modo, canEdit, canResend, onAction }: { cell: Chann
         </div>
       </div>
       <div className="flex items-end justify-between gap-2 text-muted-foreground tabular-nums">
-        {enStock ? <span>En el canal: {l.lastStockSynced ?? "—"} u.</span> : <ChannelPrice listing={l} />}
+        <ChannelPrice listing={l} />
+        <span>{l.lastStockSynced ?? "—"} u.</span>
       </div>
       {puedeReenviar && (
         <Button
@@ -356,7 +358,7 @@ function ChannelChip({ cell, modo, canEdit, canResend, onAction }: { cell: Chann
     </div>
   );
 
-  const note = l.lastError || (drift ? (enStock ? `El canal tiene ${l.lastStockSynced ?? "—"} u. y Synkro tiene ${l.stock} u.` : "El canal aún no tiene el último precio de Synkro.") : null);
+  const note = l.lastError || (drift ? (cell.stockDrift ? `El canal tiene ${l.lastStockSynced ?? "—"} u. y Synkro tiene ${l.stock} u.` : "El canal aún no tiene el último precio de Synkro.") : null);
   if (!note) return chip;
   return (
     <TooltipProvider>
@@ -368,22 +370,21 @@ function ChannelChip({ cell, modo, canEdit, canResend, onAction }: { cell: Chann
   );
 }
 
-/** Porcentaje de calidad: en cuántas de las cuentas conectadas la publicación está activa. */
-function CalidadBadge({ calidad, texto }: { calidad: Calidad; texto?: string }) {
-  const detalle = calidad.faltan.length
-    ? `Activo en ${calidad.activas} de ${calidad.total} cuentas. Falta en: ${calidad.faltan.join(", ")}.`
-    : `Activo en las ${calidad.total} cuentas conectadas.`;
+/** Porcentaje de calidad: al hacer clic se abre qué le falta para llegar al 100 %. */
+function CalidadBadge({ calidad, texto, onClick }: { calidad: Calidad; texto?: string; onClick: () => void }) {
   return (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Badge className={cn("text-[10px] tabular-nums", colorDeCalidad(calidad.porcentaje))}>
-            {texto ?? "Calidad"} {calidad.porcentaje}%
-          </Badge>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs text-xs">{detalle}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <button
+      type="button"
+      className="rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      title="Ver cómo llegar al 100 % de calidad"
+      aria-label={`${texto ?? "Calidad"} ${calidad.porcentaje} %. Ver cómo llegar al 100 %`}
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+    >
+      <Badge className={cn("text-[10px] tabular-nums cursor-pointer hover:brightness-125", colorDeCalidad(calidad.porcentaje))}>
+        {texto ?? "Calidad"} {calidad.porcentaje}%
+        <ChevronRight className="w-3 h-3 -mr-0.5" />
+      </Badge>
+    </button>
   );
 }
 
@@ -397,13 +398,25 @@ function PendingBadge({ count, long }: { count: number; long?: boolean }) {
   );
 }
 
+/** Un dato con su rótulo: «Precio S/ 63.00». */
+function Dato({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{rotulo}</p>
+      <div className="text-sm font-semibold tabular-nums">{children}</div>
+    </div>
+  );
+}
+
 /** Tablero maestro: precio y stock de cada producto, canal por canal. */
-export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, canEdit, canPublish, isLoading, isError }: Props) {
-  const enStock = modo === "stock";
-  const [view, setView] = useState<"rows" | "grid">("rows");
+export function InventoryBoard({ cuentas, listings, pending, reviewMode, canEdit, canPublish, isLoading, isError }: Props) {
+  // La cuadrícula es la vista por defecto: en el celular y en pantallas grandes se lee mejor que las filas.
+  const [view, setView] = useState<"rows" | "grid">("grid");
   const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState<EditableProduct | null>(null);
+  const [filtros, setFiltros] = useState<FiltrosDelTablero>(FILTROS_INICIALES);
+  const [editing, setEditing] = useState<{ product: EditableProduct; modo: "stock" | "precios" } | null>(null);
   const [stockDeGrupo, setStockDeGrupo] = useState<{ name: string; children: Row[] } | null>(null);
+  const [calidadAbierta, setCalidadAbierta] = useState<CalidadAbierta | null>(null);
   const [sheetFor, setSheetFor] = useState<Product | null>(null);
   const [channelAction, setChannelAction] = useState<PendingChannelAction | null>(null);
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
@@ -412,23 +425,31 @@ export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, c
   const alternar = (id: string) => setAbiertos((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const rows = useMemo(() => buildRows(listings, pending), [listings, pending]);
-  const items = useMemo(() => buildItems(rows), [rows]);
   // Calidad de cada producto (activo en cuántas de las cuentas conectadas) y resumen del catálogo.
-  const calidadDe = (r: Row): Calidad => calidadDelProducto(r.channels.map((c) => c.listing), cuentas, estadoVisible);
-  const calidades = useMemo(() => rows.map((r) => calidadDelProducto(r.channels.map((c) => c.listing), cuentas, estadoVisible)), [rows, cuentas]);
-  const resumen = useMemo(() => ({
-    calidad: calidadDelCatalogo(calidades),
-    productos: rows.length,
-    activas: calidades.reduce((n, c) => n + c.activas, 0),
-    posibles: calidades.reduce((n, c) => n + c.total, 0),
-    sinStock: rows.filter((r) => r.stock <= 0).length,
-    sinPublicar: calidades.filter((c) => c.activas === 0).length,
-  }), [calidades, rows]);
-  const calidadDeGrupo = (g: GroupItem): Calidad => {
-    const hijas = g.children.map(calidadDe);
+  const calidadPorId = useMemo(
+    () => new Map(rows.map((r) => [r.productId, calidadDelProducto(r.channels.map((c) => c.listing), cuentas, estadoVisible)])),
+    [rows, cuentas],
+  );
+  const calidadDe = (r: Row): Calidad => calidadPorId.get(r.productId) ?? calidadDelProducto(r.channels.map((c) => c.listing), cuentas, estadoVisible);
+  const calidadDeFilas = (filas: Row[]): Calidad => {
+    const hijas = filas.map(calidadDe);
     const total = Math.max(...hijas.map((h) => h.total), 1);
     return { porcentaje: calidadDelCatalogo(hijas), activas: Math.round(hijas.reduce((n, h) => n + h.activas, 0) / Math.max(hijas.length, 1)), total, faltan: [...new Set(hijas.flatMap((h) => h.faltan))] };
   };
+  const resumen = useMemo(() => {
+    const calidades = [...calidadPorId.values()];
+    return {
+      calidad: calidadDelCatalogo(calidades),
+      productos: rows.length,
+      activas: calidades.reduce((n, c) => n + c.activas, 0),
+      posibles: calidades.reduce((n, c) => n + c.total, 0),
+      sinStock: rows.filter((r) => r.stock <= 0).length,
+      sinPublicar: calidades.filter((c) => c.activas === 0).length,
+    };
+  }, [calidadPorId, rows]);
+  const abrirCalidad = (filas: Row[], nombre: string, detalle?: string) =>
+    setCalidadAbierta({ nombre, detalle, calidad: filas.length === 1 ? calidadDe(filas[0]) : calidadDeFilas(filas), mejoras: mejorasDeCalidad(filas, cuentas, estadoVisible) });
+
   // Publicaciones activas cuyo canal tiene un stock distinto al de Synkro (las mismas que muestran «Reenviar»).
   const desfasadas = useMemo(
     () => rows.flatMap((r) => r.channels.filter((c) => estadoVisible(c.listing) === "published" && c.stockDrift && c.listing.lastStockSynced != null)),
@@ -439,22 +460,52 @@ export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, c
     () => rows.flatMap((r) => r.channels.filter((c) => estadoVisible(c.listing) === "published" && c.listing.marketplace === "ripley" && c.priceDrift && c.listing.lastPriceSynced != null && c.listing.salePrice == null)),
     [rows],
   );
+
+  // Primero los filtros (sobre cada producto), luego se juntan las variantes en su grupo, luego la búsqueda y el orden.
+  const filas = useMemo(() => rows.filter((r) => cumpleFiltros(r, calidadDe(r), filtros, estadoVisible)), [rows, filtros, calidadPorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const items = useMemo(() => buildItems(filas), [filas]);
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     const coincide = (r: Row) => r.name.toLowerCase().includes(q) || r.sku.toLowerCase().includes(q) || (r.variantLabel ?? "").toLowerCase().includes(q);
-    if (!q) return items;
-    return items.filter((i) => (isGroup(i) ? i.name.toLowerCase().includes(q) || (i.code ?? "").toLowerCase().includes(q) || i.children.some(coincide) : coincide(i)));
-  }, [items, search]);
+    const lista = !q ? items : items.filter((i) => (isGroup(i) ? i.name.toLowerCase().includes(q) || (i.code ?? "").toLowerCase().includes(q) || i.children.some(coincide) : coincide(i)));
+    const stockDe = (i: Item) => (isGroup(i) ? i.children.reduce((n, c) => n + (c.stock ?? 0), 0) : i.stock);
+    const precioDe = (i: Item) => (isGroup(i) ? Math.min(...i.children.map((c) => c.price)) : i.price);
+    const calidadItem = (i: Item) => (isGroup(i) ? calidadDeFilas(i.children).porcentaje : calidadDe(i).porcentaje);
+    return [...lista].sort(comparador<Item>(filtros.orden, { nombre: (i) => i.name, calidad: calidadItem, stock: stockDe, precio: precioDe }));
+  }, [items, search, filtros.orden, calidadPorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const mostrados = visible.reduce((n, i) => n + (isGroup(i) ? i.children.length : 1), 0);
 
   const askChannelAction = (r: Row): OnChannelAction => (action, listing) =>
     setChannelAction({ productId: r.productId, productName: r.name, action, listing, listings: r.channels.map((c) => c.listing) });
+
+  /** Los dos botones de edición de un producto: cada uno abre su propio formulario y se aprueba por separado. */
+  const botonesDeEdicion = (r: Row, ancho = false) => canEdit && (
+    <>
+      <Button variant="outline" size="sm" className={cn("gap-1.5", ancho && "flex-1")} onClick={() => setEditing({ product: r, modo: "stock" })}>
+        <Pencil className="w-3.5 h-3.5" /> Editar stock
+      </Button>
+      <Button variant="outline" size="sm" className={cn("gap-1.5", ancho && "flex-1")} onClick={() => setEditing({ product: r, modo: "precios" })}>
+        <Pencil className="w-3.5 h-3.5" /> Editar precios
+      </Button>
+    </>
+  );
+  const botonesDeGrupo = (item: GroupItem, ancho = false) => canEdit && (
+    <>
+      <Button variant="outline" size="sm" className={cn("gap-1.5", ancho && "flex-1")} onClick={(e) => { e.stopPropagation(); setStockDeGrupo({ name: item.name, children: item.children }); }}>
+        <Pencil className="w-3.5 h-3.5" /> Stock de todas
+      </Button>
+      <Button variant="outline" size="sm" className={cn("gap-1.5", ancho && "flex-1")} onClick={(e) => { e.stopPropagation(); setPrecioDeGrupo({ groupId: item.groupId, name: item.name, n: item.children.length }); }}>
+        <Pencil className="w-3.5 h-3.5" /> Precio de todas
+      </Button>
+    </>
+  );
 
   const renderRow = (r: Row, nested = false) => (
               <div
                 key={r.productId}
                 className={cn("p-4 flex flex-col lg:flex-row lg:items-center gap-4 hover:bg-secondary/20 transition-colors", nested && "lg:pl-10 bg-secondary/10 border-l-2 border-border")}
               >
-                <div className="lg:w-72 shrink-0 min-w-0 flex items-center gap-3">
+                <div className="lg:w-64 shrink-0 min-w-0 flex items-center gap-3">
                   <ProductThumb src={r.imageUrl} alt={r.name} />
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">{nested ? (r.variantLabel ?? r.name) : r.name}</p>
@@ -462,85 +513,63 @@ export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, c
                     <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
                   </div>
                 </div>
-                <div className="flex items-center gap-6 text-sm tabular-nums lg:w-80 shrink-0">
-                  {enStock ? (
-                    <div>
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stock</p>
-                      <p className="font-semibold text-base">{r.stock} u.</p>
-                    </div>
-                  ) : (
-                    <>
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Precio</p>
-                        <p className="font-semibold">{money(r.price, r.channels[0]?.listing.currency)}</p>
-                      </div>
-                      <WebPrice value={r.webPrice} />
-                    </>
-                  )}
+                <div className="flex items-center gap-5 flex-wrap lg:w-80 shrink-0">
+                  <Dato rotulo="Precio">{money(r.price, r.channels[0]?.listing.currency)}</Dato>
+                  <Dato rotulo="Stock">{r.stock} u.</Dato>
+                  <Dato rotulo="Precio web">{r.webPrice != null ? money(r.webPrice) : <span className="text-muted-foreground">—</span>}</Dato>
                   <div className="flex flex-col items-start gap-1">
-                    <CalidadBadge calidad={calidadDe(r)} />
+                    <CalidadBadge calidad={calidadDe(r)} onClick={() => abrirCalidad([r], r.name, r.sku)} />
                     <PendingBadge count={r.pendingCount} long />
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 flex-1">
                   {r.channels.map((c) => (
-                    <ChannelChip key={c.listing.id} cell={c} modo={modo} canEdit={canPublish} canResend={canEdit} onAction={askChannelAction(r)} />
+                    <ChannelChip key={c.listing.id} cell={c} canEdit={canPublish} canResend={canEdit} onAction={askChannelAction(r)} />
                   ))}
                 </div>
                 <div className="flex flex-wrap gap-2 sm:shrink-0 max-w-full">
                   <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setSheetFor({ id: r.productId, name: r.name } as Product)}>
                     <FileText className="w-3.5 h-3.5" /> Ficha
                   </Button>
-                  {canEdit && (
-                    <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setEditing(r)}>
-                      <Pencil className="w-3.5 h-3.5" /> {enStock ? "Editar stock" : "Editar precios"}
-                    </Button>
-                  )}
+                  {botonesDeEdicion(r)}
                   {canPublish && <AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} />}
                 </div>
               </div>
   );
 
   const renderCard = (r: Row, nested = false) => (
-              <div key={r.productId} className="glass rounded-2xl p-4 space-y-3 border border-border">
+              <div key={r.productId} className="glass rounded-2xl p-4 space-y-3 border border-border min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex items-center gap-3">
                     <ProductThumb src={r.imageUrl} alt={r.name} />
                     <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">{nested ? (r.variantLabel ?? r.name) : r.name}</p>
+                      <p className="font-medium text-sm line-clamp-2 break-words" title={nested ? (r.variantLabel ?? r.name) : r.name}>{nested ? (r.variantLabel ?? r.name) : r.name}</p>
                       {r.variation && <p className="text-[11px] text-muted-foreground truncate">{r.variation}</p>}
                       <code className="text-[10px] font-mono text-muted-foreground">{r.sku}</code>
                     </div>
                   </div>
-                  <div className="flex gap-1 shrink-0">
-                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSheetFor({ id: r.productId, name: r.name } as Product)} aria-label="Ficha" title="Ficha: lo que se envía a cada canal">
-                      <FileText className="w-3.5 h-3.5" />
-                    </Button>
-                    {canEdit && (
-                      <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setEditing(r)} aria-label="Editar">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                  </div>
+                  <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setSheetFor({ id: r.productId, name: r.name } as Product)} aria-label="Ficha" title="Ficha: lo que se envía a cada canal">
+                    <FileText className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
-                <div className="flex items-center gap-4 text-sm tabular-nums flex-wrap">
-                  {enStock ? (
-                    <span className="font-semibold">{r.stock} u.</span>
-                  ) : (
-                    <>
-                      <span className="font-semibold">{money(r.price, r.channels[0]?.listing.currency)}</span>
-                      <WebPrice value={r.webPrice} />
-                    </>
-                  )}
-                  <CalidadBadge calidad={calidadDe(r)} />
-                  <PendingBadge count={r.pendingCount} />
+                <div className="grid grid-cols-3 gap-2">
+                  <Dato rotulo="Precio">{money(r.price, r.channels[0]?.listing.currency)}</Dato>
+                  <Dato rotulo="Stock">{r.stock} u.</Dato>
+                  <Dato rotulo="Web">{r.webPrice != null ? money(r.webPrice) : <span className="text-muted-foreground">—</span>}</Dato>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <CalidadBadge calidad={calidadDe(r)} onClick={() => abrirCalidad([r], r.name, r.sku)} />
+                  <PendingBadge count={r.pendingCount} long />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {r.channels.map((c) => (
-                    <ChannelChip key={c.listing.id} cell={c} modo={modo} canEdit={canPublish} canResend={canEdit} onAction={askChannelAction(r)} />
+                    <ChannelChip key={c.listing.id} cell={c} className="w-full max-w-none" canEdit={canPublish} canResend={canEdit} onAction={askChannelAction(r)} />
                   ))}
                 </div>
-                {canPublish && <div className="flex justify-end"><AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} /></div>}
+                <div className="flex flex-wrap gap-2">
+                  {botonesDeEdicion(r, true)}
+                  {canPublish && <AllChannelsMenu channels={r.channels} onAction={askChannelAction(r)} />}
+                </div>
               </div>
   );
 
@@ -580,8 +609,8 @@ export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, c
   return (
     <div className="space-y-4">
       {/* Resumen del catálogo: qué tan completo está el alcance de los productos en las cuentas conectadas. */}
-      <div className="glass rounded-2xl p-4 flex flex-wrap items-center gap-x-8 gap-y-3">
-        <div>
+      <div className="glass rounded-2xl p-4 grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-x-8 gap-y-3">
+        <div className="col-span-2 sm:col-span-1">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Calidad del catálogo</p>
           <p className={cn("text-2xl font-bold tabular-nums", resumen.calidad >= 80 ? "text-green-400" : resumen.calidad >= 50 ? "text-yellow-400" : "text-red-400")}>{resumen.calidad}%</p>
           <p className="text-[11px] text-muted-foreground">Publicaciones activas ÷ cuentas conectadas</p>
@@ -592,8 +621,8 @@ export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, c
         <div><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Sin publicar</p><p className={cn("text-lg font-semibold tabular-nums", resumen.sinPublicar > 0 && "text-red-400")}>{resumen.sinPublicar}</p></div>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        <div className="relative w-full sm:max-w-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full sm:w-auto sm:flex-1 sm:max-w-sm min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             className="pl-9"
@@ -603,8 +632,8 @@ export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, c
           />
         </div>
         {canEdit && (
-          <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={() => setReenvioMasivo(true)}>
-            <RotateCw className="w-3.5 h-3.5" /> {enStock ? "Reenviar stock" : "Reenviar precio"}{(enStock ? desfasadas.length : desfasadasPrecio.length) > 0 ? ` (${enStock ? desfasadas.length : desfasadasPrecio.length})` : ""}
+          <Button variant="outline" size="sm" className="gap-1.5 shrink-0 mr-auto sm:mr-0 sm:ml-auto" onClick={() => setReenvioMasivo(true)}>
+            <RotateCw className="w-3.5 h-3.5" /> Reenviar<span className="hidden sm:inline"> stock o precio</span>{desfasadas.length + desfasadasPrecio.length > 0 ? ` (${desfasadas.length + desfasadasPrecio.length})` : ""}
           </Button>
         )}
         <ToggleGroup
@@ -612,18 +641,21 @@ export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, c
           value={view}
           onValueChange={(v) => v && setView(v as "rows" | "grid")}
           aria-label="Vista"
+          className="shrink-0"
         >
-          <ToggleGroupItem value="rows" aria-label="Filas">
-            <List className="w-4 h-4" />
-          </ToggleGroupItem>
           <ToggleGroupItem value="grid" aria-label="Cuadrícula">
             <LayoutGrid className="w-4 h-4" />
+          </ToggleGroupItem>
+          <ToggleGroupItem value="rows" aria-label="Filas">
+            <List className="w-4 h-4" />
           </ToggleGroupItem>
         </ToggleGroup>
       </div>
 
+      <FiltrosDelTableroPanel filtros={filtros} onChange={setFiltros} cuentas={cuentas} mostrados={mostrados} total={rows.length} />
+
       {!visible.length && (
-        <p className="text-sm text-muted-foreground text-center py-8">Ningún producto coincide con la búsqueda.</p>
+        <p className="text-sm text-muted-foreground text-center py-8">Ningún producto coincide con los filtros o la búsqueda.</p>
       )}
 
       {view === "rows" ? (
@@ -634,7 +666,7 @@ export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, c
             return (
               <div key={item.groupId}>
                 <div className="p-4 flex flex-col lg:flex-row lg:items-center gap-4 hover:bg-secondary/20 transition-colors cursor-pointer" onClick={() => alternar(item.groupId)}>
-                  <div className="lg:w-72 shrink-0 min-w-0 flex items-center gap-3">
+                  <div className="lg:w-64 shrink-0 min-w-0 flex items-center gap-3">
                     {abierto ? <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground" />}
                     <ProductThumb src={item.imageUrl} alt={item.name} />
                     <div className="min-w-0">
@@ -643,26 +675,13 @@ export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, c
                       {item.code && <code className="ml-1 text-[10px] font-mono text-muted-foreground">{item.code}</code>}
                     </div>
                   </div>
-                  <div className="flex items-center gap-6 text-sm tabular-nums lg:w-80 shrink-0">
-                    {enStock ? (
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Stock total</p>
-                        <p className="font-semibold text-base">{item.children.reduce((n, c) => n + (c.stock ?? 0), 0)} u.</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Precio</p>
-                        <p className="font-semibold whitespace-nowrap">{rangoDePrecio(item.children)}</p>
-                      </div>
-                    )}
-                    <CalidadBadge calidad={calidadDeGrupo(item)} texto="Calidad prom." />
+                  <div className="flex items-center gap-5 flex-wrap lg:w-80 shrink-0">
+                    <Dato rotulo="Precio"><span className="whitespace-nowrap">{rangoDePrecio(item.children)}</span></Dato>
+                    <Dato rotulo="Stock total">{item.children.reduce((n, c) => n + (c.stock ?? 0), 0)} u.</Dato>
+                    <CalidadBadge calidad={calidadDeFilas(item.children)} texto="Calidad prom." onClick={() => abrirCalidad(item.children, item.name, `${item.children.length} variantes`)} />
                   </div>
                   <div className="flex-1"><GroupChannels children={item.children} /></div>
-                  {canEdit && (
-                    <Button variant="outline" size="sm" className="gap-1.5 shrink-0" onClick={(e) => { e.stopPropagation(); if (enStock) setStockDeGrupo({ name: item.name, children: item.children }); else setPrecioDeGrupo({ groupId: item.groupId, name: item.name, n: item.children.length }); }}>
-                      <Pencil className="w-3.5 h-3.5" /> {enStock ? "Stock de todas" : "Precio de todas"}
-                    </Button>
-                  )}
+                  <div className="flex flex-wrap gap-2 sm:shrink-0">{botonesDeGrupo(item)}</div>
                   <span className="text-xs text-muted-foreground shrink-0">{abierto ? "Ocultar" : "Ver variantes"}</span>
                 </div>
                 {abierto && item.children.map((c) => renderRow(c, true))}
@@ -677,28 +696,25 @@ export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, c
             const abierto = abiertos.has(item.groupId);
             return (
               // Cerrado es una tarjeta más de la cuadrícula; abierto ocupa todo el ancho para mostrar sus variantes.
-              <div key={item.groupId} className={cn("glass rounded-2xl p-4 space-y-3 border border-border", abierto && "md:col-span-2 xl:col-span-3")}>
+              <div key={item.groupId} className={cn("glass rounded-2xl p-4 space-y-3 border border-border min-w-0", abierto && "md:col-span-2 xl:col-span-3")}>
                 <button type="button" className="w-full flex items-start gap-3 text-left" onClick={() => alternar(item.groupId)} aria-expanded={abierto}>
                   <ProductThumb src={item.imageUrl} alt={item.name} />
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm truncate" title={item.name}>{item.name}</p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
+                    <p className="font-medium text-sm line-clamp-2 break-words" title={item.name}>{item.name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                       <Badge variant="secondary" className="text-[10px] py-0 px-1.5">{item.children.length} variantes</Badge>
                       {item.code && <code className="text-[10px] font-mono text-muted-foreground truncate">{item.code}</code>}
                     </div>
                   </div>
                   {abierto ? <ChevronDown className="w-4 h-4 shrink-0 text-muted-foreground mt-1" /> : <ChevronRight className="w-4 h-4 shrink-0 text-muted-foreground mt-1" />}
                 </button>
-                <div className="flex items-center gap-4 text-sm tabular-nums flex-wrap">
-                  <span className="font-semibold">{enStock ? `${item.children.reduce((n, c) => n + (c.stock ?? 0), 0)} u.` : rangoDePrecio(item.children)}</span>
-                  <CalidadBadge calidad={calidadDeGrupo(item)} texto="Calidad prom." />
+                <div className="grid grid-cols-2 gap-2">
+                  <Dato rotulo="Precio"><span className="whitespace-nowrap">{rangoDePrecio(item.children)}</span></Dato>
+                  <Dato rotulo="Stock total">{item.children.reduce((n, c) => n + (c.stock ?? 0), 0)} u.</Dato>
                 </div>
+                <CalidadBadge calidad={calidadDeFilas(item.children)} texto="Calidad prom." onClick={() => abrirCalidad(item.children, item.name, `${item.children.length} variantes`)} />
                 <GroupChannels children={item.children} />
-                {canEdit && (
-                  <Button variant="outline" size="sm" className="gap-1.5" onClick={() => (enStock ? setStockDeGrupo({ name: item.name, children: item.children }) : setPrecioDeGrupo({ groupId: item.groupId, name: item.name, n: item.children.length }))}>
-                    <Pencil className="w-3.5 h-3.5" /> {enStock ? "Stock de todas las variantes" : "Precio de todas las variantes"}
-                  </Button>
-                )}
+                <div className="flex flex-wrap gap-2">{botonesDeGrupo(item, true)}</div>
                 {abierto && (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4 pt-1">
                     {item.children.map((c) => renderCard(c, true))}
@@ -734,7 +750,8 @@ export function InventoryBoard({ modo, cuentas, listings, pending, reviewMode, c
           )}
         </DialogContent>
       </Dialog>
-      <EditInventoryDialog product={editing} reviewMode={reviewMode} modo={modo} onClose={() => setEditing(null)} />
+      <EditInventoryDialog product={editing?.product ?? null} reviewMode={reviewMode} modo={editing?.modo ?? "precios"} onClose={() => setEditing(null)} />
+      <CalidadDialog abierta={calidadAbierta} onClose={() => setCalidadAbierta(null)} />
       <ProductSheetDialog product={sheetFor} onClose={() => setSheetFor(null)} />
       <ChannelActionDialog pending={channelAction} onClose={() => setChannelAction(null)} />
       <BulkResendStockDialog open={reenvioMasivo} onOpenChange={setReenvioMasivo} candidatos={desfasadas} candidatosPrecio={desfasadasPrecio} />
