@@ -201,6 +201,8 @@ export interface SugerenciaDeAjustes {
   atributo: string;
   opciones: string[];
   items: { valor: string; opcion: string | null; motivo: string; origen: 'ia' | 'foto' | 'actual' | null; conflicto: boolean }[];
+  /** Dato de la misma clase que el principal («Color básico»): su ajuste es propio. */
+  derivado?: boolean;
 }
 
 export interface GenerateAIContentDto {
@@ -312,7 +314,7 @@ export const productsApi = {
     apiRequest<SugerenciaDeAjustes[]>(`/products/groups/${groupId}/channel-values/suggest`, { method: 'POST', body: JSON.stringify({ marketplace }) }),
 
   /** Guarda, solo para ese canal, a qué opción corresponde cada valor confirmado. El valor de la persona no cambia en Synkro ni en otros canales. */
-  applyChannelValues: (groupId: string, marketplace: string, cambios: { eje: string; valor: string; opcion: string }[]) =>
+  applyChannelValues: (groupId: string, marketplace: string, cambios: { eje: string; valor: string; opcion: string; atributo?: string }[]) =>
     apiRequest<{ aplicados: number; variantes: number }>(`/products/groups/${groupId}/channel-values/apply`, { method: 'POST', body: JSON.stringify({ marketplace, cambios }) }),
 
   /** Cambia el NOMBRE de un eje de variación del grupo («Talla» → «Tamaño cama») en el grupo y en todas sus variantes; los valores no se tocan. */

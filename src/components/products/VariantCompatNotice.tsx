@@ -84,6 +84,8 @@ function ResolverValores({ groupId, canal, nombreDelCanal }: { groupId: string; 
   const { can } = useStores();
   const [propuestas, setPropuestas] = useState<SugerenciaDeAjustes[] | null>(null);
   const [elegidas, setElegidas] = useState<Record<string, string>>({});
+  // Un eje puede tener varios datos del canal (Color y Color básico): cada uno se identifica aparte.
+  const idDe = (p: SugerenciaDeAjustes) => (p.derivado ? p.eje + "#" + p.atributo : p.eje);
   const clave = (eje: string, valor: string) => `${eje}\u0000${valor}`;
 
   const sugerir = useMutation({
@@ -91,7 +93,7 @@ function ResolverValores({ groupId, canal, nombreDelCanal }: { groupId: string; 
     onSuccess: (res) => {
       if (res.error || !res.data) return toast.error(res.error ?? "No se pudo consultar a la IA");
       setPropuestas(res.data);
-      setElegidas(Object.fromEntries(res.data.flatMap((p) => p.items.map((i) => [clave(p.eje, i.valor), i.opcion ?? ""]))));
+      setElegidas(Object.fromEntries(res.data.flatMap((p) => p.items.map((i) => [clave(idDe(p), i.valor), i.opcion ?? ""]))));
       if (!res.data.length) toast.info("No hay nada que resolver en este canal.");
     },
     onError: () => toast.error("Error al conectar con el servidor"),
@@ -100,7 +102,7 @@ function ResolverValores({ groupId, canal, nombreDelCanal }: { groupId: string; 
   const aplicar = useMutation({
     mutationFn: () => productsApi.applyChannelValues(
       groupId, canal,
-      (propuestas ?? []).flatMap((p) => p.items.map((i) => ({ eje: p.eje, valor: i.valor, opcion: elegidas[clave(p.eje, i.valor)] }))).filter((c) => !!c.opcion),
+      (propuestas ?? []).flatMap((p) => p.items.map((i) => ({ eje: p.eje, valor: i.valor, opcion: elegidas[clave(idDe(p), i.valor)], ...(p.derivado ? { atributo: p.atributo } : {}) }))).filter((c) => !!c.opcion),
     ),
     onSuccess: (res) => {
       if (res.error || !res.data) return toast.error(res.error ?? "No se pudo guardar");
@@ -113,7 +115,7 @@ function ResolverValores({ groupId, canal, nombreDelCanal }: { groupId: string; 
   });
 
   if (!can("canales.publicar")) return null;
-  const sinElegir = (propuestas ?? []).some((p) => p.items.some((i) => !elegidas[clave(p.eje, i.valor)]));
+  const sinElegir = (propuestas ?? []).some((p) => p.items.some((i) => !elegidas[clave(idDe(p), i.valor)]));
   return (
     <div className="space-y-2 pt-1 border-t border-amber-500/30">
       {!propuestas?.length && (
@@ -125,14 +127,14 @@ function ResolverValores({ groupId, canal, nombreDelCanal }: { groupId: string; 
         </div>
       )}
       {propuestas?.map((p) => (
-        <div key={p.eje} className="space-y-1.5">
+        <div key={idDe(p)} className="space-y-1.5">
           <p className="font-medium">{p.eje} → {p.atributo.replace(/\s*variant$/i, "")} de {nombreDelCanal}</p>
           {p.items.map((i) => (
             <div key={i.valor} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-0.5 items-center">
               <span className="break-words">«{i.valor}»{i.conflicto && <span className="text-amber-700 dark:text-amber-400"> · repetida</span>}</span>
               <select
-                value={elegidas[clave(p.eje, i.valor)] ?? ""}
-                onChange={(e) => setElegidas((x) => ({ ...x, [clave(p.eje, i.valor)]: e.target.value }))}
+                value={elegidas[clave(idDe(p), i.valor)] ?? ""}
+                onChange={(e) => setElegidas((x) => ({ ...x, [clave(idDe(p), i.valor)]: e.target.value }))}
                 className="h-7 max-w-[11rem] rounded-md border border-border bg-background px-2 text-xs"
               >
                 <option value="">Elige…</option>
@@ -175,7 +177,7 @@ function ResumenDeValores({ groupId, r }: { groupId: string; r: VariantCompatRes
   const queryClient = useQueryClient();
   const { can } = useStores();
   const cambiar = useMutation({
-    mutationFn: (c: { eje: string; valor: string; opcion: string }) => productsApi.applyChannelValues(groupId, r.canal, [c]),
+    mutationFn: (c: { eje: string; valor: string; opcion: string; atributo?: string }) => productsApi.applyChannelValues(groupId, r.canal, [c]),
     onSuccess: (res, c) => {
       if (res.error || !res.data) return toast.error(res.error ?? "No se pudo guardar");
       toast.success(`«${c.valor}» saldrá como «${c.opcion}» en ${r.nombreDelCanal}.`);
@@ -188,7 +190,8 @@ function ResumenDeValores({ groupId, r }: { groupId: string; r: VariantCompatRes
   const detalle = (r.detalle ?? []).filter((d) => d.items.length > 0);
   const principales = detalle.filter((d) => !d.derivado);
   if (!principales.length) return null;
-  const valores = principales.flatMap((d) => d.items);
+  // Se cuentan también los datos derivados (Color básico): si uno queda sin opción, las tallas de ese color saldrían distintas.
+  const valores = detalle.flatMap((d) => d.items);
   const sin = valores.filter((i) => i.estado === "sin").length;
   const aprox = valores.filter((i) => i.estado === "aproximado").length;
   const todoBien = sin === 0 && aprox === 0;
@@ -247,10 +250,25 @@ function ResumenDeValores({ groupId, r }: { groupId: string; r: VariantCompatRes
                   </div>
                   {derivados.map((d) => {
                     const hijo = d.items.find((x) => x.valor === i.valor);
+                    const e = ESTILO_DE_ESTADO[hijo?.estado ?? "sin"];
                     return (
-                      <p key={d.atributoId} className="text-[11px] text-muted-foreground break-words pl-3">
-                        {d.atributo}: <span className="font-medium text-foreground">{hijo?.opcion ?? "sin opción (se usará el valor ya guardado del producto)"}</span>
-                      </p>
+                      <div key={d.atributoId} className="flex items-center gap-2 flex-wrap pl-3 text-[11px] text-muted-foreground">
+                        <span>{d.atributo}:</span>
+                        {editable ? (
+                          <select
+                            value={hijo?.opcion ?? ""}
+                            disabled={cambiar.isPending}
+                            onChange={(ev) => ev.target.value && cambiar.mutate({ eje: p.eje, valor: i.valor, opcion: ev.target.value, atributo: d.atributo })}
+                            className="h-6 max-w-[10rem] rounded-md border border-border bg-background px-1.5 text-[11px] text-foreground"
+                          >
+                            {!hijo?.opcion && <option value="">Elige…</option>}
+                            {d.opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : (
+                          <span className="font-medium text-foreground">{hijo?.opcion ?? "sin opción"}</span>
+                        )}
+                        {hijo && hijo.estado !== "exacto" && <span className={"rounded px-1.5 py-0.5 " + e.clase}>{e.texto}</span>}
+                      </div>
                     );
                   })}
                 </div>
@@ -287,7 +305,7 @@ export function VariantCompatNotice({ groupId, marketplaces, categoryId, onUseCa
               {r.nombreDelCanal}: {separadas ? "se publicarán como productos separados" : "revisa estos detalles"}
             </p>
             {r.avisos.map((a, i) => <p key={i} className="break-words">{a}</p>)}
-            {(r.valoresSinEquivalente.length > 0 || (r.colisiones?.length ?? 0) > 0) && <ResolverValores groupId={groupId} canal={r.canal} nombreDelCanal={r.nombreDelCanal} />}
+            {(r.valoresSinEquivalente.length > 0 || (r.colisiones?.length ?? 0) > 0 || (r.detalle ?? []).some((d) => d.items.some((i) => i.estado === "sin"))) && <ResolverValores groupId={groupId} canal={r.canal} nombreDelCanal={r.nombreDelCanal} />}
             {separadas && (r.ejesDisponibles?.length ?? 0) > 0 && r.ejesNoPermitidos.map((eje) => <RenombrarEje key={eje} groupId={groupId} eje={eje} opciones={r.ejesDisponibles!} sugerido={r.renombresSugeridos?.find((s) => s.eje === eje)?.a} />)}
             {separadas && r.recomendada && (
               <div className="flex items-start gap-1.5 pt-1 border-t border-amber-500/30">
