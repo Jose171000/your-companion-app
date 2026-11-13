@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Info, Lightbulb, Sparkles } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info, Lightbulb, Pencil, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { productsApi, type SugerenciaDeAjustes } from "@/lib/products-api";
+import { productsApi, type DetalleDeEje, type EstadoDeValor, type SugerenciaDeAjustes, type VariantCompatResult } from "@/lib/products-api";
 import { useStores } from "@/contexts/StoreContext";
 
 const CANALES_REVISABLES = ["ripley", "falabella", "mercadolibre", "shopify", "woocommerce"];
@@ -158,6 +158,111 @@ function ResolverValores({ groupId, canal, nombreDelCanal }: { groupId: string; 
   );
 }
 
+
+const ESTILO_DE_ESTADO: Record<EstadoDeValor, { texto: string; clase: string }> = {
+  exacto: { texto: "Exacto", clase: "text-emerald-700 dark:text-emerald-400 bg-emerald-500/10" },
+  ajustado: { texto: "Ajustado", clase: "text-sky-700 dark:text-sky-400 bg-sky-500/10" },
+  aproximado: { texto: "Aproximado: revisa", clase: "text-amber-700 dark:text-amber-400 bg-amber-500/15" },
+  sin: { texto: "Sin opción", clase: "text-red-700 dark:text-red-400 bg-red-500/10" },
+};
+
+/**
+ * Siempre que el producto tenga variantes: qué opción del canal llevará cada color y cada talla (también el segundo dato de color, como «Color
+ * básico», cuya lista es otra). Así la persona ve que todo quedó identificado, qué se aproximó y qué falta, sin esperar a que algo falle.
+ * Cada fila se puede cambiar (solo vale para ese canal: lo que escribió no cambia).
+ */
+function ResumenDeValores({ groupId, r }: { groupId: string; r: VariantCompatResult }) {
+  const queryClient = useQueryClient();
+  const { can } = useStores();
+  const cambiar = useMutation({
+    mutationFn: (c: { eje: string; valor: string; opcion: string }) => productsApi.applyChannelValues(groupId, r.canal, [c]),
+    onSuccess: (res, c) => {
+      if (res.error || !res.data) return toast.error(res.error ?? "No se pudo guardar");
+      toast.success(`«${c.valor}» saldrá como «${c.opcion}» en ${r.nombreDelCanal}.`);
+      queryClient.invalidateQueries({ queryKey: ["variant-compat"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
+
+  const detalle = (r.detalle ?? []).filter((d) => d.items.length > 0);
+  const principales = detalle.filter((d) => !d.derivado);
+  if (!principales.length) return null;
+  const valores = principales.flatMap((d) => d.items);
+  const sin = valores.filter((i) => i.estado === "sin").length;
+  const aprox = valores.filter((i) => i.estado === "aproximado").length;
+  const todoBien = sin === 0 && aprox === 0;
+  const editable = can("canales.publicar");
+
+  return (
+    <div className={`rounded-lg border p-2.5 text-xs space-y-2 min-w-0 ${sin ? "border-red-500/40 bg-red-500/5" : aprox ? "border-amber-500/40 bg-amber-500/5" : "border-emerald-500/30 bg-emerald-500/5"}`}>
+      <div className="space-y-0.5">
+        <p className="font-medium flex items-center gap-1.5 break-words">
+          {todoBien ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-600" /> : <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-amber-600" />}
+          Cómo saldrán tus colores y tallas en {r.nombreDelCanal}
+        </p>
+        <p className="text-muted-foreground break-words">
+          {valores.length - sin} de {valores.length} identificados
+          {aprox > 0 && ` · ${aprox} aproximado${aprox === 1 ? "" : "s"}: revísalo${aprox === 1 ? "" : "s"}`}
+          {sin > 0 && ` · ${sin} sin opción: elígela abajo`}
+        </p>
+      </div>
+
+      {principales.map((p) => {
+        const derivados = detalle.filter((d) => d.derivado && d.eje === p.eje);
+        const detallado = p.items.some((i) => i.estado !== "exacto") || /color/i.test(p.eje);
+        if (!detallado) {
+          return (
+            <p key={p.atributoId} className="break-words">
+              <span className="font-medium">{p.eje}:</span> {p.items.map((i) => i.valor).join(", ")}{" "}
+              <span className={`rounded px-1.5 py-0.5 text-[11px] ${ESTILO_DE_ESTADO.exacto.clase}`}>Todo exacto</span>
+            </p>
+          );
+        }
+        return (
+          <div key={p.atributoId} className="space-y-1.5">
+            <p className="font-medium">{p.eje} → {p.atributo} de {r.nombreDelCanal}</p>
+            {p.items.map((i) => {
+              const estilo = ESTILO_DE_ESTADO[i.estado];
+              return (
+                <div key={i.valor} className="space-y-0.5">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1 items-center">
+                    <span className="break-words">«{i.valor}»</span>
+                    {editable ? (
+                      <select
+                        value={i.opcion ?? ""}
+                        disabled={cambiar.isPending}
+                        onChange={(e) => e.target.value && cambiar.mutate({ eje: p.eje, valor: i.valor, opcion: e.target.value })}
+                        className="h-7 max-w-[11rem] rounded-md border border-border bg-background px-2 text-xs"
+                      >
+                        {!i.opcion && <option value="">Elige…</option>}
+                        {p.opciones.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    ) : (
+                      <span className="font-medium">{i.opcion ?? "—"}</span>
+                    )}
+                    <span className={`col-span-2 w-fit rounded px-1.5 py-0.5 text-[11px] inline-flex items-center gap-1 ${estilo.clase}`}>
+                      {i.estado === "ajustado" && <Pencil className="w-3 h-3" />}{estilo.texto}
+                    </span>
+                  </div>
+                  {derivados.map((d) => {
+                    const hijo = d.items.find((x) => x.valor === i.valor);
+                    return (
+                      <p key={d.atributoId} className="text-[11px] text-muted-foreground break-words pl-3">
+                        {d.atributo}: <span className="font-medium text-foreground">{hijo?.opcion ?? "sin opción (se usará el valor ya guardado del producto)"}</span>
+                      </p>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function VariantCompatNotice({ groupId, marketplaces, categoryId, onUseCategory }: Props) {
   const canales = marketplaces.filter((m) => CANALES_REVISABLES.includes(m));
   const { data } = useQuery({
@@ -166,15 +271,17 @@ export function VariantCompatNotice({ groupId, marketplaces, categoryId, onUseCa
     enabled: !!groupId && canales.length > 0,
     staleTime: 60_000,
   });
-  const resultados = (data?.data ?? []).filter((r) => r.avisos.length > 0 || r.publicaComo === "separadas");
+  const resultados = (data?.data ?? []).filter((r) => r.avisos.length > 0 || r.publicaComo === "separadas" || (r.detalle?.length ?? 0) > 0);
   if (!resultados.length) return null;
 
   return (
     <div className="space-y-2 min-w-0">
       {resultados.map((r) => {
         const separadas = r.publicaComo === "separadas";
+        const hayAviso = r.avisos.length > 0 || separadas;
         return (
-          <div key={r.canal} className={`rounded-lg border p-2.5 text-xs space-y-1.5 min-w-0 ${separadas ? "border-amber-500/40 bg-amber-500/10" : "border-border text-muted-foreground"}`}>
+          <div key={r.canal} className="space-y-2 min-w-0">
+          {hayAviso && <div className={`rounded-lg border p-2.5 text-xs space-y-1.5 min-w-0 ${separadas ? "border-amber-500/40 bg-amber-500/10" : "border-border text-muted-foreground"}`}>
             <p className="font-medium flex items-center gap-1.5">
               {separadas ? <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> : <Info className="w-3.5 h-3.5 shrink-0" />}
               {r.nombreDelCanal}: {separadas ? "se publicarán como productos separados" : "revisa estos detalles"}
@@ -198,6 +305,8 @@ export function VariantCompatNotice({ groupId, marketplaces, categoryId, onUseCa
                 </div>
               </div>
             )}
+          </div>}
+          <ResumenDeValores groupId={groupId} r={r} />
           </div>
         );
       })}

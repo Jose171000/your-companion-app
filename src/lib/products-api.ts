@@ -157,6 +157,20 @@ export interface RipleyPreview {
   faltantes: { name: string; description: string; options?: string[] }[];
 }
 
+/** Cómo llega un valor de Synkro a la lista del canal: igual, aproximado, ajustado (IA o persona) o sin equivalente. */
+export type EstadoDeValor = 'exacto' | 'aproximado' | 'ajustado' | 'sin';
+
+/** Lo que se enviará al canal por cada valor de un eje, en un dato del canal (un color puede ir en «Color» y en «Color básico»). */
+export interface DetalleDeEje {
+  eje: string;
+  atributo: string;
+  atributoId: string;
+  /** Dato de la misma clase que el principal: su opción se deduce de la del principal. */
+  derivado: boolean;
+  opciones: string[];
+  items: { valor: string; opcion: string | null; estado: EstadoDeValor }[];
+}
+
 /** Resultado de revisar si las variantes de un grupo caben en una sola publicación de un canal. */
 export interface VariantCompatResult {
   canal: string;
@@ -172,6 +186,8 @@ export interface VariantCompatResult {
   renombresSugeridos?: { eje: string; a: string }[];
   ejesQueFaltan: string[];
   valoresSinEquivalente: { eje: string; valores: string[] }[];
+  /** Qué saldrá en el canal por cada valor de cada eje (también cuando todo está bien). */
+  detalle?: DetalleDeEje[];
   /** Valores distintos que el canal llevaría a la misma opción (dos variantes con el mismo dato). */
   colisiones?: { eje: string; atributo: string; opcion: string; valores: string[] }[];
   avisos: string[];
