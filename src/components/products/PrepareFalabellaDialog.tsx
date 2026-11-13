@@ -363,7 +363,9 @@ export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: P
                       {campo.description && <p className="text-[11px] text-muted-foreground break-words">{campo.description}</p>}
                       {campo.options.length > 0 ? (
                         <Select
-                          value={atributos[campo.name] ?? ""}
+                          // Un valor que no está en la lista de Falabella (p. ej. un color «Nude») deja el desplegable en blanco: se muestra
+                          // vacío con su aviso, para que se vea que hay que elegir una de las opciones.
+                          value={campo.options.includes(atributos[campo.name] ?? "") ? atributos[campo.name] : ""}
                           onValueChange={(v) => setAtributos((a) => ({ ...a, [campo.name]: v }))}
                         >
                           <SelectTrigger id={`fb-attr-${campo.name}`}>
@@ -385,6 +387,11 @@ export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: P
                             setAtributos((a) => ({ ...a, [campo.name]: e.target.value }))
                           }
                         />
+                      )}
+                      {campo.options.length > 0 && (atributos[campo.name] ?? "").trim() !== "" && !campo.options.includes(atributos[campo.name]) && (
+                        <p className="text-[11px] text-amber-700">
+                          «{atributos[campo.name]}» no está en la lista de Falabella. Elige una de las opciones.
+                        </p>
                       )}
                     </div>
                   ))}
