@@ -326,7 +326,17 @@ export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: P
                   <Loader2 className="w-3.5 h-3.5 animate-spin" /> La IA está completando los datos con lo que sabe del producto…
                 </p>
               )}
-              {sugerir.data?.data && !sugerir.isPending && (
+              {sugerir.data?.data?.iaError && !sugerir.isPending && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex items-start justify-between gap-3">
+                  <span>
+                    La IA no pudo completar los datos ({sugerir.data.data.iaError}). Puedes reintentar o llenarlos a mano.
+                  </span>
+                  <Button type="button" size="sm" variant="outline" className="h-7 shrink-0" onClick={() => categoria?.id && sugerir.mutate(categoria.id)}>
+                    Reintentar
+                  </Button>
+                </div>
+              )}
+              {sugerir.data?.data && !sugerir.data.data.iaError && !sugerir.isPending && (
                 <p className="text-[11px] text-muted-foreground">
                   La IA completó {sugerir.data.data.filled} de {sugerir.data.data.total} datos. Revisa los que quedaron vacíos: son los que no se pueden deducir del producto (por ejemplo, garantías o certificaciones).
                 </p>

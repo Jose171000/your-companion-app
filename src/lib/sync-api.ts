@@ -699,7 +699,7 @@ export const syncApi = {
 
   /** Valores sugeridos para todos los atributos de una categoría de Falabella (no guarda nada). */
   suggestFalabellaAttributes: (productId: string, categoryId: string) =>
-    apiRequest<{ values: Record<string, string>; estimated: string[]; filled: number; total: number }>(
+    apiRequest<{ values: Record<string, string>; estimated: string[]; filled: number; total: number; iaError?: string }>(
       `/ai/products/${productId}/suggest-falabella-attributes`,
       { method: 'POST', body: JSON.stringify({ categoryId }) },
     ),
