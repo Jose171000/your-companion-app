@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Edit, FileText, ImageOff, Package, Rocket, Sparkles, Trash2, PackageCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProductCard } from "./ProductCard";
-import { GroupCard, GroupRows, ProductRow } from "./ProductsRows";
+import { GroupCard, GroupRows, ProductRow, Seleccion } from "./ProductsRows";
 
 interface ProductsTableProps {
   products: Product[];
@@ -20,6 +20,8 @@ interface ProductsTableProps {
   onPrepareFalabella: (product: Product) => void;
   onPrepareRipley: (product: Product) => void;
   onSheet: (product: Product) => void;
+  /** Casillas de selección para acciones en lote (si no se pasa, no se muestran) */
+  seleccion?: Seleccion;
 }
 
 export function ProductsTable({
@@ -35,6 +37,7 @@ export function ProductsTable({
   onPrepareFalabella,
   onPrepareRipley,
   onSheet,
+  seleccion,
 }: ProductsTableProps) {
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (isLoading) {
@@ -122,9 +125,9 @@ export function ProductsTable({
           <tbody className="divide-y divide-border/50">
             {products.map((product) =>
               product.group && product.groupSummary ? (
-                <GroupRows key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onPrepareRipley={onPrepareRipley} onSheet={onSheet} />
+                <GroupRows key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} seleccion={seleccion} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onPrepareRipley={onPrepareRipley} onSheet={onSheet} />
               ) : (
-                <ProductRow key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onPrepareRipley={onPrepareRipley} onSheet={onSheet} />
+                <ProductRow key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} seleccion={seleccion} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onPrepareRipley={onPrepareRipley} onSheet={onSheet} />
               ),
             )}
           </tbody>
@@ -134,13 +137,14 @@ export function ProductsTable({
       {/* ── Mobile cards ───────────────────────────────────────────────────── */}
       <div className="md:hidden divide-y divide-border/50">
         {products.map((product) => product.group && product.groupSummary ? (
-          <GroupCard key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onPrepareRipley={onPrepareRipley} onSheet={onSheet} />
+          <GroupCard key={product.id} product={product} overview={overview} overviewLoading={overviewLoading} seleccion={seleccion} onEdit={onEdit} onDelete={onDelete} onRegenerate={onRegenerate} onPublish={onPublish} onPrepareFalabella={onPrepareFalabella} onPrepareRipley={onPrepareRipley} onSheet={onSheet} />
         ) : (
           <ProductCard
             key={product.id}
             product={product}
             overview={overview?.[product.id]}
             overviewLoading={overviewLoading}
+            seleccion={seleccion}
             onEdit={onEdit}
             onDelete={onDelete}
             onRegenerate={onRegenerate}

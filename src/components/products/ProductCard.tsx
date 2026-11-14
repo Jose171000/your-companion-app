@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AccionesDeFila } from "./AccionesDeFila";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { Seleccion } from "./ProductsRows";
 
 interface ProductCardProps {
   product: Product;
@@ -14,13 +16,19 @@ interface ProductCardProps {
   onRegenerate: (product: Product) => void;
   onPublish?: (product: Product) => void;
   onSheet?: (product: Product) => void;
+  seleccion?: Seleccion;
 }
 
-export function ProductCard({ product, overview, overviewLoading, onEdit, onDelete, onRegenerate, onSheet }: ProductCardProps) {
+export function ProductCard({ product, overview, overviewLoading, onEdit, onDelete, onRegenerate, onSheet, seleccion }: ProductCardProps) {
   const marketplaces = product.targetMarketplaces ?? [];
 
   return (
     <div className="p-4 flex gap-3 hover:bg-secondary/20 transition-colors">
+      {seleccion && (
+        <span className="shrink-0 flex items-start pt-1">
+          <Checkbox checked={seleccion.ids.has(product.id)} onCheckedChange={() => seleccion.alternar(product)} aria-label={`Seleccionar ${product.name}`} />
+        </span>
+      )}
       {/* Thumbnail */}
       <div className="w-14 h-14 rounded-xl overflow-hidden bg-secondary/50 flex items-center justify-center shrink-0 border border-border">
         {product.images?.[0] ? (

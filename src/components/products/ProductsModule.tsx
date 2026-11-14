@@ -16,13 +16,17 @@ import { ProductSheetDialog } from "./ProductSheetDialog";
 import { PrepareFalabellaDialog } from "./PrepareFalabellaDialog";
 import { PrepareRipleyDialog } from "./PrepareRipleyDialog";
 import { DescuentoGeneralDialog } from "@/components/marketplaces/DescuentoGeneralDialog";
+import { MAX_REGENERACION, RegeneracionMasivaDialog } from "./RegeneracionMasivaDialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 const TAMANOS_DE_PAGINA = [10, 25, 50, 100];
 
 export function ProductsModule() {
   const queryClient = useQueryClient();
-  const { activeStore } = useStores();
+  const { activeStore, can } = useStores();
   const storeId = activeStore?.id ?? "";
 
   // ── Filter state ──────────────────────────────────────────────────────────
@@ -57,6 +61,18 @@ export function ProductsModule() {
   const [falabellaTarget, setFalabellaTarget] = useState<Product | null>(null);
   const [ripleyTarget, setRipleyTarget] = useState<Product | null>(null);
   const [descuentoOpen, setDescuentoOpen] = useState(false);
+  // Selección para acciones en lote: por id de la fila (un grupo de variantes cuenta como una fila). Se conserva al cambiar de página.
+  const [seleccionados, setSeleccionados] = useState<Map<string, Product>>(new Map());
+  const [regenOpen, setRegenOpen] = useState(false);
+  const [loteActivo, setLoteActivo] = useState<string | null>(null);
+  const alternarSeleccion = (p: Product) =>
+    setSeleccionados((prev) => {
+      const n = new Map(prev);
+      if (n.has(p.id)) n.delete(p.id);
+      else if (n.size >= MAX_REGENERACION) toast.warning(`Máximo ${MAX_REGENERACION} productos por tanda.`);
+      else n.set(p.id, p);
+      return n;
+    });
 
   // ── Query ─────────────────────────────────────────────────────────────────
   const filters: ProductsQueryParams = {
@@ -105,6 +121,8 @@ export function ProductsModule() {
     setEstado("");
     setSearch("");
     setMarketplace("");
+    setSeleccionados(new Map());
+    setLoteActivo(null);
   }, [storeId]);
 
   // ── Delete mutation ───────────────────────────────────────────────────────
@@ -174,6 +192,38 @@ export function ProductsModule() {
 
       <ProductsSummaryBar summary={summaryResult?.data} value={estado} onChange={handleEstadoChange} />
 
+      {/* Selección para generar con IA varios productos a la vez */}
+      {can("productos.editar") && products.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <Checkbox
+              checked={products.every((p) => seleccionados.has(p.id))}
+              onCheckedChange={(v) =>
+                setSeleccionados((prev) => {
+                  const n = new Map(prev);
+                  if (v) { for (const p of products) { if (n.size < MAX_REGENERACION) n.set(p.id, p); } }
+                  else for (const p of products) n.delete(p.id);
+                  return n;
+                })
+              }
+              aria-label="Seleccionar los productos de esta página"
+            />
+            <span className="text-muted-foreground">Seleccionar esta página</span>
+          </label>
+          {(seleccionados.size > 0 || loteActivo) && (
+            <>
+              <span className="text-muted-foreground">{seleccionados.size} seleccionado(s) (máx. {MAX_REGENERACION})</span>
+              <Button size="sm" className="gradient-primary" onClick={() => setRegenOpen(true)}>
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" /> {loteActivo ? "Ver avance de la IA" : `Generar con IA (${seleccionados.size})`}
+              </Button>
+              {seleccionados.size > 0 && (
+                <Button size="sm" variant="ghost" onClick={() => setSeleccionados(new Map())}><X className="w-3.5 h-3.5 mr-1" /> Quitar selección</Button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {/* Table */}
       <ProductsTable
         products={products}
@@ -181,6 +231,7 @@ export function ProductsModule() {
         overviewLoading={overviewLoading}
         isLoading={isLoading}
         isError={isError}
+        seleccion={can("productos.editar") ? { ids: new Set(seleccionados.keys()), alternar: alternarSeleccion } : undefined}
         onEdit={openEdit}
         onDelete={(p) => setDeleteTarget(p)}
         onRegenerate={(p) => setRegenTarget(p)}
@@ -204,6 +255,15 @@ export function ProductsModule() {
       )}
 
       <NewProductDialog open={newOpen} onClose={() => setNewOpen(false)} />
+
+      <RegeneracionMasivaDialog
+        open={regenOpen}
+        onOpenChange={setRegenOpen}
+        productIds={[...seleccionados.keys()]}
+        loteInicialId={loteActivo}
+        onLote={setLoteActivo}
+        onFinished={() => setSeleccionados(new Map())}
+      />
 
       {/* Descuento general: todos los productos (y variantes) de la lista que se ve ahora */}
       <DescuentoGeneralDialog

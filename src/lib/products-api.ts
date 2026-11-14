@@ -227,7 +227,36 @@ function buildQueryString(params: ProductsQueryParams): string {
 // Products API
 // ─────────────────────────────────────────────
 
+export type EstadoDeRegeneracion = 'en_cola' | 'generando' | 'listo' | 'sin_cambios' | 'error';
+
+export interface ItemDeRegeneracion {
+  clave: string;
+  productId: string;
+  grupoId: string | null;
+  sku: string;
+  etiqueta: string;
+  variantes: number;
+  estado: EstadoDeRegeneracion;
+  mensaje: string | null;
+}
+
+export interface LoteDeRegeneracion {
+  id: string;
+  total: number;
+  terminados: number;
+  terminado: boolean;
+  items: ItemDeRegeneracion[];
+}
+
 export const productsApi = {
+  /** Regenerar con IA varios productos seleccionados (solo lo vacío); corre en segundo plano y devuelve el lote con cada producto «en cola» */
+  regenerateMany: (dto: { productIds: string[]; tone?: string }) =>
+    apiRequest<LoteDeRegeneracion>('/products/ai-batch', { method: 'POST', body: JSON.stringify(dto) }),
+
+  /** Avance, producto por producto, de una regeneración con IA por lotes */
+  regenerationStatus: (batchId: string) =>
+    apiRequest<LoteDeRegeneracion>(`/products/ai-batch/${batchId}`, { method: 'GET' }),
+
   /** Listar productos con filtros y paginación */
   findAll: (params: ProductsQueryParams = {}) =>
     apiRequest<PaginatedProducts>(`/products${buildQueryString(params)}`, {

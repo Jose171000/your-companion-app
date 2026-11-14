@@ -24,7 +24,7 @@ export interface ResultadoEdicionMasiva {
   columnas: string[];
   noEncontrados: string[];
   errores: { sku: string; mensaje: string }[];
-  cambios: { sku: string; nombre: string; cambios: { campo: 'nombre' | 'precio' | 'stock' | 'descripcion'; antes: string | number | null; despues: string | number }[] }[];
+  cambios: { sku: string; nombre: string; cambios: { campo: 'nombre' | 'precio' | 'stock' | 'descripcion' | 'descuento'; antes: string | number | null; despues: string | number }[] }[];
   cambiosOmitidos: number;
   actualizados?: number;
   enRevision?: number;

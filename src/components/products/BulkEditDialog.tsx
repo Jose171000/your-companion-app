@@ -6,9 +6,13 @@ import { bulkUploadApi, type ResultadoEdicionMasiva } from "@/lib/bulk-upload-ap
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-const ETIQUETA = { nombre: "Nombre", precio: "Precio", stock: "Stock", descripcion: "Descripción" } as const;
+const ETIQUETA = { nombre: "Nombre", precio: "Precio", stock: "Stock", descripcion: "Descripción", descuento: "Descuento" } as const;
+// El descuento «antes» es un precio (o nada); el «después» ya viene escrito («80.00 (20% menos) del … al …» o «quitar»).
 const mostrar = (campo: keyof typeof ETIQUETA, v: string | number | null) =>
-  v === null || v === "" ? "—" : campo === "precio" ? `S/ ${Number(v).toLocaleString("es-PE", { minimumFractionDigits: 2 })}` : String(v);
+  v === null || v === "" ? "—"
+    : campo === "precio" || (campo === "descuento" && typeof v === "number") ? `S/ ${Number(v).toLocaleString("es-PE", { minimumFractionDigits: 2 })}`
+    : campo === "descuento" && v !== "quitar" ? `S/ ${v}`
+    : String(v);
 
 interface Props {
   open: boolean;
@@ -57,7 +61,7 @@ export function BulkEditDialog({ open, onOpenChange }: Props) {
       <DialogContent className="sm:max-w-[760px] max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edición masiva de productos</DialogTitle>
-          <DialogDescription>Cambia nombre, precio y stock de muchos productos a la vez con un Excel. Antes de aplicar ves qué cambiaría en cada uno.</DialogDescription>
+          <DialogDescription>Cambia nombre, precio, stock y descuentos de muchos productos a la vez con un Excel. Antes de aplicar ves qué cambiaría en cada uno.</DialogDescription>
         </DialogHeader>
 
         {final ? (
@@ -78,7 +82,7 @@ export function BulkEditDialog({ open, onOpenChange }: Props) {
             <div className="rounded-lg border border-border p-3 flex items-center justify-between gap-3">
               <div className="text-sm">
                 <p className="font-medium">1. Descarga tus productos</p>
-                <p className="text-xs text-muted-foreground">Un Excel con SKU, nombre, precio y stock actuales. Cambia lo que quieras (no el SKU) y guárdalo.</p>
+                <p className="text-xs text-muted-foreground">Un Excel con SKU, nombre, precio y stock actuales, y columnas para el descuento (Descuento %, Precio con descuento, Descuento desde, Descuento hasta y Quitar descuento). El descuento va a todos los canales y siempre necesita «Descuento hasta». Cambia lo que quieras (no el SKU) y guárdalo.</p>
               </div>
               <Button variant="outline" size="sm" onClick={bajarPlantilla} disabled={cargando === "plantilla"} className="shrink-0">
                 {cargando === "plantilla" ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />} Descargar Excel

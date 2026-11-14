@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronRight, ImageOff } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Product, ProductOverview, productsApi } from "@/lib/products-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,9 +21,26 @@ export interface RowHandlers {
   onSheet: (product: Product) => void;
 }
 
+/** Selección de productos de la lista (para acciones en lote): cada fila de producto o de grupo cuenta como uno. */
+export interface Seleccion {
+  ids: Set<string>;
+  alternar: (product: Product) => void;
+}
+
 interface CommonProps extends RowHandlers {
   overview?: Record<string, ProductOverview>;
   overviewLoading?: boolean;
+  seleccion?: Seleccion;
+}
+
+function Casilla({ product, seleccion }: { product: Product; seleccion?: Seleccion }) {
+  if (!seleccion) return null;
+  const marcado = seleccion.ids.has(product.id);
+  return (
+    <span onClick={(e) => e.stopPropagation()} className="shrink-0 flex items-center">
+      <Checkbox checked={marcado} onCheckedChange={() => seleccion.alternar(product)} aria-label={`Seleccionar ${product.group?.name ?? product.name}`} />
+    </span>
+  );
 }
 
 const etiquetaDeVariante = (p: Product) => (p.variantValues ? Object.values(p.variantValues).join(" / ") : p.name);
@@ -62,13 +80,14 @@ function GroupActions({ product, ...handlers }: RowHandlers & { product: Product
 }
 
 /** Fila de un producto simple, o de una variante dentro de su grupo desplegado. */
-export function ProductRow({ product, overview, overviewLoading, variant, ...handlers }: CommonProps & { product: Product; variant?: boolean }) {
+export function ProductRow({ product, overview, overviewLoading, variant, seleccion, ...handlers }: CommonProps & { product: Product; variant?: boolean }) {
   const ov = overview?.[product.id];
   return (
     <tr className={cn("hover:bg-secondary/20 transition-colors group", variant && "bg-secondary/10")}>
       <td className={cn("px-4 py-3", variant && "pl-12")}>
         <div className="flex items-center gap-3">
           {variant && <span className="w-px self-stretch bg-border -ml-4 mr-1" aria-hidden />}
+          {!variant && <Casilla product={product} seleccion={seleccion} />}
           <Thumb product={product} />
           <span className="font-medium text-sm truncate max-w-[200px]">{variant ? etiquetaDeVariante(product) : product.name}</span>
         </div>
@@ -96,7 +115,7 @@ function usarVariantes(groupId: string, abierto: boolean) {
 }
 
 /** Un producto con variantes: una fila con el resumen y, al desplegar, una fila por variante. */
-export function GroupRows({ product, overview, overviewLoading, ...handlers }: CommonProps & { product: Product }) {
+export function GroupRows({ product, overview, overviewLoading, seleccion, ...handlers }: CommonProps & { product: Product }) {
   const [abierto, setAbierto] = useState(false);
   const grupo = product.group!;
   const resumen = product.groupSummary!;
@@ -112,6 +131,7 @@ export function GroupRows({ product, overview, overviewLoading, ...handlers }: C
       <tr className="hover:bg-secondary/20 transition-colors group cursor-pointer" onClick={() => setAbierto((a) => !a)}>
         <td className="px-4 py-3">
           <div className="flex items-center gap-3">
+            <Casilla product={product} seleccion={seleccion} />
             <button type="button" className="text-muted-foreground hover:text-foreground" aria-label={abierto ? "Ocultar variantes" : "Ver variantes"} aria-expanded={abierto}>
               {abierto ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </button>
@@ -144,7 +164,7 @@ export function GroupRows({ product, overview, overviewLoading, ...handlers }: C
 }
 
 /** Lo mismo en el móvil: tarjeta del grupo y, al tocarla, una tarjeta por variante. */
-export function GroupCard({ product, overview, overviewLoading, ...handlers }: CommonProps & { product: Product }) {
+export function GroupCard({ product, overview, overviewLoading, seleccion, ...handlers }: CommonProps & { product: Product }) {
   const [abierto, setAbierto] = useState(false);
   const grupo = product.group!;
   const resumen = product.groupSummary!;
@@ -155,6 +175,7 @@ export function GroupCard({ product, overview, overviewLoading, ...handlers }: C
   return (
     <div>
       <button type="button" onClick={() => setAbierto((a) => !a)} className="w-full p-4 flex gap-3 text-left hover:bg-secondary/20" aria-expanded={abierto}>
+        <Casilla product={product} seleccion={seleccion} />
         <Thumb product={product} />
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex items-center gap-1">
