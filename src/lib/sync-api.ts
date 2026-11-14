@@ -514,6 +514,14 @@ export interface YavendioPedidosResultado {
   lineasSinVincular: { pedido: string; producto: string; variantId: string | null }[];
 }
 
+export interface ResultadoDescuentoMasivo {
+  total: number;
+  aplicados?: number;
+  quitados?: number;
+  fallidos: number;
+  resultados: { productId: string; sku?: string; ok: boolean; salePrice?: number; porcentaje?: number; message: string }[];
+}
+
 export const syncApi = {
   /** Qué hay en Yavendió y con qué producto de Synkro parece corresponder cada variante. Solo lee. */
   yavendioPreviewProducts: (connectionId?: string) =>
@@ -844,6 +852,14 @@ export const syncApi = {
       method: 'PATCH',
       body: JSON.stringify(dto),
     }),
+
+  /** El mismo descuento (en soles o en porcentaje, con fecha de fin obligatoria) para varios productos y todos sus canales */
+  applyDiscount: (dto: { productIds: string[]; modo: 'precio' | 'porcentaje'; valor: number; desde?: string; hasta: string }) =>
+    apiRequest<ResultadoDescuentoMasivo>('/sync/discounts/apply', { method: 'POST', body: JSON.stringify(dto) }),
+
+  /** Quita el descuento general de varios productos */
+  removeDiscount: (productIds: string[]) =>
+    apiRequest<ResultadoDescuentoMasivo>('/sync/discounts/remove', { method: 'POST', body: JSON.stringify({ productIds }) }),
 
   /** Precio con descuento de la tienda web; null lo quita. No pasa por revisión. */
   setWebPrice: (productId: string, webPrice: number | null) =>

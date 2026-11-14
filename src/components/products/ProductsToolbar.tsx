@@ -1,7 +1,7 @@
 import { useCuentasPorCanal } from "@/components/marketplaces/AccountChooser";
 import { useEffect, useState } from "react";
 import { useStores } from "@/contexts/StoreContext";
-import { Search, Plus, Download, FileSpreadsheet } from "lucide-react";
+import { Search, Plus, Download, FileSpreadsheet, Tag } from "lucide-react";
 import { BulkEditDialog } from "./BulkEditDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,8 @@ interface ProductsToolbarProps {
   onInStockChange: (v: boolean) => void;
   onNewProduct: () => void;
   onExport: (format: "csv" | "xlsx" | "json") => void;
+  /** Abre el descuento general para los productos que se ven en la lista */
+  onDescuento?: () => void;
 }
 
 /** Canales que tiene la tienda conectados o con publicaciones, más el que está elegido (para poder quitarlo). */
@@ -62,6 +64,7 @@ export function ProductsToolbar({
   onInStockChange,
   onNewProduct,
   onExport,
+  onDescuento,
 }: ProductsToolbarProps) {
   const [localSearch, setLocalSearch] = useState(search);
   const [edicionMasiva, setEdicionMasiva] = useState(false);
@@ -153,6 +156,13 @@ export function ProductsToolbar({
           <Button variant="outline" className="flex-1 lg:flex-none font-semibold" onClick={() => setEdicionMasiva(true)}>
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Edición masiva
+          </Button>
+        )}
+
+        {onDescuento && can("inventario.editar") && (
+          <Button variant="outline" className="flex-1 lg:flex-none font-semibold" onClick={onDescuento}>
+            <Tag className="w-4 h-4 mr-2" />
+            Descuento
           </Button>
         )}
 

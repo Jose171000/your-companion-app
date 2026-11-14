@@ -15,6 +15,7 @@ import { PublishProductDialog } from "./PublishProductDialog";
 import { ProductSheetDialog } from "./ProductSheetDialog";
 import { PrepareFalabellaDialog } from "./PrepareFalabellaDialog";
 import { PrepareRipleyDialog } from "./PrepareRipleyDialog";
+import { DescuentoGeneralDialog } from "@/components/marketplaces/DescuentoGeneralDialog";
 import { toast } from "sonner";
 
 const TAMANOS_DE_PAGINA = [10, 25, 50, 100];
@@ -55,6 +56,7 @@ export function ProductsModule() {
   });
   const [falabellaTarget, setFalabellaTarget] = useState<Product | null>(null);
   const [ripleyTarget, setRipleyTarget] = useState<Product | null>(null);
+  const [descuentoOpen, setDescuentoOpen] = useState(false);
 
   // ── Query ─────────────────────────────────────────────────────────────────
   const filters: ProductsQueryParams = {
@@ -83,6 +85,8 @@ export function ProductsModule() {
   // Lo que no viene en la lista: categoría real, estado de cada canal y qué falta (una consulta por página).
   // Un grupo de variantes es una fila, pero su estado se calcula con todas sus variantes.
   const ids = [...new Set(products.flatMap((p) => [p.id, ...(p.groupSummary?.variantIds ?? [])]))];
+  // Para el descuento: un grupo cuenta con todas sus variantes (cada una es un producto con su precio).
+  const idsParaDescuento = [...new Set(products.flatMap((p) => (p.groupSummary?.variantIds?.length ? p.groupSummary.variantIds : [p.id])))];
   const { data: overviewResult, isLoading: overviewLoading } = useQuery({
     queryKey: ["products-overview", storeId, ids],
     queryFn: () => productsApi.overview(ids),
@@ -165,6 +169,7 @@ export function ProductsModule() {
         onInStockChange={handleInStockChange}
         onNewProduct={openCreate}
         onExport={handleExport}
+        onDescuento={products.length > 0 ? () => setDescuentoOpen(true) : undefined}
       />
 
       <ProductsSummaryBar summary={summaryResult?.data} value={estado} onChange={handleEstadoChange} />
@@ -199,6 +204,15 @@ export function ProductsModule() {
       )}
 
       <NewProductDialog open={newOpen} onClose={() => setNewOpen(false)} />
+
+      {/* Descuento general: todos los productos (y variantes) de la lista que se ve ahora */}
+      <DescuentoGeneralDialog
+        open={descuentoOpen}
+        onOpenChange={setDescuentoOpen}
+        productIds={idsParaDescuento}
+        resumen={`${products.length} producto(s) de esta página${idsParaDescuento.length !== products.length ? ` (${idsParaDescuento.length} con sus variantes)` : ""}${search ? ` · búsqueda «${search}»` : ""}`}
+        precioEjemplo={products.length === 1 ? Number(products[0].price) || null : null}
+      />
 
       {/* Edit dialog */}
       <ProductFormDialog

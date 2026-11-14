@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { UserListing, syncApi } from "@/lib/sync-api";
 import { ChannelPromoBlock } from "./ChannelPromoBlock";
+import { DescuentoGeneralDialog } from "./DescuentoGeneralDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,6 +48,7 @@ export function EditInventoryDialog({ product, reviewMode, modo, onClose }: Prop
   const [salePrice, setSalePrice] = useState("");
   const [saleStart, setSaleStart] = useState("");
   const [saleEnd, setSaleEnd] = useState("");
+  const [descuentoAbierto, setDescuentoAbierto] = useState(false);
 
   useEffect(() => {
     if (product) {
@@ -174,7 +176,12 @@ export function EditInventoryDialog({ product, reviewMode, modo, onClose }: Prop
             </div>
 
             <div className="space-y-2 rounded-lg border border-border p-3">
-              <Label htmlFor="inv-sale">Descuento general del producto (Falabella)</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="inv-sale">Descuento general del producto (todos los canales)</Label>
+                <Button type="button" size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => setDescuentoAbierto(true)}>
+                  En soles o %…
+                </Button>
+              </div>
               <Input
                 id="inv-sale"
                 type="number"
@@ -198,8 +205,8 @@ export function EditInventoryDialog({ product, reviewMode, modo, onClose }: Prop
                 <p className="text-[11px] text-red-400">El descuento debe ser menor que el precio ({precioBase.toFixed(2)}) y la fecha final no puede ser anterior a la inicial.</p>
               ) : (
                 <p className="text-[11px] text-muted-foreground">
-                  Es el precio con descuento (no un porcentaje). Se envía a Falabella como precio especial, con sus fechas, salvo en las cuentas con un descuento propio (abajo).
-                  {reviewMode ? " Queda pendiente hasta que lo apruebes." : ""} Para quitar un descuento ya enviado, hazlo en el Seller Center.
+                  Aquí pones el precio con descuento en soles; para ponerlo en porcentaje y con fecha de fin obligatoria usa «En soles o %». Se envía a Falabella, Mercado Libre, WooCommerce y Ripley, salvo en las cuentas con un descuento propio (abajo).
+                  {reviewMode ? " Queda pendiente hasta que lo apruebes." : ""} Para quitar un descuento ya enviado a Falabella, hazlo en el Seller Center.
                 </p>
               )}
             </div>
@@ -253,6 +260,15 @@ export function EditInventoryDialog({ product, reviewMode, modo, onClose }: Prop
           </Button>
         </DialogFooter>
       </DialogContent>
+      {product && (
+        <DescuentoGeneralDialog
+          open={descuentoAbierto}
+          onOpenChange={(abierto) => { setDescuentoAbierto(abierto); if (!abierto) onClose(); }}
+          productIds={[product.productId]}
+          resumen={`${product.name} · ${product.sku}`}
+          precioEjemplo={product.price}
+        />
+      )}
     </Dialog>
   );
 }
