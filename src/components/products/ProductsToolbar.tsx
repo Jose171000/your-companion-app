@@ -85,9 +85,9 @@ export function ProductsToolbar({
   }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center justify-between">
+    <div className="flex flex-col 2xl:flex-row gap-3 items-start 2xl:items-center justify-between">
       {/* ── Filters ─────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto flex-1 min-w-0">
+      <div className="flex flex-col sm:flex-row gap-3 w-full 2xl:w-auto flex-1 min-w-0">
         {/* Search */}
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
@@ -135,11 +135,11 @@ export function ProductsToolbar({
       </div>
 
       {/* ── Export & New product buttons ───────────────────── */}
-      <div className="flex flex-wrap w-full lg:w-auto gap-2 lg:shrink-0 min-w-0">
+      <div className="flex flex-wrap w-full 2xl:w-auto gap-2 2xl:shrink-0 min-w-0">
         {can("productos.descargar") && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="flex-1 lg:flex-none font-semibold">
+              <Button variant="outline" className="flex-1 2xl:flex-none font-semibold">
                 <Download className="w-4 h-4 mr-2" />
                 Exportar
               </Button>
@@ -153,14 +153,14 @@ export function ProductsToolbar({
         )}
 
         {can("productos.editar") && (
-          <Button variant="outline" className="flex-1 lg:flex-none font-semibold" onClick={() => setEdicionMasiva(true)}>
+          <Button variant="outline" className="flex-1 2xl:flex-none font-semibold" onClick={() => setEdicionMasiva(true)}>
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Edición masiva
           </Button>
         )}
 
         {onDescuento && can("inventario.editar") && (
-          <Button variant="outline" className="flex-1 lg:flex-none font-semibold" onClick={onDescuento}>
+          <Button variant="outline" className="flex-1 2xl:flex-none font-semibold" onClick={onDescuento}>
             <Tag className="w-4 h-4 mr-2" />
             Descuento
           </Button>
@@ -170,7 +170,7 @@ export function ProductsToolbar({
           <Button
             id="products-new-btn"
             onClick={onNewProduct}
-            className="flex-1 lg:flex-none gradient-primary glow-primary font-semibold"
+            className="flex-1 2xl:flex-none gradient-primary glow-primary font-semibold"
           >
             <Plus className="w-4 h-4 mr-2" />
             Nuevo Producto

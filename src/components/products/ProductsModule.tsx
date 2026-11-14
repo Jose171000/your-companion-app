@@ -102,7 +102,12 @@ export function ProductsModule() {
   // Un grupo de variantes es una fila, pero su estado se calcula con todas sus variantes.
   const ids = [...new Set(products.flatMap((p) => [p.id, ...(p.groupSummary?.variantIds ?? [])]))];
   // Para el descuento: un grupo cuenta con todas sus variantes (cada una es un producto con su precio).
-  const idsParaDescuento = [...new Set(products.flatMap((p) => (p.groupSummary?.variantIds?.length ? p.groupSummary.variantIds : [p.id])))];
+  // El descuento va a lo seleccionado; si no hay selección, a lo que se ve en la lista (con su búsqueda o filtro).
+  const filasDelDescuento = seleccionados.size > 0 ? [...seleccionados.values()] : products;
+  const idsDelDescuento = [...new Set(filasDelDescuento.flatMap((p) => (p.groupSummary?.variantIds?.length ? p.groupSummary.variantIds : [p.id])))];
+  const resumenDelDescuento = seleccionados.size > 0
+    ? `${seleccionados.size} producto(s) seleccionado(s)${idsDelDescuento.length !== seleccionados.size ? ` (${idsDelDescuento.length} con sus variantes)` : ""}`
+    : `Ningún producto seleccionado: se aplicará a los ${products.length} de esta página${idsDelDescuento.length !== products.length ? ` (${idsDelDescuento.length} con sus variantes)` : ""}${search ? ` · búsqueda «${search}»` : ""}`;
   const { data: overviewResult, isLoading: overviewLoading } = useQuery({
     queryKey: ["products-overview", storeId, ids],
     queryFn: () => productsApi.overview(ids),
@@ -265,13 +270,13 @@ export function ProductsModule() {
         onFinished={() => setSeleccionados(new Map())}
       />
 
-      {/* Descuento general: todos los productos (y variantes) de la lista que se ve ahora */}
+      {/* Descuento general: los productos seleccionados; sin selección, los de la lista que se ve ahora */}
       <DescuentoGeneralDialog
         open={descuentoOpen}
         onOpenChange={setDescuentoOpen}
-        productIds={idsParaDescuento}
-        resumen={`${products.length} producto(s) de esta página${idsParaDescuento.length !== products.length ? ` (${idsParaDescuento.length} con sus variantes)` : ""}${search ? ` · búsqueda «${search}»` : ""}`}
-        precioEjemplo={products.length === 1 ? Number(products[0].price) || null : null}
+        productIds={idsDelDescuento}
+        resumen={resumenDelDescuento}
+        precioEjemplo={filasDelDescuento.length === 1 ? Number(filasDelDescuento[0].price) || null : null}
       />
 
       {/* Edit dialog */}
