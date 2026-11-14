@@ -59,9 +59,9 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
   }, [selectedMarketplaces, selectedCategory, setDirty, compact]);
   /** Prepara cada canal (categoría, marca, medidas, atributos, descripción HTML) y publica el producto. */
   const lanzar = async (productId: string, opciones: { grupo?: boolean; meliCategoryId?: string; soloPreparar?: boolean } = {}) => {
-    const canales = selectedMarketplaces.filter((m) => ["mercadolibre", "falabella"].includes(m));
+    const canales = selectedMarketplaces.filter((m) => ["mercadolibre", "falabella", "woocommerce"].includes(m));
     if (!canales.length) {
-      toast.info("WooCommerce, Shopify y otros canales todavía no se publican automáticamente.");
+      toast.info("Shopify y otros canales todavía no se publican automáticamente.");
       return;
     }
     setLaunching(true);

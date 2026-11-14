@@ -8,7 +8,7 @@ import { channelName } from "./format";
 export type CuentasPorCanal = Record<string, string[]>;
 
 /** Canales que se publican desde Synkro. */
-const PUBLICABLES = ["mercadolibre", "falabella"];
+const PUBLICABLES = ["mercadolibre", "falabella", "woocommerce"];
 
 const nombreDeCuenta = (c: MarketplaceConnection) => c.label || c.externalNickname || c.externalUserId || "Cuenta";
 

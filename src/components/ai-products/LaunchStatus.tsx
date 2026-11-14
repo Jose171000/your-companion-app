@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, ExternalLink, Loader2, XCircle } from "lucide-react";
 import { syncApi } from "@/lib/sync-api";
 
-const NOMBRE: Record<string, string> = { falabella: "Falabella", mercadolibre: "Mercado Libre" };
+const NOMBRE: Record<string, string> = { falabella: "Falabella", mercadolibre: "Mercado Libre", woocommerce: "WooCommerce" };
 
 /**
  * El estado real de la publicación en cada canal. «Publicando» solo significa que el envío salió: el canal
@@ -34,6 +34,18 @@ export function LaunchStatus({ productId, etiqueta }: { productId: string; /** E
                 {l.permalink && (
                   <a href={l.permalink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">
                     Ver publicación <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </span>
+            </p>
+          ) : l.syncStatus === "paused" && l.marketplace === "woocommerce" ? (
+            <p className="text-green-500 flex items-start gap-1.5">
+              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                WooCommerce: creado como borrador. Revísalo en WordPress y publícalo allí.{" "}
+                {l.permalink && (
+                  <a href={l.permalink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline">
+                    Abrir en WordPress <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
               </span>
