@@ -22,7 +22,7 @@ import { AlertCircle, Check, ExternalLink, Loader2, Rocket, Sparkles } from "luc
 import { VolverALaFicha } from "./VolverALaFicha";
 import { toast } from "sonner";
 
-// Canales donde Synkro publica por sí mismo. WooCommerce recibe el producto como borrador: se revisa y se publica en WordPress.
+// Canales donde Synkro publica por sí mismo. WooCommerce lo crea oculto y lo publica al terminar de cargar variaciones y fotos.
 const PUBLISHABLE = [
   { id: "mercadolibre", name: "MercadoLibre", logo: "/mercadolibre.png" },
   { id: "falabella",    name: "Falabella",    logo: "/Falabella.png" },

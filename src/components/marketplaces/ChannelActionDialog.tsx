@@ -36,6 +36,13 @@ function efecto(marketplace: string, action: ChannelActionType): string {
   if (marketplace === "ripley") {
     return action === "pause" ? "la oferta queda con stock 0, inactiva" : action === "resume" ? "vuelve a mostrar el stock real" : "se quita la oferta de Ripley (el producto sigue en su catálogo y se puede volver a ofertar)";
   }
+  if (marketplace === "woocommerce") {
+    return action === "pause"
+      ? "se oculta de la tienda (queda como borrador en WordPress; si pausas solo algunas variantes, esas variaciones se ocultan)"
+      : action === "resume"
+        ? "vuelve a publicarse en la tienda y se ponen al día el stock y el precio"
+        : "va a la papelera de WordPress (se puede restaurar desde allí); si quitas solo algunas variantes, esas variaciones se eliminan";
+  }
   return "este canal todavía no se controla desde Synkro";
 }
 

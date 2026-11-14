@@ -476,7 +476,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
           )}
           {renderLaunch(grupoCreado.variants.map((v) => ({ id: v.id, etiqueta: Object.values(v.variantValues ?? {}).join(" · ") })), grupoCreado.variants[0]?.id)}
           <p className="text-[11px] text-muted-foreground">
-            Al confirmar, se publican todas las variantes juntas en los canales que elegiste. Mercado Libre las agrupa en una familia; Falabella, bajo un mismo código si la categoría admite variantes y, si no, como fichas sueltas con la variante en el nombre. WooCommerce las recibe como un solo producto variable en borrador, para revisarlo y publicarlo en WordPress.
+            Al confirmar, se publican todas las variantes juntas en los canales que elegiste. Mercado Libre las agrupa en una familia; Falabella, bajo un mismo código si la categoría admite variantes y, si no, como fichas sueltas con la variante en el nombre. WooCommerce las publica como un solo producto variable, con la categoría elegida entre las de tu tienda.
           </p>
           <Button variant="outline" onClick={() => setGrupoCreado(null)}>Crear otro producto</Button>
         </Card>
