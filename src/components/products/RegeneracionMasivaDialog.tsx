@@ -95,7 +95,7 @@ export function RegeneracionMasivaDialog({ open, onOpenChange, productIds, onFin
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-xl max-h-[92vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Generar con IA los productos seleccionados</DialogTitle>
           <DialogDescription>
@@ -104,7 +104,7 @@ export function RegeneracionMasivaDialog({ open, onOpenChange, productIds, onFin
         </DialogHeader>
 
         {!lote ? (
-          <div className="space-y-3 text-sm">
+          <div className="space-y-3 text-sm min-w-0">
             <p><b>{productIds.length}</b> producto(s) seleccionados. Los productos con variantes se generan una sola vez para todo el grupo.</p>
             {demasiados && (
               <p className="text-red-400 text-xs">El máximo por tanda es {MAX_REGENERACION} productos (un grupo cuenta como uno). Quita {productIds.length - MAX_REGENERACION} de la selección.</p>
@@ -118,7 +118,7 @@ export function RegeneracionMasivaDialog({ open, onOpenChange, productIds, onFin
             </DialogFooter>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3 min-w-0">
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{lote.terminados} de {lote.total} terminados</span>
@@ -127,14 +127,14 @@ export function RegeneracionMasivaDialog({ open, onOpenChange, productIds, onFin
               <Progress value={progreso} />
             </div>
 
-            <ul className="rounded-lg border border-border divide-y divide-border/50 max-h-80 overflow-y-auto">
+            <ul className="rounded-lg border border-border divide-y divide-border/50 max-h-80 overflow-y-auto overflow-x-hidden">
               {lote.items.map((i) => {
                 const e = ESTADO[i.estado];
                 return (
-                  <li key={i.clave} className="px-3 py-2 text-sm flex gap-3">
+                  <li key={i.clave} className="px-3 py-2 text-sm flex gap-3 min-w-0">
                     <span className={cn("mt-0.5 shrink-0", e.clase)}>{e.icono}</span>
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate" title={i.etiqueta}>
+                      <p className="font-medium break-words" title={i.etiqueta}>
                         {i.etiqueta} <code className="text-[10px] text-muted-foreground font-mono">{i.sku}</code>
                         {i.grupoId && <span className="ml-1 text-[10px] text-muted-foreground">· grupo de {i.variantes}</span>}
                       </p>

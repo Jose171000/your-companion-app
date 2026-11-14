@@ -95,7 +95,7 @@ export function DescuentoGeneralDialog({ open, onOpenChange, productIds, resumen
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[92vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Tag className="w-4 h-4" /> Descuento para todos los canales</DialogTitle>
           <DialogDescription className="break-words">
