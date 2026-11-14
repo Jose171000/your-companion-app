@@ -6,6 +6,7 @@ import { FalabellaBrandField } from "./FalabellaBrandField";
 import { PrepareFalabellaDialog } from "./PrepareFalabellaDialog";
 import { AccountChooser, CuentasPorCanal, useCuentasPorCanal } from "@/components/marketplaces/AccountChooser";
 import { VariantCompatNotice } from "./VariantCompatNotice";
+import { WooCategoryField } from "./WooCategoryField";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,10 +22,11 @@ import { AlertCircle, Check, ExternalLink, Loader2, Rocket, Sparkles } from "luc
 import { VolverALaFicha } from "./VolverALaFicha";
 import { toast } from "sonner";
 
-// Solo Mercado Libre tiene sincronización real por ahora
+// Canales donde Synkro publica por sí mismo. WooCommerce recibe el producto como borrador: se revisa y se publica en WordPress.
 const PUBLISHABLE = [
   { id: "mercadolibre", name: "MercadoLibre", logo: "/mercadolibre.png" },
   { id: "falabella",    name: "Falabella",    logo: "/Falabella.png" },
+  { id: "woocommerce",  name: "WooCommerce",  logo: "/woocomerce.png" },
 ];
 
 interface PublishProductDialogProps {
@@ -209,6 +211,10 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     );
 
+  // Con varias tiendas WooCommerce, la categoría se elige para la primera marcada; con una sola, no hace falta indicarla.
+  const wooActivas = cuentasDelCanal.woocommerce ?? [];
+  const wooCuenta = wooActivas.length > 1 ? cuentas.woocommerce?.[0] : wooActivas[0]?.id;
+
   const falabellaElegido = selected.includes("falabella");
   const falabellaPublicado = listings.find((l) => l.marketplace === "falabella")?.syncStatus === "published";
 
@@ -240,7 +246,7 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
         </DialogHeader>
 
         <div className="space-y-3">
-          {visibles.length === 0 && <p className="text-sm text-muted-foreground">Esta tienda todavía no tiene Mercado Libre ni Falabella conectados. Conéctalos en Marketplaces para publicar.</p>}
+          {visibles.length === 0 && <p className="text-sm text-muted-foreground">Esta tienda todavía no tiene Mercado Libre, Falabella ni WooCommerce conectados. Conéctalos en Marketplaces para publicar.</p>}
           {visibles.map((mp) => {
             const listing   = listings.find((l) => l.marketplace === mp.id && l.syncStatus === "published") ?? listingFor(mp.id);
             const connected = isConnected(mp.id);
@@ -283,6 +289,15 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
                     ) : listing?.syncStatus === "error" ? (
                       <p className="text-xs text-red-400 break-words line-clamp-3" title={listing.lastError}>
                         {listing.lastError || "Error al publicar"}
+                      </p>
+                    ) : mp.id === "woocommerce" && listing?.syncStatus === "paused" && !listing.pausedByUser ? (
+                      <p className="text-xs text-green-500 break-words">
+                        Creado como borrador: revísalo y publícalo en WordPress.{" "}
+                        {listing.permalink && (
+                          <a href={listing.permalink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 underline" onClick={(e) => e.stopPropagation()}>
+                            Abrir en WordPress <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
                       </p>
                     ) : listing?.syncStatus === "pending" ? (
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -333,6 +348,11 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
           )}
 
           <AccountChooser canales={selected.filter((mp) => !publicados.has(mp))} value={cuentas} onChange={setCuentas} />
+
+          {/* WooCommerce: la categoría se elige sola entre las de la tienda; aquí se ve y se puede cambiar. */}
+          {product && selected.includes("woocommerce") && !publicados.has("woocommerce") && isConnected("woocommerce") && (
+            <WooCategoryField key={`${product.id}-${wooCuenta ?? "unica"}`} productId={product.id} connectionId={wooCuenta} />
+          )}
 
           {/* Un producto con variantes: avisa, por canal, si caben en UNA publicación o se publicarán como productos separados. */}
           {product?.alGrupo && product.group?.id && (

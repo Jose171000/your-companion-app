@@ -17,7 +17,8 @@ export function CategoryCell({ overview, loading }: { overview?: ProductOverview
   if (!overview) return <span className="text-sm text-muted-foreground">{loading ? "…" : "—"}</span>;
   const { falabella, mercadolibre, internal } = overview.categories;
   const ripley = overview.categories.ripley ?? null;
-  if (!falabella && !mercadolibre && !ripley && !internal) {
+  const woocommerce = overview.categories.woocommerce ?? null;
+  if (!falabella && !mercadolibre && !ripley && !woocommerce && !internal) {
     return <span className="text-xs font-medium text-red-400">Sin categoría</span>;
   }
   return (
@@ -32,6 +33,12 @@ export function CategoryCell({ overview, loading }: { overview?: ProductOverview
         <p className="truncate" title={ripley.path ?? `Categoría ${ripley.id}`}>
           <span className="text-muted-foreground">Ripley: </span>
           {ripley.path ?? `ID ${ripley.id}`}
+        </p>
+      )}
+      {woocommerce && (
+        <p className="truncate" title={woocommerce.path ?? `Categoría ${woocommerce.id}`}>
+          <span className="text-muted-foreground">WooCommerce: </span>
+          {woocommerce.path ?? `ID ${woocommerce.id}`}
         </p>
       )}
       {mercadolibre && (

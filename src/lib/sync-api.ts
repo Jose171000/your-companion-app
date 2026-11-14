@@ -769,6 +769,22 @@ export const syncApi = {
       method: 'DELETE',
     }),
 
+  /** Categorías reales de la tienda WooCommerce (con su ruta). Synkro elige entre ellas y nunca crea una. */
+  wooCategories: (connectionId?: string) =>
+    apiRequest<{ id: number; nombre: string; ruta: string; profundidad: number; cantidad: number }[]>(
+      `/sync/woocommerce/categories${connectionId ? `?connectionId=${connectionId}` : ''}`,
+    ),
+
+  /**
+   * Categoría de WooCommerce de un producto (o su grupo). Sin opciones devuelve la ya elegida (eligiéndola sola si aún no hay);
+   * con `categoryId` fija esa; con `reelegir` vuelve a elegir sola. Si el producto ya está en WooCommerce, fijar o reelegir lo cambia allí.
+   */
+  wooCategory: (productId: string, opciones: { connectionId?: string; categoryId?: number; reelegir?: boolean } = {}) =>
+    apiRequest<{ categoria: { id: number; nombre: string; ruta: string }; origen: 'guardada' | 'texto' | 'ia' | 'manual'; motivo: string | null; actualizadosEnWoo: number }>(
+      `/sync/woocommerce/products/${productId}/category`,
+      { method: 'POST', body: JSON.stringify(opciones) },
+    ),
+
   /** Publica un producto en los marketplaces indicados (asíncrono) */
   publish: (productId: string, marketplaces: string[], connectionIds?: Record<string, string>) =>
     apiRequest<{ message: string }>(`/sync/products/${productId}/publish`, {

@@ -232,7 +232,7 @@ function CampoDeAtributo({
  */
 const TODAS = "__todas__";
 
-const CANALES_DE_PUBLICACION = ["falabella", "ripley", "mercadolibre"];
+const CANALES_DE_PUBLICACION = ["falabella", "ripley", "mercadolibre", "woocommerce"];
 
 interface AccionesDeCanal { onPublicar?: () => void; onPrepararFalabella?: () => void; onPrepararRipley?: () => void }
 
@@ -250,7 +250,9 @@ function CanalesDelProducto({ hoja, acciones, onVer, modoGrupo, variantes = 1, n
       {conectadas.length === 0 && <p className="text-sm text-muted-foreground">Esta tienda todavía no tiene canales conectados. Conéctalos en Marketplaces para publicar desde aquí.</p>}
       {conectadas.map((c) => {
         const ficha = hoja.channels.find((x) => x.connectionId === c.id);
-        const estado = ficha ? estadoDeCanal(ficha.status, ficha.pausedByUser, hoja.product.stock) : null;
+        // WooCommerce recibe el producto como borrador: «pausado» sin que lo haya pedido la persona significa que falta publicarlo en WordPress.
+        const borradorWoo = c.marketplace === "woocommerce" && ficha?.status === "paused" && !ficha.pausedByUser;
+        const estado = ficha ? (borradorWoo ? { texto: "Borrador", clase: "bg-blue-500/10 text-blue-400" } : estadoDeCanal(ficha.status, ficha.pausedByUser, hoja.product.stock)) : null;
         const publicado = ficha?.status === "published";
         const cuenta = c.label || c.externalNickname || "";
         return (
@@ -261,11 +263,11 @@ function CanalesDelProducto({ hoja, acciones, onVer, modoGrupo, variantes = 1, n
             </div>
             {estado ? <Badge className={cn("text-[10px]", estado.clase)}>{estado.texto}</Badge> : <Badge className="bg-secondary text-muted-foreground text-[10px]">Sin publicar</Badge>}
             <p className="flex-1 min-w-[160px] text-xs text-muted-foreground break-words">
-              {ficha?.lastError ? ficha.lastError : ficha ? (ficha.sent?.categoryPath ?? ficha.sent?.categoryId ?? "") : "Todavía no está en este canal."}
+              {ficha?.lastError ? ficha.lastError : c.marketplace === "woocommerce" && ficha ? `${borradorWoo ? "Creado como borrador: revísalo y publícalo en WordPress. " : ""}${ficha.sent?.categoryPath ? `Categoría: ${ficha.sent.categoryPath}` : "Sin categoría elegida"}` : ficha ? (ficha.sent?.categoryPath ?? ficha.sent?.categoryId ?? "") : "Todavía no está en este canal."}
             </p>
             <div className="flex items-center gap-1.5 flex-wrap">
               {ficha?.permalink && <a href={ficha.permalink} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline"><ExternalLink className="w-3 h-3" />Ver en el canal</a>}
-              {ficha && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => onVer(c.marketplace)}>Ver ficha</Button>}
+              {ficha && c.marketplace !== "woocommerce" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => onVer(c.marketplace)}>Ver ficha</Button>}
               {puede && c.marketplace === "falabella" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={acciones.onPrepararFalabella}>Preparar</Button>}
               {puede && c.marketplace === "ripley" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={acciones.onPrepararRipley}>{publicado ? "Revisar" : "Preparar"}</Button>}
               {puede && !publicado && c.marketplace !== "ripley" && <Button size="sm" className="h-8 text-xs" onClick={acciones.onPublicar}><Rocket className="w-3.5 h-3.5 mr-1" />Publicar</Button>}
@@ -771,7 +773,7 @@ function FichaDeProducto({
         <DialogFooter className="gap-2 sm:gap-2 flex-wrap">
           <Button variant="outline" onClick={onClose}>Cerrar</Button>
           {!modoGrupo && (
-            <Button variant="outline" onClick={() => enviarYa.mutate()} disabled={enviarYa.isPending || !hoja || hoja.channels.filter((c) => c.marketplace !== "ripley").length === 0 || cambios !== null} title={cambios ? "Guarda primero los cambios" : "Envía ya, sin esperar"}>
+            <Button variant="outline" onClick={() => enviarYa.mutate()} disabled={enviarYa.isPending || !hoja || hoja.channels.filter((c) => c.marketplace !== "ripley" && c.marketplace !== "woocommerce").length === 0 || cambios !== null} title={cambios ? "Guarda primero los cambios" : "Envía ya, sin esperar"}>
               {enviarYa.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Rocket className="w-4 h-4 mr-2" />}
               Enviar ahora a los canales
             </Button>
