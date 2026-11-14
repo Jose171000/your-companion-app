@@ -270,7 +270,7 @@ function CanalesDelProducto({ hoja, acciones, onVer, modoGrupo, variantes = 1, n
               {ficha && c.marketplace !== "woocommerce" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => onVer(c.marketplace)}>Ver ficha</Button>}
               {puede && c.marketplace === "falabella" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={acciones.onPrepararFalabella}>Preparar</Button>}
               {puede && c.marketplace === "ripley" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={acciones.onPrepararRipley}>{publicado ? "Revisar" : "Preparar"}</Button>}
-              {puede && !publicado && c.marketplace !== "ripley" && <Button size="sm" className="h-8 text-xs" onClick={acciones.onPublicar}><Rocket className="w-3.5 h-3.5 mr-1" />Publicar</Button>}
+              {puede && !publicado && c.marketplace !== "ripley" && <Button size="sm" className="h-8 text-xs" onClick={acciones.onPublicar}><Rocket className="w-3.5 h-3.5 mr-1" />{borradorWoo ? "Reenviar" : "Publicar"}</Button>}
               {puede && ficha?.linkId && (() => {
                 const puedePausar = ficha.status === "published" && !ficha.pausedByUser;
                 const puedeReanudar = ficha.status === "paused" && !!ficha.pausedByUser;
