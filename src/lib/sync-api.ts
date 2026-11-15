@@ -72,6 +72,9 @@ export interface UserListing extends ListingInfo {
   webPrice?: number | string | null;
   /** Promoción del producto en los marketplaces (precio con descuento y fechas AAAA-MM-DD) */
   promo?: { price: number | string | null; start: string | null; end: string | null } | null;
+  /** Descuento fijado solo para esta cuenta (manda sobre el general) y su precio propio, si los tiene */
+  ownPromo?: { price: number | string | null; start: string | null; end: string | null } | null;
+  ownPrice?: number | string | null;
   productId: string;
   productName: string;
   sku: string;
@@ -289,6 +292,9 @@ export interface SheetSync {
   status: string;
   price: { synkro: number | null; channel: number | null };
   stock: { synkro: number; channel: number | null };
+  /** Precio y descuento fijados solo para esta cuenta, y lo que el canal muestra con descuento */
+  ownPrice?: number | null;
+  promo?: { propio: { price: number; start: string | null; end: string | null } | null; canal: number | null };
 }
 
 export interface SheetData {

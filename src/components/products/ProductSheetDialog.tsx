@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { GroupPriceForm } from "@/components/marketplaces/GroupPriceForm";
+import { CanalDeDescuento, DescuentoDelProducto } from "@/components/marketplaces/DescuentoDelProducto";
 
 const NOMBRE_CANAL: Record<string, string> = { falabella: "Falabella", mercadolibre: "Mercado Libre", woocommerce: "WooCommerce", shopify: "Shopify", ripley: "Ripley" };
 
@@ -123,30 +124,38 @@ function PrecioDeCanal({ precio, valor, onChange }: { precio: SheetPrice; valor:
           <Label className="text-[11px] font-normal text-muted-foreground">Precio solo en este canal</Label>
           <Input type="number" min="0" step="0.01" value={valor.price} placeholder={precio.productPrice != null ? String(precio.productPrice) : ""} onChange={(e) => set("price", e.target.value)} />
         </div>
-        {precio.canSetSale && (
-          <>
-            <div className="space-y-1">
-              <Label className="text-[11px] font-normal text-muted-foreground">Precio con descuento</Label>
-              <Input type="number" min="0" step="0.01" value={valor.salePrice} placeholder={precio.productSalePrice != null ? String(precio.productSalePrice) : "Sin descuento"} onChange={(e) => set("salePrice", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] font-normal text-muted-foreground">Descuento desde</Label>
-              <Input type="date" value={valor.saleStart} onChange={(e) => set("saleStart", e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-[11px] font-normal text-muted-foreground">Descuento hasta</Label>
-              <Input type="date" value={valor.saleEnd} onChange={(e) => set("saleEnd", e.target.value)} />
-            </div>
-          </>
-        )}
       </div>
       <p className="text-[11px] text-muted-foreground">
-        {precio.canSetSale
-          ? "Déjalos vacíos para usar los del producto. Quitar un descuento ya enviado se hace desde el Seller Center de Falabella."
-          : "Déjalo vacío para usar el precio del producto. Los descuentos de Mercado Libre se manejan en su propia herramienta de promociones."}
+        Déjalo vacío para usar el precio del producto. El descuento de este canal se pone arriba, en «Descuento».
       </p>
     </div>
   );
+}
+
+/** El descuento general que tiene hoy el producto (el de los canales que no tienen uno propio). */
+function descuentoGeneralDe(hoja: SheetData): { price: number | null; start: string | null; end: string | null } | null {
+  const p = hoja.prices.find((x) => x.productSalePrice != null);
+  if (!p) return null;
+  const delProducto = p.sent.origin.promo === "producto";
+  return { price: p.productSalePrice, start: delProducto ? p.sent.saleStart : null, end: delProducto ? p.sent.saleEnd : null };
+}
+
+/** El descuento del producto: lo simple (precio o %, con fecha de fin) y, desplegable, un precio distinto por canal. */
+function DescuentoDeLaFicha({ hoja, onDone }: { hoja: SheetData; onDone: () => void }) {
+  // Todas las cuentas donde el producto está publicado (y no pausadas por la persona): en cada una se puede poner un precio con descuento propio.
+  const canales: CanalDeDescuento[] = (hoja.sync ?? [])
+    .filter((x) => ["falabella", "mercadolibre", "woocommerce", "ripley"].includes(x.marketplace) && (x.status === "published" || x.status === "paused"))
+    .map((x) => ({
+      listingId: x.listingId,
+      marketplace: x.marketplace,
+      cuenta: x.account,
+      // Ripley tiene su propia lista de precios; en los demás canales vale el precio propio de la cuenta o el del producto.
+      precioRegular: x.ownPrice ?? (x.marketplace === "ripley" ? x.price.channel : hoja.product.price),
+      mostrado: x.promo?.canal ?? null,
+      propio: x.promo?.propio ?? null,
+    }));
+  if ((hoja.sync ?? []).length === 0 && hoja.prices.length === 0) return null;
+  return <DescuentoDelProducto productIds={[hoja.product.id]} precioBase={hoja.product.price} general={descuentoGeneralDe(hoja)} canales={canales} onDone={onDone} />;
 }
 
 function EstadoDelCanal({ canal, stock }: { canal: SheetChannel; stock?: number | null }) {
@@ -647,7 +656,14 @@ function FichaDeProducto({
 
             {/* ── Precios de todas las variantes ── */}
             {modoGrupo && grupoId && (
-              <TabsContent value="precios" className="pt-4">
+              <TabsContent value="precios" className="pt-4 space-y-4">
+                <DescuentoDelProducto
+                  productIds={variantes.map((v) => v.id)}
+                  precioBase={hoja.product.price}
+                  general={descuentoGeneralDe(hoja)}
+                  alcance={`las ${variantes.length} variantes`}
+                  onDone={refrescar}
+                />
                 <GroupPriceForm groupId={grupoId} />
               </TabsContent>
             )}
@@ -655,6 +671,7 @@ function FichaDeProducto({
             {/* ── Precios por canal ── */}
             {(hoja.prices.length > 0 || (hoja.sync ?? []).length > 0) && !modoGrupo && (
               <TabsContent value="precios" className="pt-4 space-y-4">
+                <DescuentoDeLaFicha hoja={hoja} onDone={refrescar} />
                 <SincronizarCanales filas={hoja.sync ?? []} onHecho={refrescar} />
                 {hoja.prices.length > 0 && <p className="text-xs text-muted-foreground">
                   Cada canal usa el precio del producto salvo que fijes uno propio aquí. Actualizar el contenido con la IA nunca quita un descuento: se conserva el que el canal ya tiene.

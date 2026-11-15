@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { UserListing, syncApi } from "@/lib/sync-api";
-import { ChannelPromoBlock } from "./ChannelPromoBlock";
-import { DescuentoGeneralDialog } from "./DescuentoGeneralDialog";
+import { CanalDeDescuento, DescuentoDelProducto } from "./DescuentoDelProducto";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,19 +23,21 @@ export interface EditableProduct {
   stock: number;
   /** Precio con descuento de la tienda web (no va a ningún marketplace) */
   webPrice?: number | null;
-  /** Precio con descuento y fechas de vigencia en Falabella */
+  /** Descuento general del producto (precio y fechas de vigencia) */
   promo?: { price: number | null; start: string | null; end: string | null } | null;
-  /** Publicaciones del producto: de ahí salen los bloques de descuento por cuenta (Falabella y Ripley) */
+  /** Publicaciones del producto: de ahí salen los canales donde se puede poner un precio con descuento distinto */
   channels?: { listing: UserListing }[];
 }
 
 interface Props {
   product: EditableProduct | null;
   reviewMode: boolean;
-  /** «stock»: solo el stock. «precios»: precio, descuentos y precio web. Cada uno se aprueba por separado. */
+  /** «stock»: solo el stock. «precios»: precio, descuento y precio web. Cada uno se aprueba por separado. */
   modo: "stock" | "precios";
   onClose: () => void;
 }
+
+const num = (v: number | string | null | undefined) => (v === null || v === undefined || v === "" ? null : Number(v));
 
 /** Edita el stock o los precios de un producto; con el modo revisión activo el cambio queda pendiente de aprobación. */
 export function EditInventoryDialog({ product, reviewMode, modo, onClose }: Props) {
@@ -45,51 +46,38 @@ export function EditInventoryDialog({ product, reviewMode, modo, onClose }: Prop
   const [price, setPrice] = useState("");
   const [stock, setStock] = useState("");
   const [webPrice, setWebPrice] = useState("");
-  const [salePrice, setSalePrice] = useState("");
-  const [saleStart, setSaleStart] = useState("");
-  const [saleEnd, setSaleEnd] = useState("");
-  const [descuentoAbierto, setDescuentoAbierto] = useState(false);
 
   useEffect(() => {
     if (product) {
       setPrice(String(product.price));
       setStock(String(product.stock));
       setWebPrice(product.webPrice != null ? String(product.webPrice) : "");
-      setSalePrice(product.promo?.price != null ? String(product.promo.price) : "");
-      setSaleStart(product.promo?.start ?? "");
-      setSaleEnd(product.promo?.end ?? "");
     }
   }, [product]);
 
-  // Solo las cuentas de Falabella y Ripley donde el producto está publicado (y que no pausaste tú).
-  const cuentasConDescuento = (product?.channels ?? [])
+  // Las cuentas donde el producto está publicado (y que no pausaste tú): ahí se puede poner un precio con descuento propio.
+  const canalesDeDescuento: CanalDeDescuento[] = (product?.channels ?? [])
     .map((c) => c.listing)
-    .filter((l) => (l.marketplace === "falabella" || l.marketplace === "ripley") && (l.syncStatus === "published" || l.syncStatus === "paused") && !l.pausedByUser);
+    .filter((l) => ["falabella", "mercadolibre", "woocommerce", "ripley"].includes(l.marketplace) && (l.syncStatus === "published" || l.syncStatus === "paused") && !l.pausedByUser)
+    .map((l) => ({
+      listingId: l.id,
+      marketplace: l.marketplace,
+      cuenta: l.accountLabel ?? null,
+      // Ripley tiene su propia lista de precios; en los demás canales vale el precio propio de la cuenta o el del producto.
+      precioRegular: l.ownPrice != null ? num(l.ownPrice) : l.marketplace === "ripley" ? num(l.regularPrice) : product?.price ?? null,
+      mostrado: num(l.salePrice),
+      propio: l.ownPromo?.price != null ? { price: Number(l.ownPromo.price), start: l.ownPromo.start ?? null, end: l.ownPromo.end ?? null } : null,
+    }));
 
   const priceNum = Number(price);
   const stockNum = Number(stock);
-  // Cada pestaña toca solo lo suyo: en «Stock» ni el precio ni los descuentos cuentan, y al revés.
+  // Cada pestaña toca solo lo suyo: en «Stock» el precio no cuenta, y al revés.
   const priceChanged = !enStock && !!product && price !== "" && priceNum !== product.price;
   const stockChanged = enStock && !!product && stock !== "" && stockNum !== product.stock;
   // El precio web puede quedar vacío: eso lo quita.
   const webNum = webPrice === "" ? null : Number(webPrice);
   const webChanged = !enStock && !!product && webNum !== (product.webPrice != null ? Number(product.webPrice) : null);
-  // Promoción en Falabella: precio con descuento (menor que el precio) y fechas opcionales.
-  const saleNum = salePrice === "" ? null : Number(salePrice);
-  const promoChanged =
-    !enStock &&
-    !!product &&
-    (saleNum !== (product.promo?.price != null ? Number(product.promo.price) : null) ||
-      saleStart !== (product.promo?.start ?? "") ||
-      saleEnd !== (product.promo?.end ?? ""));
-  const precioBase = priceChanged ? priceNum : product?.price ?? 0;
-  // Solo se revisa el descuento si se está cambiando él o el precio: un descuento que ya estaba no debe impedir guardar otra cosa.
-  const promoInvalid =
-    saleNum !== null &&
-    (promoChanged || priceChanged) &&
-    (Number.isNaN(saleNum) || saleNum <= 0 || saleNum >= precioBase || (saleStart !== "" && saleEnd !== "" && saleEnd < saleStart));
   const invalid =
-    promoInvalid ||
     (priceChanged && (Number.isNaN(priceNum) || priceNum < 0)) ||
     (stockChanged && (!Number.isInteger(stockNum) || stockNum < 0)) ||
     (webChanged && webNum !== null && (Number.isNaN(webNum) || webNum < 0));
@@ -100,27 +88,12 @@ export function EditInventoryDialog({ product, reviewMode, modo, onClose }: Prop
       if (webChanged) {
         const web = await syncApi.setWebPrice(product!.productId, webNum);
         if (web.error) return web;
-        if (!priceChanged && !stockChanged && !promoChanged) return web;
+        if (!priceChanged && !stockChanged) return web;
       }
-      // El descuento también espera aprobación con el modo revisión (el precio web no: no va a ningún canal).
-      // Va después del precio: el descuento se valida contra el precio regular ya guardado.
-      let ultimo: Awaited<ReturnType<typeof syncApi.updateInventory>> | null = null;
-      if (priceChanged || stockChanged) {
-        ultimo = await syncApi.updateInventory(product!.productId, {
-          ...(priceChanged ? { price: priceNum } : {}),
-          ...(stockChanged ? { stock: stockNum } : {}),
-        });
-        if (ultimo.error) return ultimo;
-      }
-      if (promoChanged) {
-        const promo = await syncApi.setPromo(product!.productId, {
-          salePrice: saleNum,
-          saleStartDate: saleNum !== null && saleStart ? saleStart : null,
-          saleEndDate: saleNum !== null && saleEnd ? saleEnd : null,
-        });
-        if (promo.error || !ultimo) return promo;
-      }
-      return ultimo!;
+      return syncApi.updateInventory(product!.productId, {
+        ...(priceChanged ? { price: priceNum } : {}),
+        ...(stockChanged ? { stock: stockNum } : {}),
+      });
     },
     onSuccess: (res) => {
       if (res.error) {
@@ -137,10 +110,10 @@ export function EditInventoryDialog({ product, reviewMode, modo, onClose }: Prop
 
   return (
     <Dialog open={product !== null} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-md max-h-[92vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-md max-h-[92vh] overflow-y-auto overflow-x-hidden [&>*]:min-w-0">
         <DialogHeader>
           <DialogTitle>{enStock ? "Editar stock" : "Editar precios"}</DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="break-words">
             {product?.name} · <code className="font-mono text-xs">{product?.sku}</code>
           </DialogDescription>
         </DialogHeader>
@@ -175,52 +148,19 @@ export function EditInventoryDialog({ product, reviewMode, modo, onClose }: Prop
               />
             </div>
 
-            <div className="space-y-2 rounded-lg border border-border p-3">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="inv-sale">Descuento general del producto (todos los canales)</Label>
-                <Button type="button" size="sm" variant="outline" className="h-7 text-xs shrink-0" onClick={() => setDescuentoAbierto(true)}>
-                  En soles o %…
-                </Button>
-              </div>
-              <Input
-                id="inv-sale"
-                type="number"
-                min={0}
-                step="0.01"
-                placeholder="Sin descuento"
-                value={salePrice}
-                onChange={(e) => setSalePrice(e.target.value)}
+            {product && (
+              <DescuentoDelProducto
+                productIds={[product.productId]}
+                precioBase={priceChanged && !Number.isNaN(priceNum) ? priceNum : product.price}
+                general={product.promo}
+                canales={canalesDeDescuento}
+                onDone={onClose}
               />
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="inv-sale-start" className="text-xs">Desde (opcional)</Label>
-                  <Input id="inv-sale-start" type="date" value={saleStart} onChange={(e) => setSaleStart(e.target.value)} disabled={salePrice === ""} />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="inv-sale-end" className="text-xs">Hasta (opcional)</Label>
-                  <Input id="inv-sale-end" type="date" value={saleEnd} onChange={(e) => setSaleEnd(e.target.value)} disabled={salePrice === ""} />
-                </div>
-              </div>
-              {promoInvalid ? (
-                <p className="text-[11px] text-red-400">El descuento debe ser menor que el precio ({precioBase.toFixed(2)}) y la fecha final no puede ser anterior a la inicial.</p>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">
-                  Aquí pones el precio con descuento en soles; para ponerlo en porcentaje y con fecha de fin obligatoria usa «En soles o %». Se envía a Falabella, Mercado Libre, WooCommerce y Ripley, salvo en las cuentas con un descuento propio (abajo).
-                  {reviewMode ? " Queda pendiente hasta que lo apruebes." : ""} Para quitar un descuento ya enviado a Falabella, hazlo en el Seller Center.
-                </p>
-              )}
-            </div>
-
-            {cuentasConDescuento.length > 0 && (
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm font-semibold">Descuento por canal</p>
-                  <p className="text-[11px] text-muted-foreground">Lo que cada canal muestra hoy y lo que quieres mandarle. Cada canal tiene su propio precio de lista.</p>
-                </div>
-                {cuentasConDescuento.map((l) => (
-                  <ChannelPromoBlock key={l.id} listing={l} promoDelProducto={product?.promo} />
-                ))}
-              </div>
+            )}
+            {reviewMode && (
+              <p className="text-[11px] text-muted-foreground -mt-1">
+                Con el modo revisión encendido, el descuento no sale a ningún canal hasta que apruebes la solicitud de cada cuenta en el Tablero (o en Revisión).
+              </p>
             )}
 
             <div className="space-y-2">
@@ -243,7 +183,7 @@ export function EditInventoryDialog({ product, reviewMode, modo, onClose }: Prop
 
         <p className="text-xs text-muted-foreground">
           {reviewMode
-            ? `El modo revisión está activo: ${enStock ? "el cambio de stock" : "los cambios de precio y descuento"} quedarán pendientes hasta que los apruebes aquí mismo, en la lista de pendientes.${enStock ? "" : " El precio web se guarda al instante."}`
+            ? `El modo revisión está activo: ${enStock ? "el cambio de stock" : "el cambio de precio"} quedará pendiente hasta que lo apruebes aquí mismo, en la lista de pendientes.${enStock ? "" : " El precio web se guarda al instante."}`
             : "El modo revisión está apagado: el cambio se enviará de inmediato a los canales publicados."}
         </p>
 
@@ -253,22 +193,13 @@ export function EditInventoryDialog({ product, reviewMode, modo, onClose }: Prop
           </Button>
           <Button
             className="gradient-primary"
-            disabled={mutation.isPending || invalid || (!priceChanged && !stockChanged && !webChanged && !promoChanged)}
+            disabled={mutation.isPending || invalid || (!priceChanged && !stockChanged && !webChanged)}
             onClick={() => mutation.mutate()}
           >
             {reviewMode ? "Enviar a revisión" : "Guardar y sincronizar"}
           </Button>
         </DialogFooter>
       </DialogContent>
-      {product && (
-        <DescuentoGeneralDialog
-          open={descuentoAbierto}
-          onOpenChange={(abierto) => { setDescuentoAbierto(abierto); if (!abierto) onClose(); }}
-          productIds={[product.productId]}
-          resumen={`${product.name} · ${product.sku}`}
-          precioEjemplo={product.price}
-        />
-      )}
     </Dialog>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2, Save } from "lucide-react";
+import { ChevronDown, ChevronRight, Loader2, Save } from "lucide-react";
 import { GroupPrices, syncApi } from "@/lib/sync-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,11 +30,13 @@ export function GroupPriceForm({ groupId, onDone }: { groupId: string; onDone?: 
 
   const [precio, setPrecio] = useState("");
   const [canales, setCanales] = useState<Record<string, PropioDeCanal>>({});
+  const [verCanales, setVerCanales] = useState(false);
   const original = useMemo(() => (info ? Object.fromEntries(info.canales.map((c) => [c.connectionId, propioDe(c.own)])) : {}), [info]);
   useEffect(() => {
     if (!info) return;
     setPrecio(info.price.comun !== null ? String(info.price.comun) : "");
     setCanales(original);
+    setVerCanales(info.canales.some((c) => c.own.price != null || c.own.salePrice != null));
   }, [info, original]);
 
   const refrescar = () => {
@@ -111,11 +113,14 @@ export function GroupPriceForm({ groupId, onDone }: { groupId: string; onDone?: 
 
       {info.canales.length > 0 && (
         <div className="space-y-3">
-          <div>
-            <p className="text-sm font-medium">Precio y descuento propios de cada canal</p>
-            <p className="text-[11px] text-muted-foreground">Vacío usa el precio del producto. Se aplican a las variantes publicadas en esa cuenta y salen al canal sin pasar por revisión.</p>
-          </div>
-          {info.canales.map((c) => {
+          <button type="button" className="w-full flex items-start gap-2 text-left" onClick={() => setVerCanales((v) => !v)} aria-expanded={verCanales}>
+            {verCanales ? <ChevronDown className="w-4 h-4 mt-0.5 shrink-0" /> : <ChevronRight className="w-4 h-4 mt-0.5 shrink-0" />}
+            <span>
+              <span className="block text-sm font-medium">Precio y descuento propios de cada canal</span>
+              <span className="block text-[11px] text-muted-foreground">Opcional: vacío usa el precio y el descuento del producto. Se aplican a las variantes publicadas en esa cuenta y salen al canal sin pasar por revisión.</span>
+            </span>
+          </button>
+          {verCanales && info.canales.map((c) => {
             const v = valorDe(c.connectionId);
             return (
               <div key={c.connectionId} className="rounded-lg border border-border p-3 space-y-2">
@@ -149,12 +154,12 @@ export function GroupPriceForm({ groupId, onDone }: { groupId: string; onDone?: 
               </div>
             );
           })}
-          <div className="flex justify-end">
+          {verCanales && <div className="flex justify-end">
             <Button size="sm" className="gap-1.5 max-w-full h-auto min-h-8 whitespace-normal text-center" disabled={!cambiosDeCanal.length || canalInvalido || guardarCanales.isPending} onClick={() => guardarCanales.mutate()}>
               {guardarCanales.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
               Guardar precios de canal en las {n} variantes
             </Button>
-          </div>
+          </div>}
         </div>
       )}
     </div>
