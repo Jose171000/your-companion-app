@@ -143,14 +143,24 @@ function buildItems(rows: Row[]): Item[] {
 }
 
 /** Cuántas variantes hay en cada estado, canal por canal: «Falabella: 5 publicado, 1 error». */
-function GroupChannels({ children }: { children: Row[] }) {
-  const porCanal = new Map<string, { canal: string; estados: Map<string, number> }>();
+function GroupChannels({ children, abierto, onVerVariantes }: { children: Row[]; abierto?: boolean; onVerVariantes?: () => void }) {
+  const porCanal = new Map<string, { canal: string; nombre: string; cuenta: string | null; estados: Map<string, number>; enlaces: Set<string>; total: number; conEnlace: number }>();
   for (const r of children) {
     for (const c of r.channels) {
       const clave = `${c.listing.marketplace}|${c.listing.accountLabel ?? ""}`;
-      const fila = porCanal.get(clave) ?? { canal: `${channelName(c.listing.marketplace)}${c.listing.accountLabel ? ` · ${c.listing.accountLabel}` : ""}`, estados: new Map<string, number>() };
+      const fila = porCanal.get(clave) ?? {
+        canal: `${channelName(c.listing.marketplace)}${c.listing.accountLabel ? ` · ${c.listing.accountLabel}` : ""}`,
+        nombre: channelName(c.listing.marketplace),
+        cuenta: c.listing.accountLabel ?? null,
+        estados: new Map<string, number>(),
+        enlaces: new Set<string>(),
+        total: 0,
+        conEnlace: 0,
+      };
       const e = estadoVisible(c.listing);
       fila.estados.set(e, (fila.estados.get(e) ?? 0) + 1);
+      fila.total++;
+      if (c.listing.permalink) { fila.enlaces.add(c.listing.permalink); fila.conEnlace++; }
       porCanal.set(clave, fila);
     }
   }
@@ -158,7 +168,25 @@ function GroupChannels({ children }: { children: Row[] }) {
     <div className="flex flex-wrap gap-2">
       {[...porCanal.entries()].map(([clave, f]) => (
         <div key={clave} className="rounded-xl border border-border bg-secondary/20 px-3 py-2 text-xs space-y-1 min-w-[132px]">
-          <p className="font-semibold truncate">{f.canal}</p>
+          {/* Una sola publicación en la cuenta: el nombre es el enlace directo. Si cada variante tiene la suya, se indica dónde verlas. */}
+          {f.enlaces.size === 1 && f.conEnlace === f.total ? (
+            <p className="font-semibold min-w-0 flex items-baseline gap-1">
+              <a
+                href={[...f.enlaces][0]}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 shrink-0 hover:underline"
+                title={`Abrir la publicación en ${f.nombre}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {f.nombre}
+                <ExternalLink className="w-3 h-3 shrink-0 text-muted-foreground" />
+              </a>
+              {f.cuenta && <span className="font-normal text-muted-foreground truncate min-w-0"> · {f.cuenta}</span>}
+            </p>
+          ) : (
+            <p className="font-semibold truncate" title={f.canal}>{f.canal}</p>
+          )}
           <div className="flex flex-wrap gap-1">
             {[...f.estados.entries()].map(([estado, n]) => (
               <Badge key={estado} className={cn("text-[10px] py-0 px-1.5", STATUS_STYLES[estado] ?? STATUS_STYLES.pending)}>
@@ -166,6 +194,21 @@ function GroupChannels({ children }: { children: Row[] }) {
               </Badge>
             ))}
           </div>
+          {f.enlaces.size > 1 && (
+            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <ExternalLink className="w-3 h-3 shrink-0" />
+              {abierto ? "El enlace de cada publicación está en su variante, abajo." : (
+                <>
+                  Cada variante tiene su enlace.{" "}
+                  {onVerVariantes && (
+                    <button type="button" className="underline hover:text-foreground" onClick={(e) => { e.stopPropagation(); onVerVariantes(); }}>
+                      Ver variantes
+                    </button>
+                  )}
+                </>
+              )}
+            </p>
+          )}
         </div>
       ))}
     </div>
@@ -301,23 +344,23 @@ function ChannelChip({ cell, className, canEdit, canResend, onAction }: { cell: 
         className,
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-semibold truncate">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+        <span className="font-semibold min-w-0 max-w-full flex items-baseline gap-1">
           {l.permalink ? (
             // Enlace directo a la publicación en el canal.
             <a
               href={l.permalink}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 hover:underline"
+              className="inline-flex items-center gap-1 shrink-0 hover:underline"
               title={`Abrir la publicación en ${channelName(l.marketplace)}`}
               onClick={(e) => e.stopPropagation()}
             >
               {channelName(l.marketplace)}
               <ExternalLink className="w-3 h-3 shrink-0 text-muted-foreground" />
             </a>
-          ) : channelName(l.marketplace)}
-          {l.accountLabel && <span className="font-normal text-muted-foreground"> · {l.accountLabel}</span>}
+          ) : <span className="shrink-0">{channelName(l.marketplace)}</span>}
+          {l.accountLabel && <span className="font-normal text-muted-foreground truncate min-w-0"> · {l.accountLabel}</span>}
         </span>
         <div className="flex items-center gap-1">
           <Badge className={cn("text-[10px] gap-1", STATUS_STYLES[estado] ?? STATUS_STYLES.pending)}>
@@ -422,6 +465,7 @@ export function InventoryBoard({ cuentas, listings, pending, reviewMode, canEdit
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const [reenvioMasivo, setReenvioMasivo] = useState(false);
   const [precioDeGrupo, setPrecioDeGrupo] = useState<{ groupId: string; name: string; n: number } | null>(null);
+  const abrirGrupo = (id: string) => setAbiertos((prev) => new Set(prev).add(id));
   const alternar = (id: string) => setAbiertos((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const rows = useMemo(() => buildRows(listings, pending), [listings, pending]);
@@ -680,7 +724,7 @@ export function InventoryBoard({ cuentas, listings, pending, reviewMode, canEdit
                     <Dato rotulo="Stock total">{item.children.reduce((n, c) => n + (c.stock ?? 0), 0)} u.</Dato>
                     <CalidadBadge calidad={calidadDeFilas(item.children)} texto="Calidad prom." onClick={() => abrirCalidad(item.children, item.name, `${item.children.length} variantes`)} />
                   </div>
-                  <div className="flex-1"><GroupChannels children={item.children} /></div>
+                  <div className="flex-1"><GroupChannels children={item.children} abierto={abierto} onVerVariantes={() => abrirGrupo(item.groupId)} /></div>
                   <div className="flex flex-wrap gap-2 sm:shrink-0">{botonesDeGrupo(item)}</div>
                   <span className="text-xs text-muted-foreground shrink-0">{abierto ? "Ocultar" : "Ver variantes"}</span>
                 </div>
@@ -713,7 +757,7 @@ export function InventoryBoard({ cuentas, listings, pending, reviewMode, canEdit
                   <Dato rotulo="Stock total">{item.children.reduce((n, c) => n + (c.stock ?? 0), 0)} u.</Dato>
                 </div>
                 <CalidadBadge calidad={calidadDeFilas(item.children)} texto="Calidad prom." onClick={() => abrirCalidad(item.children, item.name, `${item.children.length} variantes`)} />
-                <GroupChannels children={item.children} />
+                <GroupChannels children={item.children} abierto={abierto} onVerVariantes={() => abrirGrupo(item.groupId)} />
                 <div className="flex flex-wrap gap-2">{botonesDeGrupo(item, true)}</div>
                 {abierto && (
                   <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4 pt-1">
