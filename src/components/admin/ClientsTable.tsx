@@ -23,6 +23,13 @@ const STATUS_STYLES: Record<string, string> = {
   perdido: "bg-red-500/10 text-red-500 border-red-500/30",
 };
 
+/** Una conexión por tienda y canal: se agrupan para no repetir "Falabella, Falabella, Falabella…". */
+function canalesAgrupados(canales: string[]): string {
+  const cuenta = new Map<string, number>();
+  for (const c of canales) cuenta.set(c, (cuenta.get(c) ?? 0) + 1);
+  return [...cuenta.entries()].map(([c, n]) => (n > 1 ? `${c} ×${n}` : c)).join(", ");
+}
+
 /** Solo se marca lo que no es un cliente normal: quien es superadmin o contador tiene que verse a simple vista. */
 function RolBadge({ role }: { role: string }) {
   if (role === "admin") {
@@ -137,7 +144,7 @@ export function ClientsTable({
                   </p>
                   <p className="text-xs text-muted-foreground capitalize">
                     {c.stats.connectedMarketplaces.length
-                      ? c.stats.connectedMarketplaces.join(", ")
+                      ? canalesAgrupados(c.stats.connectedMarketplaces)
                       : "sin canales conectados"}
                   </p>
                 </td>
