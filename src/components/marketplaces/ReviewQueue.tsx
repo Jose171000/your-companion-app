@@ -33,8 +33,12 @@ const RESOLVED_STYLES: Record<string, { label: string; className: string }> = {
 
 const fmtFecha = (d: string) => d.split("-").reverse().join("/");
 
-/** «120|2026-11-09|2027-01-31» → «S/ 120.00 (09/11/2026 → 31/01/2027)»; «quitar» o vacío → «Sin descuento». */
-function fmtDescuento(v: string | null) {
+/**
+ * «120|2026-11-09|2027-01-31» → «S/ 120.00 (09/11/2026 → 31/01/2027)»; «quitar» o vacío → «Sin descuento».
+ * Un «|g» al final marca el descuento GENERAL del producto («quitar|g», «120|…|g»): no es un dato más y se ignora al mostrarlo.
+ */
+function fmtDescuento(valor: string | null) {
+  const v = valor != null && valor.endsWith("|g") ? valor.slice(0, -2) : valor;
   if (v == null || v === "" || v === "quitar") return "Sin descuento";
   const [precio, desde, hasta] = v.split("|");
   const fechas = desde || hasta ? ` (${desde ? fmtFecha(desde) : "…"} → ${hasta ? fmtFecha(hasta) : "…"})` : "";
