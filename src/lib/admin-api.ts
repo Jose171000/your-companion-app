@@ -188,6 +188,13 @@ export const adminApi = {
   deleteStore: (id: string) =>
     apiRequest<{ message: string; resumen: { pedidos: number; productos: number; canales: number } }>(`/admin/stores/${id}`, { method: 'DELETE' }),
 
+  /** Cambia el rol de la cuenta (superadmin, contador o cliente) y cierra sus sesiones. */
+  updateRole: (id: string, role: "admin" | "contador" | "user") =>
+    apiRequest<{ message: string; role: string }>(`/admin/clients/${id}/role`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    }),
+
   /** Elimina la cuenta y todos sus datos */
   deleteClient: (id: string) =>
     apiRequest<{ message: string }>(`/admin/clients/${id}`, { method: 'DELETE' }),

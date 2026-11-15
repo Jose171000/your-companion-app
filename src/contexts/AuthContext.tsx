@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { prepararTiendaActivaDe } from '@/lib/sesion-de-tienda';
 import { EVENTO_SESION_VENCIDA } from '@/lib/api';
 import { INACTIVIDAD_MINUTOS, estaInactiva, olvidarActividad, registrarActividad } from '@/lib/inactividad';
 import { authApi, User, AuthResponse, LoginCredentials, RegisterCredentials, ForgotPasswordCredentials, ResetPasswordCredentials } from '@/lib/api';
@@ -21,12 +23,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  /** Lo que quedó en memoria (tiendas, productos…) es de la cuenta anterior: no debe verse con la siguiente. */
+  const entrarCon = (usuarioId: string) => {
+    if (prepararTiendaActivaDe(usuarioId)) queryClient.clear();
+  };
 
   // Sesión por actividad: se renueva sola mientras se usa la aplicación y solo se cierra tras un rato sin actividad.
   const limpiarSesion = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('refresh_token');
     olvidarActividad();
+    queryClient.clear();
     setUser(null);
   };
 
@@ -44,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       authApi.getProfile().then(({ data, error }) => {
         if (data && !error) {
+          entrarCon(data.id);
           setUser(data);
           registrarActividad();
         } else {
@@ -102,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('auth_token', data.accessToken);
     localStorage.setItem('refresh_token', data.refreshToken);
     registrarActividad();
+    entrarCon(data.user.id);
     setUser(data.user);
     return { success: true };
   };
@@ -121,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const sesion = data as AuthResponse;
     localStorage.setItem('auth_token', sesion.accessToken);
     localStorage.setItem('refresh_token', sesion.refreshToken);
+    entrarCon(sesion.user.id);
     // Quien se registró con una invitación entra ya con esa tienda activa (la misma clave que usa StoreContext).
     if (sesion.invitedStore) {
       try { localStorage.setItem('active_store_id', sesion.invitedStore.storeId); } catch { /* sin almacenamiento */ }
@@ -134,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('refresh_token');
     olvidarActividad();
+    queryClient.clear();
     setUser(null);
   };
 

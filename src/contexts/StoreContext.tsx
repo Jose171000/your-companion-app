@@ -57,6 +57,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return store;
   }, [stores, activeId]);
 
+  // Sin ninguna tienda a la que pertenecer, la guardada no es suya: no debe seguir viajando en las peticiones.
+  useEffect(() => {
+    if (!data?.data || stores.length > 0) return;
+    try { localStorage.removeItem(ACTIVE_KEY); } catch { /* nada */ }
+    setActiveId(null);
+  }, [data, stores.length]);
+
   const setActiveStore = useCallback((id: string) => {
     setActiveId(id);
     try { localStorage.setItem(ACTIVE_KEY, id); } catch { /* sin almacenamiento: solo esta sesión */ }

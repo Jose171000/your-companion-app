@@ -23,6 +23,15 @@ const STATUS_STYLES: Record<string, string> = {
   perdido: "bg-red-500/10 text-red-500 border-red-500/30",
 };
 
+/** Solo se marca lo que no es un cliente normal: quien es superadmin o contador tiene que verse a simple vista. */
+function RolBadge({ role }: { role: string }) {
+  if (role === "admin") {
+    return <Badge className="text-[10px] bg-[#FCCB34] text-[#111] hover:bg-[#FCCB34]">Superadmin</Badge>;
+  }
+  if (role === "contador") return <Badge variant="outline" className="text-[10px]">Contador</Badge>;
+  return null;
+}
+
 export function ClientsTable({
   clients,
   isLoading,
@@ -107,10 +116,13 @@ export function ClientsTable({
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <Badge variant="secondary" className="text-[10px] gap-1">
-                    <Building2 className="w-3 h-3" />
-                    {c.profile?.clientType === "agency" ? "Agencia" : "Software"}
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Badge variant="secondary" className="text-[10px] gap-1">
+                      <Building2 className="w-3 h-3" />
+                      {c.profile?.clientType === "agency" ? "Agencia" : "Software"}
+                    </Badge>
+                    <RolBadge role={c.role} />
+                  </div>
                 </td>
                 <td className="px-4 py-3">
                   <Badge
@@ -173,6 +185,7 @@ export function ClientsTable({
               <div className="min-w-0">
                 <p className="font-medium text-sm">{c.profile?.businessName || `${c.name} ${c.lastName}`}</p>
                 <p className="text-xs text-muted-foreground truncate">{c.email}</p>
+                <div className="mt-1"><RolBadge role={c.role} /></div>
               </div>
               <Badge className={cn("text-[10px] capitalize shrink-0", STATUS_STYLES[c.profile?.status ?? "activo"])}>
                 {c.profile?.status ?? "activo"}

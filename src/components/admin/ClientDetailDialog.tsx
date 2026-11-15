@@ -33,6 +33,13 @@ import { toast } from "sonner";
 import { AlertTriangle, CheckCircle2, Copy, KeyRound, Loader2, Plus, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRestrictableSections } from "@/hooks/use-app-sections";
+import { useAuth } from "@/contexts/AuthContext";
+
+const ROLES: { id: "admin" | "contador" | "user"; label: string; ayuda: string }[] = [
+  { id: "user", label: "Cliente", ayuda: "Ve solo sus tiendas. Es lo normal." },
+  { id: "contador", label: "Contador", ayuda: "Solo finanzas y facturación." },
+  { id: "admin", label: "Superadmin", ayuda: "Ve y gestiona a TODOS los clientes: finanzas, cuentas, tiendas y actividad. Puede eliminarlas." },
+];
 
 interface ClientDetailDialogProps {
   client: AdminClient | null;
@@ -50,7 +57,9 @@ const today = () => new Date().toISOString().slice(0, 10);
 export function ClientDetailDialog({ client, onClose }: ClientDetailDialogProps) {
   const { secciones: RESTRICTABLE } = useRestrictableSections();
   const queryClient = useQueryClient();
+  const { user: yo } = useAuth();
   const open = client !== null;
+  const [rol, setRol] = useState<"admin" | "contador" | "user">("user");
 
   const [profile, setProfile] = useState<UpdateClientProfileDto>({});
   const [payment, setPayment] = useState<CreatePaymentDto>({
@@ -97,6 +106,7 @@ export function ClientDetailDialog({ client, onClose }: ClientDetailDialogProps)
     setSections(current ?? []);
     setFullAccess(!current || current.length === 0);
     setIsActive(detail?.isActive ?? client.isActive ?? true);
+    setRol((client.role as "admin" | "contador" | "user") ?? "user");
     setNewPassword(null);
     setEmbedCheck(null);
   }, [client, detail]);
@@ -164,6 +174,25 @@ export function ClientDetailDialog({ client, onClose }: ClientDetailDialogProps)
     },
     onError: () => toast.error("Error al guardar los permisos"),
   });
+
+  const saveRole = useMutation({
+    mutationFn: () => adminApi.updateRole(client!.id, rol),
+    onSuccess: (res) => {
+      if (res.error) return toast.error(res.error);
+      toast.success(res.data?.message ?? "Rol actualizado");
+      queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-client", client?.id] });
+    },
+    onError: () => toast.error("Error al cambiar el rol"),
+  });
+
+  const cambiarRol = () => {
+    const destino = ROLES.find((r) => r.id === rol)!;
+    const aviso = rol === "admin"
+      ? `Vas a hacer SUPERADMIN a ${client?.email}. Podrá ver y eliminar los datos de todos los clientes.`
+      : `Vas a cambiar a ${client?.email} a «${destino.label}». Se cerrarán sus sesiones abiertas.`;
+    if (window.confirm(`${aviso}\n\n¿Continuar?`)) saveRole.mutate();
+  };
 
   const checkEmbed = useMutation({
     mutationFn: () => adminApi.checkEmbeddable(profile.reportEmbedUrl!),
@@ -444,6 +473,40 @@ export function ClientDetailDialog({ client, onClose }: ClientDetailDialogProps)
               )}
               Guardar permisos
             </Button>
+
+            {/* Rol */}
+            <div className="pt-5 border-t border-border space-y-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-[#FCCB34]" />
+                <p className="font-medium text-sm">Rol de la cuenta</p>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {ROLES.find((r) => r.id === rol)?.ayuda}
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <Select value={rol} onValueChange={(v) => setRol(v as typeof rol)} disabled={client?.id === yo?.id}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLES.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  onClick={cambiarRol}
+                  disabled={saveRole.isPending || rol === client?.role || client?.id === yo?.id}
+                >
+                  {saveRole.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  Cambiar rol
+                </Button>
+              </div>
+              {client?.id === yo?.id && (
+                <p className="text-xs text-muted-foreground">No puedes cambiar tu propio rol.</p>
+              )}
+            </div>
 
             {/* Contraseña */}
             <div className="pt-5 border-t border-border space-y-3">
