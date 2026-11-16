@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CorregirValorDeVariante } from "./CorregirValorDeVariante";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -448,6 +449,16 @@ function FichaDeProducto({
 
   const cambia = <K extends keyof Borrador>(k: K, v: Borrador[K]) => setBorrador((b) => (b ? { ...b, [k]: v } : b));
 
+  // Tras corregir el valor que un canal rechazó, esta variante se vuelve a mandar a ESA cuenta.
+  const reenviar = async (canal: string, connectionId: string) => {
+    const res = canal === "mercadolibre"
+      ? await syncApi.launchProduct(product!.id, [canal], { [canal]: [connectionId] })
+      : await syncApi.publish(product!.id, [canal], { [canal]: connectionId });
+    if (res.error) toast.error(res.error);
+    else toast.success("Reenviado. En unos minutos se ve el resultado en el canal.");
+    queryClient.invalidateQueries({ queryKey: ["product-sheet", product?.id] });
+  };
+
   // Solo se envía lo que cambió: así un guardado no pisa lo que no se tocó.
   const cambios = useMemo(() => {
     if (!borrador || !original) return null;
@@ -692,6 +703,9 @@ function FichaDeProducto({
               <TabsContent value="falabella" className="pt-4 space-y-4">
                 <EstadoDelCanal canal={fal} stock={hoja.product.stock} />
                 {fal.lastError && <p className="text-xs text-red-400 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{fal.lastError}</p>}
+                {!modoGrupo && product?.group?.id && product.variantValues && (fal.lastError || /valor no válido/i.test(fal.motivo ?? "")) && (
+                  <CorregirValorDeVariante groupId={product.group.id} canal="falabella" nombreDelCanal="Falabella" variantValues={product.variantValues} onApplied={() => reenviar("falabella", fal.connectionId)} />
+                )}
                 {fal.listo ? (
                   <p className="text-xs text-green-500 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> La ficha cumple lo que pide Falabella.</p>
                 ) : (
@@ -735,6 +749,9 @@ function FichaDeProducto({
               <TabsContent value="mercadolibre" className="pt-4 space-y-4">
                 <EstadoDelCanal canal={meli} stock={hoja.product.stock} />
                 {meli.lastError && <p className="text-xs text-red-400 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{meli.lastError}</p>}
+                {!modoGrupo && product?.group?.id && product.variantValues && meli.lastError && (
+                  <CorregirValorDeVariante groupId={product.group.id} canal="mercadolibre" nombreDelCanal="Mercado Libre" variantValues={product.variantValues} onApplied={() => reenviar("mercadolibre", meli.connectionId)} />
+                )}
                 <div className="rounded-lg border border-border p-3 space-y-1 text-sm break-words">
                   <p><span className="text-muted-foreground">Título:</span> {meli.sent.title} <span className="text-[11px] text-muted-foreground">(Mercado Libre no deja cambiarlo en una publicación ya creada)</span></p>
                   <p><span className="text-muted-foreground">Categoría:</span> {meli.sent.categoryId ?? "—"}</p>
