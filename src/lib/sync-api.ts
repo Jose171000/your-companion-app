@@ -235,8 +235,8 @@ export interface GroupPrices {
     marketplace: string;
     account: string;
     canSetSale: boolean;
-    /** false en WooCommerce: allí solo se fija el descuento propio, no un precio propio. */
-    canSetPrice?: boolean;
+    /** Si el envío de precios a esta cuenta no está disponible (Ripley), por qué: se guarda en Synkro pero no se manda. */
+    avisoDeEnvio?: string | null;
     variantes: number;
     own: { price: number | null; salePrice: number | null; saleStart: string | null; saleEnd: string | null };
     differs: boolean;
