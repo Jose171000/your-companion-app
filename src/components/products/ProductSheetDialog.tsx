@@ -199,8 +199,8 @@ function EtiquetaDeOrigen({ origen }: { origen: Origen }) {
 }
 
 function CampoDeAtributo({
-  etiqueta, descripcion, obligatorio, opciones, valor, onChange, origen, propio,
-}: { etiqueta: string; descripcion?: string; obligatorio?: boolean; opciones?: string[]; valor: string; onChange: (v: string) => void; origen?: Origen; propio?: boolean }) {
+  etiqueta, descripcion, obligatorio, opciones, valor, onChange, origen, propio, enviadoComo, canal,
+}: { etiqueta: string; descripcion?: string; obligatorio?: boolean; opciones?: string[]; valor: string; onChange: (v: string) => void; origen?: Origen; propio?: boolean; enviadoComo?: string | null; canal?: string }) {
   if (propio) {
     return (
       <div className="space-y-1 min-w-0 opacity-70">
@@ -232,6 +232,7 @@ function CampoDeAtributo({
       ) : (
         <Input value={valor} onChange={(e) => onChange(e.target.value)} placeholder="Sin completar" />
       )}
+      {enviadoComo && <p className="text-[11px] text-sky-600 dark:text-sky-400 break-words">Se envía a {canal ?? "el canal"} como: <span className="font-medium">{enviadoComo}</span></p>}
     </div>
   );
 }
@@ -759,7 +760,7 @@ function FichaDeProducto({
                 <p className="text-xs text-muted-foreground">La descripción de texto se edita en la pestaña General. Aquí van los atributos que recibe Mercado Libre:</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {(meli.sent.attributes as any[]).map((a) => (
-                    <CampoDeAtributo key={a.id} etiqueta={a.id} origen={a.origin} propio={modoGrupo && esPropioDeVariante(a.id, ejes)} valor={borrador.atributosMeli[a.id] ?? ""} onChange={(v) => cambia("atributosMeli", { ...borrador.atributosMeli, [a.id]: v })} />
+                    <CampoDeAtributo key={a.id} etiqueta={a.id} origen={a.origin} enviadoComo={a.sentAs} canal="Mercado Libre" propio={modoGrupo && esPropioDeVariante(a.id, ejes)} valor={borrador.atributosMeli[a.id] ?? ""} onChange={(v) => cambia("atributosMeli", { ...borrador.atributosMeli, [a.id]: v })} />
                   ))}
                 </div>
               </TabsContent>
