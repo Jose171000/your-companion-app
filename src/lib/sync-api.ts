@@ -235,6 +235,8 @@ export interface GroupPrices {
     marketplace: string;
     account: string;
     canSetSale: boolean;
+    /** false en WooCommerce: allí solo se fija el descuento propio, no un precio propio. */
+    canSetPrice?: boolean;
     variantes: number;
     own: { price: number | null; salePrice: number | null; saleStart: string | null; saleEnd: string | null };
     differs: boolean;

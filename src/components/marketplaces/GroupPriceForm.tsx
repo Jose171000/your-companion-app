@@ -128,11 +128,12 @@ export function GroupPriceForm({ groupId, onDone }: { groupId: string; onDone?: 
                   <span className="font-medium">{channelName(c.marketplace)}</span>
                   <span className="text-xs text-muted-foreground">{c.account} · {c.variantes} variantes publicadas</span>
                 </div>
+                {c.canSetPrice === false && <p className="text-[11px] text-muted-foreground">En {channelName(c.marketplace)} se envía siempre el precio del producto; aquí solo puedes fijar el descuento.</p>}
                 {c.differs && <p className="text-[11px] text-amber-500">Hoy las variantes tienen valores distintos aquí: al guardar se igualan al de abajo.</p>}
                 <div className="grid grid-cols-1 min-[480px]:grid-cols-2 md:grid-cols-4 gap-2">
                   <div className="space-y-1">
                     <Label className="text-[11px] font-normal text-muted-foreground">Precio solo en este canal</Label>
-                    <Input type="number" min="0" step="0.01" value={v.price} onChange={(e) => set(c.connectionId, "price", e.target.value)} />
+                    <Input type="number" min="0" step="0.01" value={v.price} disabled={c.canSetPrice === false} placeholder={c.canSetPrice === false ? "Usa el del producto" : undefined} onChange={(e) => set(c.connectionId, "price", e.target.value)} />
                   </div>
                   {c.canSetSale && (
                     <>
