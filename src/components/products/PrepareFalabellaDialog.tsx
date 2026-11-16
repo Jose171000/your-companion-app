@@ -215,7 +215,7 @@ export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: P
 
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           {desdeFicha && <VolverALaFicha onClick={onClose} />}
           <DialogTitle className="flex items-center gap-2">
@@ -236,7 +236,8 @@ export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: P
             {categoria ? (
               <div className="flex items-start justify-between gap-3 rounded-lg border border-primary/40 bg-primary/5 p-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{categoria.path}</p>
+                  {/* La ruta trae barras «|» sin espacios: sin esto no parte la línea y el diálogo se ensancha. */}
+                  <p className="text-sm font-medium [overflow-wrap:anywhere]">{categoria.path}</p>
                   <p className="text-xs text-muted-foreground">ID {categoria.id}</p>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => setCategoria(null)}>
@@ -265,7 +266,7 @@ export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: P
                           onClick={() => setCategoria({ id: c.id, path: c.path })}
                           className="w-full text-left p-3 hover:bg-secondary/40 transition-colors"
                         >
-                          <p className="text-sm font-medium">{c.path}</p>
+                          <p className="text-sm font-medium [overflow-wrap:anywhere]">{c.path}</p>
                         </button>
                       ))}
                     </div>
@@ -332,7 +333,7 @@ export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: P
                           className="w-full text-left p-3 hover:bg-secondary/40 transition-colors"
                         >
                           <p className="text-sm font-medium">{c.name}</p>
-                          <p className="text-xs text-muted-foreground">{c.path}</p>
+                          <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{c.path}</p>
                         </button>
                       ))
                     )}
