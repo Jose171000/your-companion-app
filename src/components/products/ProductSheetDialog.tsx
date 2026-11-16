@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { GroupPriceForm } from "@/components/marketplaces/GroupPriceForm";
+import { GroupStockForm } from "@/components/marketplaces/GroupStockForm";
 import { CanalDeDescuento, DescuentoDelProducto } from "@/components/marketplaces/DescuentoDelProducto";
 
 const NOMBRE_CANAL: Record<string, string> = { falabella: "Falabella", mercadolibre: "Mercado Libre", woocommerce: "WooCommerce", shopify: "Shopify", ripley: "Ripley" };
@@ -430,6 +431,14 @@ function FichaDeProducto({
   modoGrupo?: boolean; grupoId?: string; nombreDelGrupo?: string; ejes?: string[];
 }) {
   const queryClient = useQueryClient();
+  const { activeStore } = useStores();
+  const { data: ajustesSync } = useQuery({
+    queryKey: ["sync-settings", activeStore?.id],
+    queryFn: () => syncApi.getSyncSettings(),
+    enabled: !!activeStore?.id && modoGrupo,
+    staleTime: 30_000,
+  });
+  const modoRevision = ajustesSync?.data?.reviewMode ?? true;
   const open = product !== null;
   const [borrador, setBorrador] = useState<Borrador | null>(null);
   const [verHtml, setVerHtml] = useState(true);
@@ -678,6 +687,15 @@ function FichaDeProducto({
                   onDone={refrescar}
                 />
                 <GroupPriceForm groupId={grupoId} />
+                <div className="rounded-lg border border-border p-3 space-y-2">
+                  <Label className="text-sm font-medium">Stock de las {variantes.length} variantes</Label>
+                  <p className="text-[11px] text-muted-foreground">Pon el mismo número en todas o ajusta cada variante. Solo se envía lo que cambias.</p>
+                  <GroupStockForm
+                    reviewMode={modoRevision}
+                    onDone={refrescar}
+                    variantes={variantes.map((v) => ({ productId: v.id, sku: v.sku, etiqueta: v.variantValues ? Object.values(v.variantValues).join(" / ") : v.name, stock: v.stock ?? 0 }))}
+                  />
+                </div>
               </TabsContent>
             )}
 
