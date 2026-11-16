@@ -17,12 +17,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { MapaDeCalor } from "./MapaDeCalor";
+import { EvolucionDeVentas } from "./EvolucionDeVentas";
 import { EnviosYCupones } from "./EnviosYCupones";
 import { cn } from "@/lib/utils";
 import { AlertCircle, ArrowRight, Download, FileSpreadsheet, FileText, ListChecks, Loader2, Package, Receipt, RefreshCw, TrendingUp } from "lucide-react";
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -34,11 +33,6 @@ import {
 
 const money = (n: number) =>
   `S/ ${Number(n || 0).toLocaleString("es-PE", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const dayLabel = (d: string) => {
-  const [, m, day] = d.split("-");
-  return `${day}/${m}`;
-};
 
 const CHANNEL_NAMES: Record<string, string> = {
   mercadolibre: "MercadoLibre",
@@ -200,7 +194,6 @@ export function AnalyticsModule() {
     );
   }
 
-  const chartData = report.byDay.map((d) => ({ ...d, label: dayLabel(d.date) }));
   const hasData = report.totals.orders > 0 || report.totals.sales > 0;
 
   const nativeReport = (
@@ -288,54 +281,14 @@ export function AnalyticsModule() {
         </div>
       )}
 
-      {/* Evolución de ventas */}
-      <div className="glass rounded-2xl border border-border dark:border-white/10 p-5 md:p-6">
-        <h3 className="font-semibold mb-1">Evolución de ventas</h3>
-        <p className="text-xs text-muted-foreground mb-6">
-          {report.range.from} al {report.range.to}
-        </p>
-
-        {chartData.length === 0 ? (
-          <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">
-            Sin datos para mostrar en este rango.
-          </div>
-        ) : (
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#FCCB34" stopOpacity={0.45} />
-                    <stop offset="100%" stopColor="#FCCB34" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
-                <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} minTickGap={20} />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  width={60}
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v) => `S/${Number(v) >= 1000 ? `${Math.round(Number(v) / 1000)}k` : v}`}
-                />
-                <Tooltip
-                  formatter={(v: number, name: string) =>
-                    name === "sales" ? [money(v), "Ventas"] : [v, "Pedidos"]
-                  }
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: "1px solid rgba(120,120,120,.25)",
-                    background: "rgba(20,20,20,.92)",
-                    color: "#fff",
-                    fontSize: 12,
-                  }}
-                />
-                <Area type="monotone" dataKey="sales" stroke="#FCCB34" strokeWidth={2} fill="url(#salesFill)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
+      {/* Evolución de ventas: por día, semana, mes o año, con la variación frente al periodo anterior */}
+      <EvolucionDeVentas
+        dias={report.byDay}
+        rangoTexto={`${report.range.from} al ${report.range.to}`}
+        storeId={storeId}
+        estados={estados.join(",")}
+        incluirEnvio={incluirEnvio}
+      />
 
       {/* Lo más vendido, con su stock y en cuánto se agota */}
       <ProductosGanadores
