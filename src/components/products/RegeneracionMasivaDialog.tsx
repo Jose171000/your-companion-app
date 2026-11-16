@@ -41,10 +41,11 @@ export function RegeneracionMasivaDialog({ open, onOpenChange, productIds, onFin
   const [loteId, setLoteId] = useState<string | null>(null);
   const [inicial, setInicial] = useState<LoteDeRegeneracion | null>(null);
   const [lanzando, setLanzando] = useState(false);
+  const [sobrescribir, setSobrescribir] = useState(false);
   const avisado = useRef<string | null>(null);
 
   useEffect(() => {
-    if (open) { setLoteId(loteInicialId ?? null); setInicial(null); avisado.current = null; }
+    if (open) { setLoteId(loteInicialId ?? null); setInicial(null); avisado.current = null; setSobrescribir(false); }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mientras la tanda corre se pregunta cada 3 segundos; al terminar se deja de preguntar.
@@ -80,7 +81,7 @@ export function RegeneracionMasivaDialog({ open, onOpenChange, productIds, onFin
 
   const lanzar = async (ids: string[]) => {
     setLanzando(true);
-    const res = await productsApi.regenerateMany({ productIds: ids });
+    const res = await productsApi.regenerateMany({ productIds: ids, sobrescribir });
     setLanzando(false);
     if (res.error || !res.data) { toast.error(res.error ?? "No se pudo iniciar la regeneración"); return; }
     avisado.current = null;
@@ -99,7 +100,7 @@ export function RegeneracionMasivaDialog({ open, onOpenChange, productIds, onFin
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Sparkles className="w-4 h-4" /> Generar con IA los productos seleccionados</DialogTitle>
           <DialogDescription>
-            La IA redacta la ficha HTML, la descripción y el título que falten y llena los atributos vacíos. <b>No cambia nada que ya tenga valor</b> y no envía nada a los canales.
+            La IA redacta la ficha HTML, la descripción y el título que falten y llena los atributos vacíos. <b>Por defecto no cambia nada que ya tenga valor</b> y no envía nada a los canales.
           </DialogDescription>
         </DialogHeader>
 
@@ -109,6 +110,11 @@ export function RegeneracionMasivaDialog({ open, onOpenChange, productIds, onFin
             {demasiados && (
               <p className="text-red-400 text-xs">El máximo por tanda es {MAX_REGENERACION} productos (un grupo cuenta como uno). Quita {productIds.length - MAX_REGENERACION} de la selección.</p>
             )}
+            <label className="flex items-start gap-2 rounded-lg border border-border p-3 cursor-pointer">
+              <input type="checkbox" className="mt-0.5" checked={sobrescribir} onChange={(e) => setSobrescribir(e.target.checked)} />
+              <span className="text-xs"><b>Volver a generar también lo que ya tiene</b><br /><span className="text-muted-foreground">La IA reescribe la ficha HTML, la descripción y el título aunque ya existan; lo anterior se pierde. Sigue sin enviar nada a los canales.</span></span>
+            </label>
+            {sobrescribir && <p className="text-xs text-amber-500">Se van a sobrescribir los textos de {productIds.length} producto(s).</p>}
             <p className="text-xs text-muted-foreground">Tarda unos minutos: puedes cerrar esta ventana y el trabajo sigue en segundo plano (la lista de productos se actualiza al terminar).</p>
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

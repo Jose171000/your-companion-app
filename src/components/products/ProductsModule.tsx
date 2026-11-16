@@ -301,7 +301,6 @@ export function ProductsModule() {
         productIds={[...seleccionados.keys()]}
         loteInicialId={loteActivo}
         onLote={setLoteActivo}
-        onFinished={() => setSeleccionados(new Map())}
       />
 
       {/* Descuento general: los productos seleccionados; sin selección, los de la lista que se ve ahora */}

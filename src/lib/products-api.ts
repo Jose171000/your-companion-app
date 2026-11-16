@@ -254,7 +254,7 @@ export interface LoteDeRegeneracion {
 
 export const productsApi = {
   /** Regenerar con IA varios productos seleccionados (solo lo vacío); corre en segundo plano y devuelve el lote con cada producto «en cola» */
-  regenerateMany: (dto: { productIds: string[]; tone?: string }) =>
+  regenerateMany: (dto: { productIds: string[]; tone?: string; sobrescribir?: boolean }) =>
     apiRequest<LoteDeRegeneracion>('/products/ai-batch', { method: 'POST', body: JSON.stringify(dto) }),
 
   /** Avance, producto por producto, de una regeneración con IA por lotes */
