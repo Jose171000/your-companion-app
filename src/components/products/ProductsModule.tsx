@@ -3,6 +3,7 @@ import { useStores } from "@/contexts/StoreContext";
 import { useDestinoPendiente } from "@/lib/aviso-destino";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productsApi, Product, ProductsQueryParams } from "@/lib/products-api";
+import { syncApi } from "@/lib/sync-api";
 import { ProductsToolbar } from "./ProductsToolbar";
 import { ProductsTable } from "./ProductsTable";
 import { ProductsPagination } from "./ProductsPagination";
@@ -19,7 +20,7 @@ import { DescuentoGeneralDialog } from "@/components/marketplaces/DescuentoGener
 import { MAX_REGENERACION, RegeneracionMasivaDialog } from "./RegeneracionMasivaDialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Sparkles, X } from "lucide-react";
+import { ImagePlus, Loader2, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 const TAMANOS_DE_PAGINA = [10, 25, 50, 100];
@@ -157,6 +158,29 @@ export function ProductsModule() {
   const handleInStockChange = (v: boolean) => { setInStock(v); setPage(1); };
   const handleEstadoChange = (v: EstadoFiltro) => { setEstado(v); setPage(1); };
 
+  // Reenviar las fotos a Falabella: solo desde el filtro «Falta imagen en Falabella», que lista únicamente lo que Falabella rechazó por sus imágenes.
+  const [reenviandoFotos, setReenviandoFotos] = useState(false);
+  const reenviarFotos = async () => {
+    const filas = seleccionados.size > 0 ? [...seleccionados.values()] : products;
+    const idsFotos = [...new Set(filas.flatMap((p) => (p.groupSummary?.variantIds?.length ? p.groupSummary.variantIds : [p.id])))];
+    if (!window.confirm(`Se volverán a mandar a Falabella las fotos de ${idsFotos.length} producto(s) a los que les falta la imagen. ¿Continuar?`)) return;
+    setReenviandoFotos(true);
+    try {
+      const res = await syncApi.resendFalabellaImages(idsFotos);
+      if (res.error || !res.data) { toast.error(res.error ?? "No se pudieron reenviar las imágenes"); return; }
+      // Por qué se omitieron, agrupado: sin fotos, enviadas hace poco, tope de intentos…
+      const motivos = new Map<string, number>();
+      for (const o of res.data.omitidos) motivos.set(o.motivo, (motivos.get(o.motivo) ?? 0) + 1);
+      const detalle = [...motivos.entries()].map(([m, n]) => `${n}: ${m}`).join(" · ");
+      toast.success(`Fotos reenviadas a Falabella: ${res.data.enviados}.${res.data.omitidos.length ? ` Omitidos ${res.data.omitidos.length} — ${detalle}.` : ""} Falabella tarda unos minutos en procesarlas; no hace falta reenviar a cada momento.`, { duration: 12000 });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+    } catch {
+      toast.error("Error al conectar con el servidor");
+    } finally {
+      setReenviandoFotos(false);
+    }
+  };
+
   // «Nuevo producto» usa el mismo flujo de IA Productos; la ventana de edición se queda para cambiar un producto existente.
   const [newOpen, setNewOpen] = useState(false);
   const openCreate = () => setNewOpen(true);
@@ -196,6 +220,16 @@ export function ProductsModule() {
       />
 
       <ProductsSummaryBar summary={summaryResult?.data} value={estado} onChange={handleEstadoChange} />
+
+      {/* Solo en el filtro «Falta imagen en Falabella»: ahí están únicamente los que Falabella rechazó por sus imágenes. */}
+      {estado === "falta-imagen" && can("canales.publicar") && products.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm">
+          <p className="flex-1 min-w-[16rem] text-muted-foreground">Falabella rechazó estas fichas por falta de imágenes. Si tienen fotos en Synkro, se las vuelvo a mandar{seleccionados.size > 0 ? ` (solo las ${seleccionados.size} seleccionadas)` : " (todas las de esta página)"}. Las que no tienen fotos en Synkro se omiten: cárgales imágenes primero (filtro «Sin fotos»).</p>
+          <Button size="sm" className="gradient-primary" disabled={reenviandoFotos} onClick={reenviarFotos}>
+            {reenviandoFotos ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5 mr-1.5" />} Reenviar imágenes a Falabella
+          </Button>
+        </div>
+      )}
 
       {/* Selección para generar con IA varios productos a la vez */}
       {can("productos.editar") && products.length > 0 && (

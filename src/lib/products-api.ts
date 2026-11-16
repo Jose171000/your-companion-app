@@ -88,6 +88,10 @@ export interface ProductsSummary {
   sinPublicar: number;
   conError: number;
   incompletos: number;
+  /** Sin ninguna foto en Synkro. */
+  sinFotos: number;
+  /** Falabella rechazó la ficha por sus imágenes. */
+  faltaImagen: number;
 }
 
 /** Lo que responde el servidor: los productos y, aparte, los datos de la paginación (`meta`). */
@@ -140,7 +144,7 @@ export interface ProductsQueryParams {
   minPrice?: number;
   maxPrice?: number;
   inStock?: boolean;
-  estado?: 'sin-categoria' | 'sin-publicar' | 'con-error' | 'incompletos';
+  estado?: 'sin-categoria' | 'sin-publicar' | 'con-error' | 'incompletos' | 'sin-fotos' | 'falta-imagen';
   /** Pide las variantes de un grupo en vez de una sola fila por grupo */
   groupId?: string;
   sortBy?: 'createdAt' | 'name' | 'price' | 'stock' | 'sku';

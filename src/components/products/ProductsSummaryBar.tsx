@@ -1,7 +1,7 @@
 import { ProductsSummary } from "@/lib/products-api";
 import { cn } from "@/lib/utils";
 
-export type EstadoFiltro = "" | "sin-categoria" | "sin-publicar" | "con-error" | "incompletos";
+export type EstadoFiltro = "" | "sin-categoria" | "sin-publicar" | "con-error" | "incompletos" | "sin-fotos" | "falta-imagen";
 
 const ITEMS: { id: EstadoFiltro; label: string; campo: keyof ProductsSummary; alerta?: boolean }[] = [
   { id: "", label: "Todos", campo: "total" },
@@ -9,6 +9,8 @@ const ITEMS: { id: EstadoFiltro; label: string; campo: keyof ProductsSummary; al
   { id: "sin-categoria", label: "Sin categoría", campo: "sinCategoria", alerta: true },
   { id: "sin-publicar", label: "Sin publicar", campo: "sinPublicar" },
   { id: "con-error", label: "Con error", campo: "conError", alerta: true },
+  { id: "sin-fotos", label: "Sin fotos", campo: "sinFotos", alerta: true },
+  { id: "falta-imagen", label: "Falta imagen en Falabella", campo: "faltaImagen", alerta: true },
 ];
 
 /** Cuántos productos hay en cada situación; cada contador filtra la lista. */

@@ -827,6 +827,13 @@ export const syncApi = {
       body: JSON.stringify({ marketplaces, ...(connectionIds ? { connectionIds } : {}) }),
     }),
 
+  /** Vuelve a mandar a Falabella las fotos de fichas que rechazó por «Images Missing». Solo se envían las que de verdad les falta la imagen y tienen fotos en Synkro. */
+  resendFalabellaImages: (productIds: string[], connectionId?: string) =>
+    apiRequest<{ enviados: number; omitidos: { sku: string; motivo: string }[] }>('/sync/falabella/resend-images', {
+      method: 'POST',
+      body: JSON.stringify({ productIds, ...(connectionId ? { connectionId } : {}) }),
+    }),
+
   /** El canal quedó con otro stock que Synkro: vuelve a mandar a ESA cuenta el de Synkro (con el modo revisión, queda como solicitud) */
   resendListingStock: (listingId: string) =>
     apiRequest<{ message: string; pending?: number }>(`/sync/listings/${listingId}/resend-stock`, { method: 'POST' }),
