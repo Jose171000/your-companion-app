@@ -1,6 +1,6 @@
 /**
- * Agrupa las ventas diarias por día, semana, mes o año, y calcula si se está creciendo. Funciones puras (sin red ni zona horaria: las fechas
- * son «AAAA-MM-DD» y se manejan en UTC solo para sumar días).
+ * Agrupa las ventas diarias por día, semana, mes o año DENTRO del rango elegido, y lo compara con el periodo anterior de la misma duración.
+ * Funciones puras (sin red ni zona horaria: las fechas son «AAAA-MM-DD» y se manejan en UTC solo para sumar días).
  */
 
 export type Agrupacion = "dia" | "semana" | "mes" | "anio";
@@ -15,15 +15,20 @@ export interface PuntoDeVentas {
   titulo: string;
   sales: number;
   orders: number;
-  /** El periodo todavía no terminó (la semana, el mes o el año actual): no cuenta para comparar. */
-  enCurso: boolean;
 }
 
-export interface Crecimiento {
-  /** Variación respecto al periodo anterior, en %. */
-  pct: number;
-  /** Con qué se compara, para mostrarlo («último mes vs el anterior»). */
-  texto: string;
+/** Un punto del periodo elegido junto con el que le corresponde del periodo anterior (por posición). */
+export interface PuntoComparado extends PuntoDeVentas {
+  prevSales: number | null;
+  prevOrders: number | null;
+  prevTitulo: string | null;
+}
+
+export interface PeriodoAnterior {
+  from: string;
+  to: string;
+  /** Cómo se llama en pantalla («mes anterior», «30 días anteriores»). */
+  etiqueta: string;
 }
 
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
@@ -36,6 +41,8 @@ const aFecha = (s: string): Date => {
 const aTexto = (d: Date): string => d.toISOString().slice(0, 10);
 const sumarDias = (d: Date, n: number): Date => new Date(d.getTime() + n * 86_400_000);
 const corto = (s: string): string => { const [, m, d] = s.split("-"); return `${d}/${m}`; };
+const diasEntre = (from: string, to: string): number => Math.round((aFecha(to).getTime() - aFecha(from).getTime()) / 86_400_000) + 1;
+const ultimoDiaDelMes = (anio: number, mes0: number): number => new Date(Date.UTC(anio, mes0 + 1, 0)).getUTCDate();
 
 /** El lunes de la semana de esa fecha. */
 const lunesDe = (s: string): string => {
@@ -71,53 +78,67 @@ function siguiente(desde: string, modo: Agrupacion): string {
 }
 
 /**
- * Suma las ventas por periodo. Los periodos sin ventas entre el primero y el último salen en 0 (si no, el gráfico engañaría).
- * `hoy` («AAAA-MM-DD») marca los periodos que aún no terminaron.
+ * Suma las ventas por periodo, cubriendo TODO el rango elegido: los periodos sin ventas salen en 0 (si no, el gráfico engañaría).
+ * El primer y el último periodo pueden quedar parciales si el rango no empieza o termina en el borde de una semana, mes o año.
  */
-export function agruparVentas(dias: VentaDelDia[], modo: Agrupacion, hoy: string): PuntoDeVentas[] {
-  if (!dias.length) return [];
+export function agruparVentas(dias: VentaDelDia[], modo: Agrupacion, from: string, to: string): PuntoDeVentas[] {
+  if (!from || !to || from > to) return [];
   const mapa = new Map<string, { sales: number; orders: number }>();
   for (const x of dias) {
+    if (x.date < from || x.date > to) continue;
     const { desde } = limitesDe(x.date, modo);
     const actual = mapa.get(desde) ?? { sales: 0, orders: 0 };
     actual.sales += Number(x.sales) || 0;
     actual.orders += Number(x.orders) || 0;
     mapa.set(desde, actual);
   }
-  const claves = [...mapa.keys()].sort();
   const salida: PuntoDeVentas[] = [];
-  for (let k = claves[0]; k <= claves[claves.length - 1]; k = siguiente(k, modo)) {
+  const ultimo = limitesDe(to, modo).desde;
+  for (let k = limitesDe(from, modo).desde; k <= ultimo; k = siguiente(k, modo)) {
     const { hasta } = limitesDe(k, modo);
     const v = mapa.get(k) ?? { sales: 0, orders: 0 };
-    salida.push({ clave: k, ...etiquetas(k, hasta, modo), sales: Math.round(v.sales * 100) / 100, orders: v.orders, enCurso: modo !== "dia" && hasta >= hoy });
+    salida.push({ clave: k, ...etiquetas(k, hasta, modo), sales: Math.round(v.sales * 100) / 100, orders: v.orders });
   }
   return salida;
 }
 
 /**
- * ¿Se está creciendo? Por día: los últimos 7 días contra los 7 anteriores (necesita 14 días de datos). Por semana, mes o año: el último
- * periodo COMPLETO contra el anterior. Devuelve null si no hay con qué comparar.
+ * El periodo con el que comparar: el inmediatamente anterior y de la MISMA duración. Si lo elegido son meses calendario completos
+ * (del 1 al último día), se compara con los mismos meses anteriores; si no, con los mismos días anteriores (30 días → los 30 anteriores).
  */
-export function calcularCrecimiento(dias: VentaDelDia[], puntos: PuntoDeVentas[], modo: Agrupacion): Crecimiento | null {
-  const variacion = (ahora: number, antes: number) => (antes > 0 ? Math.round(((ahora - antes) / antes) * 1000) / 10 : null);
-  if (modo === "dia") {
-    if (dias.length < 2) return null;
-    const ordenados = [...dias].sort((a, b) => a.date.localeCompare(b.date));
-    const ultimo = ordenados[ordenados.length - 1].date;
-    if (ordenados[0].date > aTexto(sumarDias(aFecha(ultimo), -13))) return null;
-    const suma = (desde: string, hasta: string) => ordenados.filter((x) => x.date >= desde && x.date <= hasta).reduce((s, x) => s + (Number(x.sales) || 0), 0);
-    const ahora = suma(aTexto(sumarDias(aFecha(ultimo), -6)), ultimo);
-    const antes = suma(aTexto(sumarDias(aFecha(ultimo), -13)), aTexto(sumarDias(aFecha(ultimo), -7)));
-    const pct = variacion(ahora, antes);
-    return pct === null ? null : { pct, texto: "últimos 7 días vs los 7 anteriores" };
+export function periodoAnterior(from: string, to: string): PeriodoAnterior | null {
+  if (!from || !to || from > to) return null;
+  const a = aFecha(from);
+  const b = aFecha(to);
+  const esMesCompleto = a.getUTCDate() === 1 && b.getUTCDate() === ultimoDiaDelMes(b.getUTCFullYear(), b.getUTCMonth());
+  if (esMesCompleto) {
+    const meses = (b.getUTCFullYear() * 12 + b.getUTCMonth()) - (a.getUTCFullYear() * 12 + a.getUTCMonth()) + 1;
+    const desde = new Date(Date.UTC(a.getUTCFullYear(), a.getUTCMonth() - meses, 1));
+    const hasta = new Date(Date.UTC(a.getUTCFullYear(), a.getUTCMonth(), 0));
+    return { from: aTexto(desde), to: aTexto(hasta), etiqueta: meses === 1 ? "mes anterior" : meses === 12 ? "año anterior" : `${meses} meses anteriores` };
   }
-  const completos = puntos.filter((p) => !p.enCurso);
-  if (completos.length < 2) return null;
-  const ultimo = completos[completos.length - 1];
-  const previo = completos[completos.length - 2];
-  const pct = variacion(ultimo.sales, previo.sales);
-  const texto = modo === "semana" ? "última semana completa vs la anterior" : modo === "mes" ? "último mes completo vs el anterior" : "último año completo vs el anterior";
-  return pct === null ? null : { pct, texto };
+  const n = diasEntre(from, to);
+  const hasta = sumarDias(a, -1);
+  return { from: aTexto(sumarDias(hasta, -(n - 1))), to: aTexto(hasta), etiqueta: n === 1 ? "día anterior" : `${n} días anteriores` };
+}
+
+/** Une cada punto con el que ocupa la misma posición en el periodo anterior. */
+export function compararConAnterior(actual: PuntoDeVentas[], anterior: PuntoDeVentas[]): PuntoComparado[] {
+  return actual.map((p, i) => ({
+    ...p,
+    prevSales: anterior[i]?.sales ?? null,
+    prevOrders: anterior[i]?.orders ?? null,
+    prevTitulo: anterior[i]?.titulo ?? null,
+  }));
+}
+
+/** Variación en % entre dos totales; null si el anterior fue 0 (no hay base para comparar). */
+export function variacion(actual: number, anterior: number): number | null {
+  return anterior > 0 ? Math.round(((actual - anterior) / anterior) * 1000) / 10 : null;
+}
+
+export function sumaDeVentas(dias: { sales: number; orders: number }[]): { sales: number; orders: number } {
+  return dias.reduce((s, x) => ({ sales: s.sales + (Number(x.sales) || 0), orders: s.orders + (Number(x.orders) || 0) }), { sales: 0, orders: 0 });
 }
 
 /** El periodo con más ventas. */
@@ -125,16 +146,5 @@ export function mejorPeriodo(puntos: PuntoDeVentas[]): PuntoDeVentas | null {
   return puntos.reduce<PuntoDeVentas | null>((mejor, p) => (!mejor || p.sales > mejor.sales ? p : mejor), null);
 }
 
-/** «AAAA-MM-DD» de hoy en la zona horaria local. */
-export function hoyLocal(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Desde cuándo pedir las ventas para el gráfico: 12 meses para «Mes» y 3 años para «Año». Semana y día usan el rango elegido en pantalla. */
-export function desdeParaGrafico(modo: Agrupacion, hoy: string): string | null {
-  const d = aFecha(hoy);
-  if (modo === "mes") return aTexto(new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 11, 1)));
-  if (modo === "anio") return `${d.getUTCFullYear() - 2}-01-01`;
-  return null;
-}
+/** «dd/mm/aaaa» de una fecha «AAAA-MM-DD». */
+export const fechaLarga = (s: string): string => { const [y, m, d] = s.split("-"); return `${d}/${m}/${y}`; };

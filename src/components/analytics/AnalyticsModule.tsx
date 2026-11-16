@@ -284,7 +284,8 @@ export function AnalyticsModule() {
       {/* Evolución de ventas: por día, semana, mes o año, con la variación frente al periodo anterior */}
       <EvolucionDeVentas
         dias={report.byDay}
-        rangoTexto={`${report.range.from} al ${report.range.to}`}
+        from={from}
+        to={to}
         storeId={storeId}
         estados={estados.join(",")}
         incluirEnvio={incluirEnvio}

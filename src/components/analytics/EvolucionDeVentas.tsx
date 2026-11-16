@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { Loader2, TrendingDown, TrendingUp } from "lucide-react";
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { reportsApi } from "@/lib/admin-api";
 import { cn } from "@/lib/utils";
 import {
-  agruparVentas, calcularCrecimiento, desdeParaGrafico, hoyLocal, mejorPeriodo,
+  agruparVentas, compararConAnterior, fechaLarga, mejorPeriodo, periodoAnterior, sumaDeVentas, variacion,
   type Agrupacion, type VentaDelDia,
 } from "@/lib/ventas-por-periodo";
 
@@ -27,74 +27,56 @@ const OPCIONES: { id: Agrupacion; label: string }[] = [
   { id: "anio", label: "Año" },
 ];
 
-const AYUDA: Record<Agrupacion, string> = {
-  dia: "",
-  semana: "",
-  mes: "Últimos 12 meses",
-  anio: "Últimos 3 años",
-};
+const UNIDAD: Record<Agrupacion, string> = { dia: "días", semana: "semanas", mes: "meses", anio: "años" };
+const UNO: Record<Agrupacion, string> = { dia: "día", semana: "semana", mes: "mes", anio: "año" };
 
 interface Props {
-  /** Ventas diarias del rango elegido arriba en la pantalla. */
+  /** Ventas diarias del rango elegido en la pantalla. */
   dias: VentaDelDia[];
-  /** Texto del rango elegido («2026-11-01 al 2026-11-16»). */
-  rangoTexto: string;
+  /** El rango elegido («Personalizado», últimos 30 días, un mes…), «AAAA-MM-DD». */
+  from: string;
+  to: string;
   storeId?: string;
-  /** Los mismos filtros del reporte, para que el gráfico no cuente otra cosa. */
+  /** Los mismos filtros del reporte, para que el gráfico y la comparación no cuenten otra cosa. */
   estados: string;
   incluirEnvio: boolean;
 }
 
 /**
- * Evolución de ventas por día, semana, mes o año, con la variación frente al periodo anterior para ver si se está creciendo.
- * Día y semana usan el rango de fechas elegido en la pantalla; mes y año piden por su cuenta los últimos 12 meses o 3 años,
- * con los mismos filtros, para poder comparar aunque el rango de arriba sea corto.
+ * Evolución de ventas dentro del rango elegido, agrupada por día, semana, mes o año, y comparada con el periodo anterior de la MISMA
+ * duración (30 días → los 30 anteriores; un mes completo → el mes anterior) para ver si se está creciendo. La línea punteada es el
+ * periodo anterior, alineado por posición.
  */
-export function EvolucionDeVentas({ dias, rangoTexto, storeId, estados, incluirEnvio }: Props) {
+export function EvolucionDeVentas({ dias, from, to, storeId, estados, incluirEnvio }: Props) {
   const [modo, setModo] = useState<Agrupacion>("dia");
-  const hoy = useMemo(() => hoyLocal(), []);
-  const desde = desdeParaGrafico(modo, hoy);
+  const anterior = useMemo(() => periodoAnterior(from, to), [from, to]);
 
-  const { data: largo, isFetching: cargandoLargo } = useQuery({
-    queryKey: ["sales-evolution", storeId, modo, desde, hoy, estados, incluirEnvio],
-    queryFn: () => reportsApi.getSales(desde!, hoy, estados || undefined, incluirEnvio),
-    enabled: !!storeId && desde !== null,
+  const { data: previo, isFetching: cargandoPrevio } = useQuery({
+    queryKey: ["sales-previous", storeId, anterior?.from, anterior?.to, estados, incluirEnvio],
+    queryFn: () => reportsApi.getSales(anterior!.from, anterior!.to, estados || undefined, incluirEnvio),
+    enabled: !!storeId && !!anterior,
     placeholderData: keepPreviousData,
     staleTime: 5 * 60_000,
   });
+  const diasPrevios: VentaDelDia[] = previo?.data?.byDay ?? [];
+  const hayPrevio = !!previo?.data;
 
-  const base: VentaDelDia[] = desde !== null ? (largo?.data?.byDay ?? []) : dias;
-  const puntos = useMemo(() => agruparVentas(base, modo, hoy), [base, modo, hoy]);
-  const crecimiento = useMemo(() => calcularCrecimiento(base, puntos, modo), [base, puntos, modo]);
-  const mejor = useMemo(() => mejorPeriodo(puntos), [puntos]);
-  const total = puntos.reduce((s, p) => s + p.sales, 0);
+  const actual = useMemo(() => agruparVentas(dias, modo, from, to), [dias, modo, from, to]);
+  const puntosPrevios = useMemo(() => (anterior && hayPrevio ? agruparVentas(diasPrevios, modo, anterior.from, anterior.to) : []), [diasPrevios, modo, anterior, hayPrevio]);
+  const datos = useMemo(() => compararConAnterior(actual, puntosPrevios), [actual, puntosPrevios]);
 
-  const sube = (crecimiento?.pct ?? 0) >= 0;
-  const subtitulo = desde !== null ? `${AYUDA[modo]} · hasta hoy` : rangoTexto;
-
-  const tooltip = (
-    <Tooltip
-      cursor={{ fill: "rgba(120,120,120,.12)" }}
-      labelFormatter={(_, items) => (items?.[0]?.payload as any)?.titulo ?? ""}
-      formatter={(v: number, name: string) => (name === "sales" ? [money(v), "Ventas"] : [v, "Pedidos"])}
-      contentStyle={{ borderRadius: 12, border: "1px solid rgba(120,120,120,.25)", background: "rgba(20,20,20,.92)", color: "#fff", fontSize: 12 }}
-      labelStyle={{ color: "#fff", fontWeight: 600 }}
-    />
-  );
-  const ejes = (
-    <>
-      <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
-      <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} minTickGap={modo === "dia" ? 20 : 8} />
-      <YAxis tickLine={false} axisLine={false} width={62} tick={{ fontSize: 11 }} tickFormatter={montoCorto} domain={[0, "auto"]} allowDecimals={false} />
-    </>
-  );
+  const totalActual = useMemo(() => sumaDeVentas(dias.filter((d) => d.date >= from && d.date <= to)), [dias, from, to]);
+  const totalPrevio = useMemo(() => sumaDeVentas(diasPrevios), [diasPrevios]);
+  const pct = hayPrevio ? variacion(totalActual.sales, totalPrevio.sales) : null;
+  const sube = (pct ?? 0) >= 0;
+  const mejor = useMemo(() => mejorPeriodo(actual), [actual]);
 
   return (
     <div className="glass rounded-2xl border border-border dark:border-white/10 p-5 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3 mb-1">
         <div className="min-w-0">
           <h3 className="font-semibold">Evolución de ventas</h3>
-          <p className="text-xs text-muted-foreground">{subtitulo}</p>
+          <p className="text-xs text-muted-foreground">{fechaLarga(from)} al {fechaLarga(to)} · agrupado por {UNIDAD[modo]}</p>
         </div>
         <div className="inline-flex rounded-lg bg-secondary/60 p-1" role="tablist" aria-label="Agrupar por">
           {OPCIONES.map((o) => (
@@ -115,57 +97,61 @@ export function EvolucionDeVentas({ dias, rangoTexto, storeId, estados, incluirE
         </div>
       </div>
 
+      {/* Comparación con el periodo anterior de la misma duración */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-4 min-h-6 text-xs">
-        {crecimiento ? (
+        {anterior && pct !== null && (
           <span className={cn("inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold", sube ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400" : "bg-red-500/15 text-red-600 dark:text-red-400")}>
             {sube ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-            {sube ? "+" : ""}{crecimiento.pct.toLocaleString("es-PE")} %
+            {sube ? "+" : ""}{pct.toLocaleString("es-PE")} %
           </span>
-        ) : (
-          <span className="text-muted-foreground">Aún no hay con qué comparar en este rango.</span>
         )}
-        {crecimiento && <span className="text-muted-foreground">{crecimiento.texto}</span>}
+        {anterior && hayPrevio && (
+          <span className="text-muted-foreground">
+            vs {anterior.etiqueta} ({fechaLarga(anterior.from)} al {fechaLarga(anterior.to)}): <span className="font-medium text-foreground">{money(totalPrevio.sales)}</span>
+            {pct === null && " · sin ventas en ese periodo, no hay base para comparar"}
+          </span>
+        )}
+        {cargandoPrevio && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
         {mejor && mejor.sales > 0 && <span className="text-muted-foreground">Mejor periodo: <span className="font-medium text-foreground">{mejor.titulo}</span> ({money(mejor.sales)})</span>}
-        {puntos.length > 0 && <span className="text-muted-foreground">Total mostrado: <span className="font-medium text-foreground">{money(total)}</span></span>}
-        {cargandoLargo && desde !== null && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />}
       </div>
 
-      {puntos.length === 0 ? (
-        <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">
-          {cargandoLargo && desde !== null ? "Cargando…" : "Sin datos para mostrar en este rango."}
-        </div>
+      {datos.length === 0 ? (
+        <div className="h-48 flex items-center justify-center text-sm text-muted-foreground">Sin datos para mostrar en este rango.</div>
       ) : (
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
-            {modo === "dia" ? (
-              <AreaChart data={puntos} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#FCCB34" stopOpacity={0.45} />
-                    <stop offset="100%" stopColor="#FCCB34" stopOpacity={0.02} />
-                  </linearGradient>
-                </defs>
-                {ejes}
-                {tooltip}
-                <Area type="monotone" dataKey="sales" stroke="#FCCB34" strokeWidth={2} fill="url(#salesFill)" />
-              </AreaChart>
-            ) : (
-              <BarChart data={puntos} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                {ejes}
-                {tooltip}
-                <Bar dataKey="sales" radius={[6, 6, 0, 0]} maxBarSize={56}>
-                  {puntos.map((p) => (
-                    // El periodo que aún no termina se ve más claro: es parcial y no debe leerse como una caída.
-                    <Cell key={p.clave} fill="#FCCB34" fillOpacity={p.enCurso ? 0.4 : 1} />
-                  ))}
-                </Bar>
-              </BarChart>
-            )}
+            <ComposedChart data={datos} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FCCB34" stopOpacity={0.45} />
+                  <stop offset="100%" stopColor="#FCCB34" stopOpacity={0.02} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="opacity-10" vertical={false} />
+              <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} minTickGap={modo === "dia" ? 20 : 8} />
+              <YAxis tickLine={false} axisLine={false} width={62} tick={{ fontSize: 11 }} tickFormatter={montoCorto} domain={[0, "auto"]} allowDecimals={false} />
+              <Tooltip
+                labelFormatter={(_, items) => (items?.[0]?.payload as any)?.titulo ?? ""}
+                formatter={(v: number, name: string, item: any) =>
+                  name === "prevSales" ? [money(v), `${anterior?.etiqueta ?? "Anterior"}${item?.payload?.prevTitulo ? ` (${item.payload.prevTitulo})` : ""}`] : [money(v), "Ventas"]
+                }
+                contentStyle={{ borderRadius: 12, border: "1px solid rgba(120,120,120,.25)", background: "rgba(20,20,20,.92)", color: "#fff", fontSize: 12 }}
+                labelStyle={{ color: "#fff", fontWeight: 600 }}
+              />
+              <Area type="monotone" dataKey="sales" stroke="#FCCB34" strokeWidth={2} fill="url(#salesFill)" />
+              {hayPrevio && <Line type="monotone" dataKey="prevSales" stroke="#9ca3af" strokeWidth={1.5} strokeDasharray="5 4" dot={false} connectNulls />}
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       )}
-      {modo !== "dia" && puntos.some((p) => p.enCurso) && (
-        <p className="text-[11px] text-muted-foreground mt-2">La barra más clara es el periodo en curso: todavía no terminó y no cuenta para el porcentaje.</p>
+      {datos.length === 1 && modo !== "dia" && (
+        <p className="text-[11px] text-muted-foreground mt-2">Con este rango solo hay 1 punto por {UNO[modo]}. Elige un rango más largo en «Personalizado» para ver la evolución.</p>
+      )}
+      {anterior && (
+        <p className="text-[11px] text-muted-foreground mt-2">
+          <span className="inline-block w-4 border-t-2 border-[#FCCB34] align-middle mr-1" /> Periodo elegido
+          <span className="inline-block w-4 border-t-2 border-dashed border-[#9ca3af] align-middle mx-1 ml-4" /> {anterior.etiqueta}
+        </p>
       )}
     </div>
   );
