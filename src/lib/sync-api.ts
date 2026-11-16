@@ -644,6 +644,25 @@ export const syncApi = {
       cuentas: { id: string; marketplace: string; nombre: string; registradas: number; yaRegistradas: number; incompleto: boolean; error?: string }[];
     }>(`/sync/orders/import-history?days=${days}${connectionId ? `&connectionId=${connectionId}` : ""}`, { method: "POST" }),
 
+  /** Nombre y ruta de una categoría guardada, o `valida: false` si Falabella ya no la tiene como categoría final. */
+  describeFalabellaCategory: (categoryId: string) =>
+    apiRequest<{ id: string; valida: boolean; name?: string; path?: string }>(
+      `/sync/falabella/categories/${encodeURIComponent(categoryId)}`,
+      { method: 'GET' },
+    ),
+
+  /** Vuelve a pedir a Falabella su árbol de categorías, sin esperar al caché de 12 horas. */
+  refreshFalabellaCategories: () =>
+    apiRequest<{ total: number; message: string }>('/sync/falabella/categories/refresh', { method: 'POST' }),
+
+  /** Productos de la tienda cuya categoría de Falabella ya no existe (solo consulta). */
+  getObsoleteFalabellaCategories: () =>
+    apiRequest<{
+      revisados: number;
+      obsoletos: number;
+      categorias: { categoryId: string; total: number; productos: { id: string; sku: string; name: string }[] }[];
+    }>('/sync/falabella/categories/obsoletas', { method: 'GET' }),
+
   /** Categorías de Falabella donde se puede publicar, filtradas por texto. */
   searchFalabellaCategories: (search: string) =>
     apiRequest<{ id: string; name: string; path: string }[]>(

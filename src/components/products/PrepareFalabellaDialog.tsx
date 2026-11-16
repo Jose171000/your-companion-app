@@ -90,6 +90,52 @@ export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: P
     staleTime: 10 * 60_000,
   });
 
+  // La categoría guardada puede haber dejado de existir: Falabella cambia su árbol seguido.
+  // Se comprueba contra el árbol actual y, si sigue vigente, se muestra su nombre real.
+  const [categoriaCaida, setCategoriaCaida] = useState<string | null>(null);
+  const [verObsoletas, setVerObsoletas] = useState(false);
+  const { data: revision } = useQuery({
+    queryKey: ["falabella-category-check", categoria?.id],
+    queryFn: () => syncApi.describeFalabellaCategory(categoria!.id),
+    enabled: open && !!categoria?.id,
+    staleTime: 60_000,
+  });
+  useEffect(() => {
+    const r = revision?.data;
+    if (!r || r.id !== categoria?.id) return;
+    if (r.valida && r.path) {
+      if (categoria.path !== r.path) setCategoria({ id: r.id, path: r.path });
+    } else if (!r.valida) {
+      setCategoriaCaida(r.id);
+      setCategoria(null);
+      // Se deja la búsqueda lista con la primera palabra con sentido del nombre («Toalla de Baño…» → «Toalla»).
+      const palabra = (product?.name ?? "").split(/\s+/).find((w) => w.replace(/[^\p{L}]/gu, "").length >= 4);
+      if (palabra) setBusqueda(palabra.replace(/[^\p{L}]/gu, ""));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revision, categoria?.id]);
+  useEffect(() => {
+    if (open) { setCategoriaCaida(null); setVerObsoletas(false); }
+  }, [open, product?.id]);
+
+  const actualizarCategorias = useMutation({
+    mutationFn: () => syncApi.refreshFalabellaCategories(),
+    onSuccess: (res) => {
+      if (res.error) { toast.error(res.error); return; }
+      toast.success(res.data?.message ?? "Categorías actualizadas");
+      queryClient.invalidateQueries({ queryKey: ["falabella-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["falabella-category-check"] });
+    },
+    onError: () => toast.error("No se pudieron actualizar las categorías"),
+  });
+
+  const { data: obsoletas, isFetching: buscandoObsoletas } = useQuery({
+    queryKey: ["falabella-obsoletas"],
+    queryFn: () => syncApi.getObsoleteFalabellaCategories(),
+    enabled: open && verObsoletas,
+    staleTime: 60_000,
+  });
+
   const { data: camposResult, isFetching: cargandoCampos } = useQuery({
     queryKey: ["falabella-fields", categoria?.id],
     queryFn: () => syncApi.getFalabellaCategoryFields(categoria!.id),
@@ -199,6 +245,12 @@ export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: P
               </div>
             ) : (
               <>
+                {categoriaCaida && (
+                  <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm space-y-1">
+                    <p className="font-medium">La categoría guardada (ID {categoriaCaida}) ya no existe en Falabella.</p>
+                    <p className="text-xs text-muted-foreground">Falabella cambia su catálogo con frecuencia. Elige otra abajo; al guardarla reemplaza a la vieja.</p>
+                  </div>
+                )}
                 {sugeridas.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-xs text-muted-foreground">
@@ -229,6 +281,36 @@ export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: P
                     onChange={(e) => setBusqueda(e.target.value)}
                   />
                 </div>
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                  <button type="button" className="text-primary hover:underline disabled:opacity-50" disabled={actualizarCategorias.isPending} onClick={() => actualizarCategorias.mutate()}>
+                    {actualizarCategorias.isPending ? "Actualizando…" : "¿No aparece? Actualizar categorías desde Falabella"}
+                  </button>
+                  <button type="button" className="text-muted-foreground hover:underline" onClick={() => setVerObsoletas((v) => !v)}>
+                    {verObsoletas ? "Ocultar revisión" : "Revisar otros productos con categoría vieja"}
+                  </button>
+                </div>
+
+                {verObsoletas && (
+                  <div className="rounded-lg border border-border p-3 text-xs space-y-2">
+                    {buscandoObsoletas || !obsoletas ? (
+                      <Skeleton className="h-10 w-full" />
+                    ) : obsoletas.data && obsoletas.data.obsoletos > 0 ? (
+                      <>
+                        <p className="font-medium">{obsoletas.data.obsoletos} de {obsoletas.data.revisados} productos tienen una categoría que ya no existe:</p>
+                        {obsoletas.data.categorias.map((c) => (
+                          <div key={c.categoryId}>
+                            <p className="font-medium">ID {c.categoryId} · {c.total} producto{c.total === 1 ? "" : "s"}</p>
+                            <p className="text-muted-foreground">{c.productos.slice(0, 5).map((p) => p.name).join(" · ")}{c.total > 5 ? "…" : ""}</p>
+                          </div>
+                        ))}
+                        <p className="text-muted-foreground">Ábrelos y elige una categoría nueva en «Preparar para Falabella».</p>
+                      </>
+                    ) : (
+                      <p>Todos los productos de esta tienda tienen categorías vigentes.</p>
+                    )}
+                  </div>
+                )}
 
                 {busqueda.trim().length > 0 && busqueda.trim().length < 3 && (
                   <p className="text-xs text-muted-foreground">Escribe al menos 3 letras.</p>
