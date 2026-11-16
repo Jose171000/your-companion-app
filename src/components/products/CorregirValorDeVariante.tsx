@@ -44,6 +44,7 @@ export function CorregirValorDeVariante({ productId, canal, nombreDelCanal, onAp
   }, [productId, canal]);
 
   const items = sugerir.data?.data?.items ?? [];
+  const sinCategoria = !!sugerir.data?.data?.sinCategoria;
 
   const aplicar = useMutation({
     mutationFn: () =>
@@ -76,7 +77,10 @@ export function CorregirValorDeVariante({ productId, canal, nombreDelCanal, onAp
           <Button type="button" variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => sugerir.mutate()}><Sparkles className="w-3.5 h-3.5" /> Reintentar</Button>
         </div>
       )}
-      {sugerir.isSuccess && !sugerir.data?.error && !items.length && (
+      {sugerir.isSuccess && !sugerir.data?.error && sinCategoria && (
+        <p className="break-words">Esta variante no tiene categoría de {nombreDelCanal}: sin ella no hay listas que revisar. Dale la categoría con el aviso del grupo o en «Preparar para Falabella».</p>
+      )}
+      {sugerir.isSuccess && !sugerir.data?.error && !sinCategoria && !items.length && (
         <p className="break-words">No encontré un dato de lista cerrada con un valor rechazado en esta variante: el error puede ser de otro dato. Revisa el mensaje del canal.</p>
       )}
       {items.map((i) => {

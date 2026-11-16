@@ -349,7 +349,7 @@ export const productsApi = {
 
   /** Qué dato de lista cerrada rechazó el canal de UNA variante, con las opciones que sí acepta y la recomendada por la IA. Solo consulta. */
   suggestChannelFix: (productId: string, marketplace: string) =>
-    apiRequest<{ items: { atributo: string; valor: string; opciones: string[]; opcion: string | null; motivo: string; origen: 'ia' | 'foto' | 'actual' | null }[] }>(`/products/channel-fix/${productId}/suggest`, { method: 'POST', body: JSON.stringify({ marketplace }) }),
+    apiRequest<{ sinCategoria?: boolean; items: { atributo: string; valor: string; opciones: string[]; opcion: string | null; motivo: string; origen: 'ia' | 'foto' | 'actual' | null }[] }>(`/products/channel-fix/${productId}/suggest`, { method: 'POST', body: JSON.stringify({ marketplace }) }),
 
   /** Guarda, solo para ese canal, la opción elegida para el dato que rechazó la variante. */
   applyChannelFix: (productId: string, marketplace: string, cambios: { atributo: string; valor: string; opcion: string }[]) =>

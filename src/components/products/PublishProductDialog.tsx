@@ -7,6 +7,7 @@ import { PrepareFalabellaDialog } from "./PrepareFalabellaDialog";
 import { AccountChooser, CuentasPorCanal, useCuentasPorCanal } from "@/components/marketplaces/AccountChooser";
 import { VariantCompatNotice } from "./VariantCompatNotice";
 import { CorregirValorDeVariante } from "./CorregirValorDeVariante";
+import { CategoriaDelGrupo } from "./CategoriaDelGrupo";
 import { WooCategoryField } from "./WooCategoryField";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -349,6 +350,9 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
           )}
 
           <AccountChooser canales={selected.filter((mp) => !publicados.has(mp))} value={cuentas} onChange={setCuentas} />
+
+          {/* Variantes del grupo sin categoría de Falabella o con categorías distintas */}
+          {product?.group?.id && selected.includes("falabella") && <CategoriaDelGrupo groupId={product.group.id} />}
 
           {/* Una variante rechazada por un color o talla que el canal no tiene: corrección solo para ese valor, con la opción recomendada por la IA. */}
           {product && !product.alGrupo && ["mercadolibre", "falabella"]

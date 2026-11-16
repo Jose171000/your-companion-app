@@ -653,6 +653,20 @@ export const syncApi = {
       { method: 'GET' },
     ),
 
+  /** Categoría de Falabella de cada variante de un grupo: cuántas no tienen y si el grupo mezcla categorías. Solo consulta. */
+  getFalabellaGroupCategoryStatus: (groupId: string) =>
+    apiRequest<{ variantes: number; sinCategoria: string[]; categorias: { id: string; total: number; publicadas: number }[]; recomendada: string | null; mezcladas: boolean }>(
+      `/sync/falabella/groups/${groupId}/category-status`,
+      { method: 'GET' },
+    ),
+
+  /** Da una categoría solo a las variantes del grupo que no tienen ninguna (por defecto la de las ya publicadas). No envía nada a Falabella. */
+  completeFalabellaGroupCategory: (groupId: string, categoryId?: string) =>
+    apiRequest<{ asignadas: number; categoryId: string; ruta?: string | null }>(
+      `/sync/falabella/groups/${groupId}/complete-category`,
+      { method: 'POST', body: JSON.stringify(categoryId ? { categoryId } : {}) },
+    ),
+
   /** Vuelve a pedir a Falabella su árbol de categorías, sin esperar al caché de 12 horas. */
   refreshFalabellaCategories: () =>
     apiRequest<{ total: number; message: string }>('/sync/falabella/categories/refresh', { method: 'POST' }),

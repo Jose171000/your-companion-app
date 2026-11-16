@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CorregirValorDeVariante } from "./CorregirValorDeVariante";
+import { CategoriaDelGrupo } from "./CategoriaDelGrupo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -703,6 +704,7 @@ function FichaDeProducto({
             {fal && (
               <TabsContent value="falabella" className="pt-4 space-y-4">
                 <EstadoDelCanal canal={fal} stock={hoja.product.stock} />
+                {product?.group?.id && <CategoriaDelGrupo groupId={product.group.id} />}
                 {fal.lastError && <p className="text-xs text-red-400 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{fal.lastError}</p>}
                 {!modoGrupo && product && (fal.lastError || /valor no válido/i.test(fal.motivo ?? "")) && (
                   <CorregirValorDeVariante productId={product.id} canal="falabella" nombreDelCanal="Falabella" onApplied={() => reenviar("falabella", fal.connectionId)} />
