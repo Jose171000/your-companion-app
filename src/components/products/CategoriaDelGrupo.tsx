@@ -39,7 +39,8 @@ export function CategoriaDelGrupo({ groupId }: { groupId: string }) {
     mutationFn: () => syncApi.completeFalabellaGroupCategory(groupId),
     onSuccess: (res) => {
       if (res.error || !res.data) return toast.error(res.error ?? "No se pudo asignar la categoría");
-      toast.success(`Categoría asignada a ${res.data.asignadas} variante(s). No se envió nada a Falabella.`);
+      const n = res.data.asignadas + res.data.igualadas;
+      toast.success(`Categoría unificada en ${n} variante(s).${res.data.distintasPublicadas ? ` ${res.data.distintasPublicadas} ya publicada(s) con otra conservan la de su ficha en Falabella.` : ""} No se envió nada a Falabella.`);
       for (const k of ["falabella-group-category", "products", "product-sheet", "sync-status", "products-overview"]) queryClient.invalidateQueries({ queryKey: [k] });
     },
     onError: () => toast.error("Error al conectar con el servidor"),
@@ -47,22 +48,19 @@ export function CategoriaDelGrupo({ groupId }: { groupId: string }) {
 
   if (!estado || (!estado.sinCategoria.length && !estado.mezcladas)) return null;
   const faltan = estado.sinCategoria.length;
+  const porAlinear = estado.porAsignar + estado.porIgualar;
 
   return (
     <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs space-y-2">
-      {faltan > 0 && (
-        <div className="space-y-1.5">
-          <p className="break-words"><span className="font-medium">{faltan} de las {estado.variantes} variantes de este grupo no tienen categoría de Falabella</span>, aunque las demás sí.</p>
-          {estado.recomendada && can("canales.publicar") ? (
-            <Button type="button" size="sm" className="h-7 text-xs" disabled={completar.isPending} onClick={() => completar.mutate()}>
-              {completar.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
-              Darles la misma que usan las demás: {nombreDe(estado.recomendada)}
-            </Button>
-          ) : (
-            <p className="text-muted-foreground">Elige una categoría en «Preparar para Falabella».</p>
-          )}
-        </div>
-      )}
+      <p className="break-words">Un producto con variantes debe tener <span className="font-medium">una sola categoría</span> para todas sus variantes.{faltan > 0 && <> {faltan} de las {estado.variantes} no tienen ninguna.</>}</p>
+      {porAlinear > 0 && (estado.recomendada && can("canales.publicar") ? (
+        <Button type="button" size="sm" className="h-7 text-xs h-auto min-h-7 whitespace-normal text-left" disabled={completar.isPending} onClick={() => completar.mutate()}>
+          {completar.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : null}
+          Dejar {porAlinear} variante(s) con: {nombreDe(estado.recomendada)}
+        </Button>
+      ) : (
+        <p className="text-muted-foreground">Elige una categoría en «Preparar para Falabella».</p>
+      ))}
       {estado.mezcladas && (
         <div className="space-y-1">
           <p className="font-medium">Las variantes de este grupo usan categorías distintas en Falabella:</p>
@@ -71,7 +69,7 @@ export function CategoriaDelGrupo({ groupId }: { groupId: string }) {
               <li key={c.id} className="break-words">{nombreDe(c.id)} — {c.total} variante(s){c.publicadas ? `, ${c.publicadas} ya en Falabella` : ""}</li>
             ))}
           </ul>
-          <p className="text-muted-foreground">Las ya publicadas conservan la categoría de su ficha en Falabella y no se cambian desde aquí. Si el grupo debe tener una sola, conviene decidirlo antes de publicar las que faltan.</p>
+          <p className="text-muted-foreground">{estado.distintasPublicadas > 0 ? `${estado.distintasPublicadas} variante(s) ya publicada(s) tienen otra y conservan la de su ficha en Falabella (el canal no deja cambiarla desde aquí). ` : ""}Las que no se han enviado se alinean con el botón.</p>
         </div>
       )}
     </div>
