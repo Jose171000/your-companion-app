@@ -409,6 +409,8 @@ export interface FalabellaPrepReport {
   estimatedAttributes: string[];
   /** La IA redactó la descripción HTML estándar en este paso. */
   descriptionGenerated?: boolean;
+  /** La IA no pudo redactar la ficha HTML (ni en el reintento): se enviará el texto hasta que se vuelva a intentar. */
+  descriptionFailed?: boolean;
   /** Atributos de la categoría con valor, de cuántos hay. */
   attributes?: { filled: number; total: number };
 }

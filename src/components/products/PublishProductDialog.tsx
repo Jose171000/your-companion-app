@@ -440,6 +440,12 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
                     </p>
                   )}
 
+                  {prep.descriptionFailed && (
+                    <p className="text-[11px] text-amber-500 break-words">
+                      La IA no pudo redactar la descripción HTML (se intentó dos veces). Se enviará el texto del producto; vuelve a pulsar «Preparar con IA» en unos minutos para generarla.
+                    </p>
+                  )}
+
                   {prep.estimatedAttributes.length > 0 && (
                     <p className="text-[11px] text-amber-500 break-words">
                       Datos estimados por la IA: {prep.estimatedAttributes.join(", ")}. Revísalos antes de publicar.
