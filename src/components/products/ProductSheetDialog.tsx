@@ -703,8 +703,8 @@ function FichaDeProducto({
               <TabsContent value="falabella" className="pt-4 space-y-4">
                 <EstadoDelCanal canal={fal} stock={hoja.product.stock} />
                 {fal.lastError && <p className="text-xs text-red-400 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{fal.lastError}</p>}
-                {!modoGrupo && product?.group?.id && product.variantValues && (fal.lastError || /valor no válido/i.test(fal.motivo ?? "")) && (
-                  <CorregirValorDeVariante groupId={product.group.id} canal="falabella" nombreDelCanal="Falabella" variantValues={product.variantValues} onApplied={() => reenviar("falabella", fal.connectionId)} />
+                {!modoGrupo && product && (fal.lastError || /valor no válido/i.test(fal.motivo ?? "")) && (
+                  <CorregirValorDeVariante productId={product.id} canal="falabella" nombreDelCanal="Falabella" onApplied={() => reenviar("falabella", fal.connectionId)} />
                 )}
                 {fal.listo ? (
                   <p className="text-xs text-green-500 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> La ficha cumple lo que pide Falabella.</p>
@@ -749,8 +749,8 @@ function FichaDeProducto({
               <TabsContent value="mercadolibre" className="pt-4 space-y-4">
                 <EstadoDelCanal canal={meli} stock={hoja.product.stock} />
                 {meli.lastError && <p className="text-xs text-red-400 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{meli.lastError}</p>}
-                {!modoGrupo && product?.group?.id && product.variantValues && meli.lastError && (
-                  <CorregirValorDeVariante groupId={product.group.id} canal="mercadolibre" nombreDelCanal="Mercado Libre" variantValues={product.variantValues} onApplied={() => reenviar("mercadolibre", meli.connectionId)} />
+                {!modoGrupo && product && meli.lastError && (
+                  <CorregirValorDeVariante productId={product.id} canal="mercadolibre" nombreDelCanal="Mercado Libre" onApplied={() => reenviar("mercadolibre", meli.connectionId)} />
                 )}
                 <div className="rounded-lg border border-border p-3 space-y-1 text-sm break-words">
                   <p><span className="text-muted-foreground">Título:</span> {meli.sent.title} <span className="text-[11px] text-muted-foreground">(Mercado Libre no deja cambiarlo en una publicación ya creada)</span></p>

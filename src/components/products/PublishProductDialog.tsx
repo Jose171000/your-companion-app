@@ -351,15 +351,14 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
           <AccountChooser canales={selected.filter((mp) => !publicados.has(mp))} value={cuentas} onChange={setCuentas} />
 
           {/* Una variante rechazada por un color o talla que el canal no tiene: corrección solo para ese valor, con la opción recomendada por la IA. */}
-          {product?.group?.id && !product.alGrupo && product.variantValues && ["mercadolibre", "falabella"]
+          {product && !product.alGrupo && ["mercadolibre", "falabella"]
             .filter((mp) => listings.some((l) => l.marketplace === mp && l.syncStatus === "error"))
             .map((mp) => (
               <CorregirValorDeVariante
                 key={`${product.id}-${mp}`}
-                groupId={product.group!.id}
+                productId={product.id}
                 canal={mp}
                 nombreDelCanal={PUBLISHABLE.find((p) => p.id === mp)?.name ?? mp}
-                variantValues={product.variantValues!}
                 onApplied={() => {
                   if (porPublicar.includes(mp)) publishMutation.mutate();
                   else toast.success("Ajuste guardado. Marca el canal y pulsa Publicar para reenviar.");

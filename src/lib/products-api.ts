@@ -343,6 +343,14 @@ export const productsApi = {
   suggestChannelValues: (groupId: string, marketplace: string) =>
     apiRequest<SugerenciaDeAjustes[]>(`/products/groups/${groupId}/channel-values/suggest`, { method: 'POST', body: JSON.stringify({ marketplace }) }),
 
+  /** Qué dato de lista cerrada rechazó el canal de UNA variante, con las opciones que sí acepta y la recomendada por la IA. Solo consulta. */
+  suggestChannelFix: (productId: string, marketplace: string) =>
+    apiRequest<{ items: { atributo: string; valor: string; opciones: string[]; opcion: string | null; motivo: string; origen: 'ia' | 'foto' | 'actual' | null }[] }>(`/products/channel-fix/${productId}/suggest`, { method: 'POST', body: JSON.stringify({ marketplace }) }),
+
+  /** Guarda, solo para ese canal, la opción elegida para el dato que rechazó la variante. */
+  applyChannelFix: (productId: string, marketplace: string, cambios: { atributo: string; valor: string; opcion: string }[]) =>
+    apiRequest<{ aplicados: number }>(`/products/channel-fix/${productId}/apply`, { method: 'POST', body: JSON.stringify({ marketplace, cambios }) }),
+
   /** Guarda, solo para ese canal, a qué opción corresponde cada valor confirmado. El valor de la persona no cambia en Synkro ni en otros canales. */
   applyChannelValues: (groupId: string, marketplace: string, cambios: { eje: string; valor: string; opcion: string; atributo?: string }[]) =>
     apiRequest<{ aplicados: number; variantes: number }>(`/products/groups/${groupId}/channel-values/apply`, { method: 'POST', body: JSON.stringify({ marketplace, cambios }) }),
