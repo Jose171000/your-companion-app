@@ -6,6 +6,7 @@ import { FalabellaBrandField } from "./FalabellaBrandField";
 import { PrepareFalabellaDialog } from "./PrepareFalabellaDialog";
 import { AccountChooser, CuentasPorCanal, useCuentasPorCanal } from "@/components/marketplaces/AccountChooser";
 import { VariantCompatNotice } from "./VariantCompatNotice";
+import { CorregirValorDeVariante } from "./CorregirValorDeVariante";
 import { WooCategoryField } from "./WooCategoryField";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -348,6 +349,23 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
           )}
 
           <AccountChooser canales={selected.filter((mp) => !publicados.has(mp))} value={cuentas} onChange={setCuentas} />
+
+          {/* Una variante rechazada por un color o talla que el canal no tiene: corrección solo para ese valor, con la opción recomendada por la IA. */}
+          {product?.group?.id && !product.alGrupo && product.variantValues && ["mercadolibre", "falabella"]
+            .filter((mp) => listings.some((l) => l.marketplace === mp && l.syncStatus === "error"))
+            .map((mp) => (
+              <CorregirValorDeVariante
+                key={`${product.id}-${mp}`}
+                groupId={product.group!.id}
+                canal={mp}
+                nombreDelCanal={PUBLISHABLE.find((p) => p.id === mp)?.name ?? mp}
+                variantValues={product.variantValues!}
+                onApplied={() => {
+                  if (porPublicar.includes(mp)) publishMutation.mutate();
+                  else toast.success("Ajuste guardado. Marca el canal y pulsa Publicar para reenviar.");
+                }}
+              />
+            ))}
 
           {/* WooCommerce: la categoría se elige sola entre las de la tienda; aquí se ve y se puede cambiar. */}
           {product && selected.includes("woocommerce") && !publicados.has("woocommerce") && isConnected("woocommerce") && (
