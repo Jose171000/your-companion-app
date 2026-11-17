@@ -381,6 +381,10 @@ export const productsApi = {
   remove: (id: string) =>
     apiRequest<{ message: string }>(`/products/${id}`, { method: 'DELETE' }),
 
+  /** Eliminar varios productos a la vez; uno que no se pueda eliminar no frena a los demás y vuelve con su motivo */
+  removeMany: (ids: string[]) =>
+    apiRequest<{ eliminados: number; omitidos: { id: string; motivo: string }[] }>('/products/bulk-delete', { method: 'POST', body: JSON.stringify({ ids }) }),
+
   /** Exportar catálogo completo */
   exportProducts: (format: 'json' | 'csv' | 'xlsx', params: ProductsQueryParams = {}) => {
     const { page, limit, sortBy, order, ...exportParams } = params;

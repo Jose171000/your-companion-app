@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { 
   Check, 
   Pencil, 
-  RotateCcw, 
   Copy,
   AlertCircle,
   CheckCircle2,
@@ -73,7 +72,7 @@ export function GeneratedFieldsPreview({ visible, productData }: GeneratedFields
 
       if (productData.aiAttributes) {
         Object.entries(productData.aiAttributes)
-          .filter(([key, val]) => val !== null && typeof val !== "object" && key !== "descriptionHtml")
+          .filter(([key, val]) => val !== null && typeof val !== "object" && key !== "descriptionHtml" && !key.startsWith("_") && !["NameCn", "NameEn"].includes(key))
           .forEach(([key, val]) => {
           newFields.push({ id: `attr_${key}`, label: key, value: String(val), required: false, type: "text", aiGenerated: true, confidence: "high" });
         });
@@ -94,6 +93,110 @@ export function GeneratedFieldsPreview({ visible, productData }: GeneratedFields
   const requiredCount = fields.filter((f) => f.required).length;
   const filledRequired = fields.filter((f) => f.required && f.value).length;
 
+  const tarjetaDe = (field: Field) => (
+        <Card
+          key={field.id}
+          className={cn(
+            "p-3 md:p-4 transition-all",
+            editingField === field.id && "ring-2 ring-primary"
+          )}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
+            <div className="flex-1 space-y-2 min-w-0">
+              <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                <label className="font-medium text-xs md:text-sm">{field.label}</label>
+                {field.required && (
+                  <Badge variant="secondary" className="text-[9px] md:text-[10px] px-1 md:px-1.5 py-0">
+                    Requerido
+                  </Badge>
+                )}
+                {field.aiGenerated && (
+                  <Badge
+                    className={cn(
+                      "text-[9px] md:text-[10px] px-1 md:px-1.5 py-0",
+                      confidenceColors[field.confidence]
+                    )}
+                  >
+                    IA {field.confidence === "high" ? "✓" : field.confidence === "medium" ? "~" : "?"}
+                  </Badge>
+                )}
+              </div>
+
+              {editingField === field.id ? (
+                field.type === "textarea" ? (
+                  <Textarea
+                    value={field.value}
+                    onChange={(e) =>
+                      setFields(
+                        fields.map((f) =>
+                          f.id === field.id ? { ...f, value: e.target.value } : f
+                        )
+                      )
+                    }
+                    className="min-h-24 bg-secondary/50"
+                    autoFocus
+                  />
+                ) : (
+                  <Input
+                    value={field.value}
+                    onChange={(e) =>
+                      setFields(
+                        fields.map((f) =>
+                          f.id === field.id ? { ...f, value: e.target.value } : f
+                        )
+                      )
+                    }
+                    className="bg-secondary/50"
+                    autoFocus
+                  />
+                )
+              ) : (
+                <p
+                  className={cn(
+                    "text-sm whitespace-pre-wrap",
+                    !field.value && "text-muted-foreground italic"
+                  )}
+                >
+                  {field.value || "Sin completar"}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1">
+              {editingField === field.id ? (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => setEditingField(null)}
+                  className="h-8 w-8 text-green-400"
+                >
+                  <Check className="w-4 h-4" />
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setEditingField(field.id)}
+                    className="h-8 w-8"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => navigator.clipboard.writeText(field.value)}
+                    className="h-8 w-8"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </Card>
+  );
+
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header Stats */}
@@ -109,11 +212,6 @@ export function GeneratedFieldsPreview({ visible, productData }: GeneratedFields
             <CheckCircle2 className="w-3 h-3 md:w-3.5 md:h-3.5 text-green-400" />
             {filledRequired}/{requiredCount} requeridos
           </Badge>
-          <Button variant="outline" size="sm" className="gap-1.5 md:gap-2 text-xs md:text-sm h-8 md:h-9">
-            <RotateCcw className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span className="hidden sm:inline">Regenerar todo</span>
-            <span className="sm:hidden">Regenerar</span>
-          </Button>
         </div>
       </div>
 
@@ -176,112 +274,18 @@ export function GeneratedFieldsPreview({ visible, productData }: GeneratedFields
         </div>
       ))}
 
-      {/* Fields Grid */}
+      {/* Lo principal a la vista; el resto de datos que la IA completó, plegado */}
       <div className="grid gap-3 md:gap-4">
-        {fields.map((field) => (
-          <Card
-            key={field.id}
-            className={cn(
-              "p-3 md:p-4 transition-all",
-              editingField === field.id && "ring-2 ring-primary"
-            )}
-          >
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
-              <div className="flex-1 space-y-2 min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-                  <label className="font-medium text-xs md:text-sm">{field.label}</label>
-                  {field.required && (
-                    <Badge variant="secondary" className="text-[9px] md:text-[10px] px-1 md:px-1.5 py-0">
-                      Requerido
-                    </Badge>
-                  )}
-                  {field.aiGenerated && (
-                    <Badge
-                      className={cn(
-                        "text-[9px] md:text-[10px] px-1 md:px-1.5 py-0",
-                        confidenceColors[field.confidence]
-                      )}
-                    >
-                      IA {field.confidence === "high" ? "✓" : field.confidence === "medium" ? "~" : "?"}
-                    </Badge>
-                  )}
-                </div>
-
-                {editingField === field.id ? (
-                  field.type === "textarea" ? (
-                    <Textarea
-                      value={field.value}
-                      onChange={(e) =>
-                        setFields(
-                          fields.map((f) =>
-                            f.id === field.id ? { ...f, value: e.target.value } : f
-                          )
-                        )
-                      }
-                      className="min-h-24 bg-secondary/50"
-                      autoFocus
-                    />
-                  ) : (
-                    <Input
-                      value={field.value}
-                      onChange={(e) =>
-                        setFields(
-                          fields.map((f) =>
-                            f.id === field.id ? { ...f, value: e.target.value } : f
-                          )
-                        )
-                      }
-                      className="bg-secondary/50"
-                      autoFocus
-                    />
-                  )
-                ) : (
-                  <p
-                    className={cn(
-                      "text-sm whitespace-pre-wrap",
-                      !field.value && "text-muted-foreground italic"
-                    )}
-                  >
-                    {field.value || "Sin completar"}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex items-center gap-1">
-                {editingField === field.id ? (
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    onClick={() => setEditingField(null)}
-                    className="h-8 w-8 text-green-400"
-                  >
-                    <Check className="w-4 h-4" />
-                  </Button>
-                ) : (
-                  <>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setEditingField(field.id)}
-                      className="h-8 w-8"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => navigator.clipboard.writeText(field.value)}
-                      className="h-8 w-8"
-                    >
-                      <Copy className="w-4 h-4" />
-                    </Button>
-                  </>
-                )}
-              </div>
-            </div>
-          </Card>
-        ))}
+        {fields.filter((f) => !f.id.startsWith("attr_")).map(tarjetaDe)}
       </div>
+      {fields.some((f) => f.id.startsWith("attr_")) && (
+        <details className="rounded-xl border border-border p-3">
+          <summary className="cursor-pointer text-sm font-medium">Ver los {fields.filter((f) => f.id.startsWith("attr_")).length} datos que la IA completó</summary>
+          <div className="grid gap-3 md:gap-4 mt-3">
+            {fields.filter((f) => f.id.startsWith("attr_")).map(tarjetaDe)}
+          </div>
+        </details>
+      )}
 
       {/* Missing Fields Warning */}
       {filledRequired < requiredCount && (

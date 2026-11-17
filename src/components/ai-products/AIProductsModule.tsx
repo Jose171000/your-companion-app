@@ -2,11 +2,9 @@ import { AccountChooser, CuentasPorCanal } from "@/components/marketplaces/Accou
 import { BulkProgressCard, LoteEnCurso } from "./BulkProgressCard";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { MarketplaceSelector } from "./MarketplaceSelector";
 import { ProductInputForm } from "./ProductInputForm";
 import { GeneratedFieldsPreview } from "./GeneratedFieldsPreview";
-import { ExportActions } from "./ExportActions";
 import { PackageReview } from "./PackageReview";
 import { LaunchStatus } from "./LaunchStatus";
 import { Button } from "@/components/ui/button";
@@ -78,6 +76,11 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
       }
       setLaunch(res.data);
       onCreated?.();
+      // «Faltan datos obligatorios» salió al generar; al preparar el canal esos datos se completan. Si el canal ya está listo, el aviso es viejo.
+      const listos = [res.data.falabella?.listo ? "falabella" : null, res.data.ripley?.listo ? "ripley" : null].filter(Boolean) as string[];
+      if (listos.length) {
+        setGeneratedProduct((p: any) => p ? { ...p, aiReport: { ...(p.aiReport ?? {}), missingAttributes: Object.fromEntries(Object.entries(p.aiReport?.missingAttributes ?? {}).filter(([canal]) => !listos.includes(canal))) } } : p);
+      }
       // El servidor eligió categoría, marca y medidas al preparar Falabella: la tarjeta de medidas debe verlos.
       const f = res.data.falabella;
       // En un grupo no hay un solo producto cuya tarjeta de medidas actualizar.
@@ -229,27 +232,9 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
     }
   };
 
-  const handleExport = async (format: string) => {
-    if (!generatedProduct) return;
-    try {
-      toast.loading(`Exportando en ${format.toUpperCase()}...`, { id: "export-ai-toast" });
-      await productsApi.exportAiContent(format as "csv" | "xlsx" | "json", {
-        search: generatedProduct.sku // Filtra por el SKU generado
-      });
-      toast.success("Exportación completada", { id: "export-ai-toast" });
-    } catch (error: any) {
-      toast.error(error.message || "Error al exportar", { id: "export-ai-toast" });
-    }
-  };
-
-  /** Reintenta: vuelve a preparar y publicar los canales elegidos. */
-  const handlePublish = async () => {
-    if (generatedProduct?.id) await lanzar(generatedProduct.id);
-  };
-
   /**
-   * Resultado del lanzamiento: lo mismo para un producto individual y para un grupo de variantes. Mientras los canales solo
-   * están preparados, muestra todo lo generado para que la persona lo revise y confirme; recién entonces se publica.
+   * Resultado del lanzamiento: una tarjeta por canal elegido, con su estado en una línea y el detalle plegado. Mientras los canales solo
+   * están preparados, la persona revisa y confirma; recién entonces se publica.
    */
   const renderLaunch = (estados: { id: string; etiqueta?: string }[], relanzarId?: string) => {
     const preparado = !!launch?.channels.some((c) => c.status === "preparado");
@@ -257,6 +242,60 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
     const variantes = launch?.variants ?? [];
     const verMeli = variantes.some((v) => v.titulos.mercadolibre);
     const verFala = variantes.some((v) => v.titulos.falabella);
+    const sinPublicarAuto = selectedMarketplaces.filter((m) => !CANALES_LANZABLES.includes(m));
+    const estimados: string[] = [];
+    if (launch?.estimatedMeli?.length) estimados.push(`Mercado Libre (${launch.estimatedMeli.length} datos)`);
+    if (launch?.falabella?.measures?.estimated) estimados.push("medidas del paquete (Falabella)");
+
+    /** Las líneas que se ven al desplegar «Ver detalle» de un canal. */
+    const detalleDe = (canal: string): string[] => {
+      if (!launch) return [];
+      const l: string[] = [];
+      if (canal === "mercadolibre" && launch.meliCategory?.id) l.push(`Categoría: ${launch.meliCategory.path ?? launch.meliCategory.id}`);
+      if (canal === "falabella" && launch.falabella) {
+        const f = launch.falabella;
+        l.push(`Categoría: ${f.category ? f.category.path : "sin categoría"}`);
+        l.push(`Marca: ${f.brand.value}`);
+        if (f.attributes) l.push(`Atributos con valor: ${f.attributes.filled} de ${f.attributes.total}`);
+        if (f.categoryNote) l.push(f.category ? `Revisa la categoría: ${f.categoryNote}. Puedes cambiarla desde Publicar → Preparar para Falabella.` : `No se encontró una categoría segura (${f.categoryNote}): elígela desde Publicar → Preparar para Falabella.`);
+      }
+      if (canal === "ripley" && launch.ripley) {
+        const r = launch.ripley;
+        l.push(`Categoría: ${r.category ? r.category.path : "sin categoría"}`);
+        if (r.brand) l.push(`Marca: ${r.brand}`);
+        if (r.attributes) l.push(`Atributos con valor: ${r.attributes.filled} de ${r.attributes.total}`);
+        l.push(...r.avisos.slice(0, 3));
+      }
+      return l;
+    };
+
+    const tarjeta = (c: { marketplace: string; status: string; message: string }) => {
+      const nombre = NOMBRE_DE_CANAL[c.marketplace] ?? c.marketplace;
+      const color = c.status === "error" ? "text-red-400" : c.status === "omitido" ? "text-amber-500" : "text-green-500";
+      const icono = c.status === "error" ? "✗" : c.status === "omitido" ? "•" : "✓";
+      const resumen = c.status === "preparado"
+        ? `Listo para publicar${grupo ? ` las ${estados.length} variantes` : ""}`
+        : c.message.replace(new RegExp(`^${nombre}:\\s*`), "");
+      const detalle = detalleDe(c.marketplace);
+      return (
+        <div key={c.marketplace} className="rounded-lg border border-border p-2.5">
+          <div className="flex items-start gap-2 text-sm">
+            <span className={color}>{icono}</span>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">{nombre}</p>
+              <p className={`text-xs break-words ${color}`}>{resumen}</p>
+            </div>
+          </div>
+          {detalle.length > 0 && (
+            <details className="mt-1.5">
+              <summary className="cursor-pointer text-[11px] text-muted-foreground">Ver detalle</summary>
+              <div className="mt-1 space-y-0.5 text-xs text-muted-foreground break-words">{detalle.map((t, i) => <p key={i}>{t}</p>)}</div>
+            </details>
+          )}
+        </div>
+      );
+    };
+
     return (
       <>
         {launching && (
@@ -267,61 +306,31 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
 
         {launch && !launching && (
           <div className={`mt-4 rounded-xl border p-3 md:p-4 space-y-3 ${preparado ? "border-amber-500/50" : "border-border"}`}>
-            <p className="text-sm font-medium">{preparado ? "Revisa antes de publicar" : "Resultado de la publicación"}</p>
-            {preparado && (
-              <p className="text-xs text-muted-foreground">
-                Todo esto lo generó la IA y todavía NO se publicó. Revísalo y, si está bien, confirma. Puedes corregir lo que haga falta desde la <b>Ficha</b> antes de confirmar.
-              </p>
-            )}
-            {launch.channels.map((c) => (
-              <p key={c.marketplace} className={`text-sm break-words ${c.status === "error" ? "text-red-400" : c.status === "omitido" ? "text-amber-500" : c.status === "preparado" ? "text-foreground" : "text-green-500"}`}>
-                {c.status === "encolado" ? "✓" : c.status === "preparado" ? "◦" : c.status === "omitido" ? "•" : "✗"} {c.message}
-              </p>
-            ))}
-            {selectedMarketplaces.filter((m) => !CANALES_LANZABLES.includes(m)).map((m) => (
-              <p key={m} className="text-sm break-words text-amber-500">• {NOMBRE_DE_CANAL[m] ?? m}: todavía no se publica automáticamente desde aquí; el contenido queda generado en Synkro.</p>
-            ))}
-            {launch.meliCategory?.id && (
-              <p className="text-xs text-muted-foreground break-words">Mercado Libre: categoría {launch.meliCategory.path ?? launch.meliCategory.id}</p>
-            )}
-            {launch.falabella && (
-              <p className="text-xs text-muted-foreground break-words">
-                Falabella: {launch.falabella.category ? launch.falabella.category.path : "sin categoría"} · marca {launch.falabella.brand.value}
-                {launch.falabella.attributes ? ` · atributos ${launch.falabella.attributes.filled} de ${launch.falabella.attributes.total}` : ""}
-                {launch.falabella.listo ? "" : ` · todavía ${launch.falabella.motivo}`}
-              </p>
-            )}
-            {launch.ripley && (
-              <p className="text-xs text-muted-foreground break-words">
-                Ripley: {launch.ripley.category ? launch.ripley.category.path : "sin categoría"}
-                {launch.ripley.brand ? ` · marca ${launch.ripley.brand}` : ""}
-                {launch.ripley.attributes ? ` · atributos ${launch.ripley.attributes.filled} de ${launch.ripley.attributes.total}` : ""}
-                {launch.ripley.listo ? "" : ` · todavía ${launch.ripley.motivo}`}
-              </p>
-            )}
-            {launch.ripley && launch.ripley.avisos.length > 0 && (
-              <p className="text-xs text-amber-500 break-words">Ripley: {launch.ripley.avisos.slice(0, 3).join(" · ")}</p>
-            )}
-            {launch.falabella?.categoryNote && (
-              <p className="text-xs text-amber-500 break-words">
-                {launch.falabella.category
-                  ? `Revisa la categoría de Falabella: ${launch.falabella.categoryNote}. Puedes cambiarla desde Publicar → Preparar para Falabella.`
-                  : `Falabella: no se encontró una categoría segura (${launch.falabella.categoryNote}). No se publicará para evitar una categoría equivocada: elígela desde Publicar → Preparar para Falabella.`}
-              </p>
-            )}
-            {launch.estimatedMeli.length > 0 && (
-              <p className="text-xs text-amber-500 break-words">Mercado Libre: la IA estimó estos datos obligatorios, revísalos en la ficha: {launch.estimatedMeli.join(", ")}.</p>
-            )}
-            {launch.falabella?.measures?.estimated && (
-              <p className="text-xs text-amber-500 break-words">Las medidas del paquete para Falabella son una estimación de la IA: revísalas, porque Falabella las usa para calcular el envío.</p>
+            <div>
+              <p className="text-sm font-medium">{preparado ? "Revisa antes de publicar" : "Resultado de la publicación"}</p>
+              {preparado && <p className="text-xs text-muted-foreground">Nada se ha publicado todavía. Corrige lo que haga falta en la Ficha y confirma.</p>}
+            </div>
+
+            <div className="space-y-2">
+              {launch.channels.map(tarjeta)}
+              {sinPublicarAuto.map((m) => (
+                <div key={m} className="rounded-lg border border-border p-2.5 text-sm">
+                  <p className="font-medium">{NOMBRE_DE_CANAL[m] ?? m}</p>
+                  <p className="text-xs text-amber-500">Todavía no se publica automáticamente desde aquí; el contenido queda generado en Synkro.</p>
+                </div>
+              ))}
+            </div>
+
+            {estimados.length > 0 && (
+              <p className="text-xs text-amber-500 break-words">La IA estimó algunos datos: {estimados.join(" · ")}. Revísalos en la Ficha antes de publicar.</p>
             )}
 
-            {preparado && variantes.length > 0 && (
+            {preparado && grupo && variantes.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-muted-foreground text-left">
-                      {grupo && <th className="font-normal pb-1 pr-3">Variante</th>}
+                      <th className="font-normal pb-1 pr-3">Variante</th>
                       <th className="font-normal pb-1 pr-3">SKU</th>
                       <th className="font-normal pb-1 pr-3">Precio</th>
                       <th className="font-normal pb-1 pr-3">Stock</th>
@@ -332,7 +341,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
                   <tbody>
                     {variantes.map((v) => (
                       <tr key={v.id} className="border-t border-border align-top">
-                        {grupo && <td className="py-1.5 pr-3 whitespace-nowrap">{v.etiqueta}</td>}
+                        <td className="py-1.5 pr-3 whitespace-nowrap">{v.etiqueta}</td>
                         <td className="py-1.5 pr-3 font-mono">{v.sku}</td>
                         <td className="py-1.5 pr-3">{v.price != null ? `S/ ${v.price.toFixed(2)}` : "—"}</td>
                         <td className="py-1.5 pr-3">{v.stock ?? "—"}</td>
@@ -344,25 +353,16 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
                 </table>
               </div>
             )}
-            {preparado && grupo && (
-              <p className="text-[11px] text-muted-foreground">En Mercado Libre, el nombre de la familia es común y el canal le agrega el color de cada variante.</p>
-            )}
 
             {preparado && relanzarId && (
-              <div className="flex flex-wrap items-center gap-3 pt-1">
-                <Button disabled={launching} onClick={() => lanzar(relanzarId, { grupo, meliCategoryId: launch.meliCategory?.id })}>
+              <div className="pt-1">
+                <Button className="h-auto min-h-9 whitespace-normal text-left" disabled={launching} onClick={() => lanzar(relanzarId, { grupo, meliCategoryId: launch.meliCategory?.id })}>
                   Confirmar y publicar{grupo ? ` las ${estados.length} variantes` : ""}
                 </Button>
-                <span className="text-xs text-muted-foreground">Si no confirmas, queda creado en Synkro y lo puedes publicar después desde Productos.</span>
               </div>
             )}
 
             {!preparado && estados.map((e) => <LaunchStatus key={e.id} productId={e.id} etiqueta={e.etiqueta} />)}
-            {!preparado && (
-              <p className="text-[11px] text-muted-foreground">
-                Lo que la IA estimó (medidas, algunos atributos) queda marcado para revisarlo. Puedes corregirlo desde la <b>Ficha</b> del producto y se envía solo a los canales.
-              </p>
-            )}
           </div>
         )}
 
@@ -493,9 +493,6 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
             <p className="text-xs text-green-500">La IA preparó el contenido del grupo una sola vez y lo repartió entre las variantes.</p>
           )}
           {renderLaunch(grupoCreado.variants.map((v) => ({ id: v.id, etiqueta: Object.values(v.variantValues ?? {}).join(" · ") })), grupoCreado.variants[0]?.id)}
-          <p className="text-[11px] text-muted-foreground">
-            Al confirmar, se publican todas las variantes juntas en los canales que elegiste. Mercado Libre las agrupa en una familia; Falabella, bajo un mismo código si la categoría admite variantes y, si no, como fichas sueltas con la variante en el nombre. WooCommerce las publica como un solo producto variable, con la categoría elegida entre las de tu tienda.
-          </p>
           <Button variant="outline" onClick={() => setGrupoCreado(null)}>Crear otro producto</Button>
         </Card>
       )}
@@ -539,17 +536,9 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
             >
               Crear otro producto
             </Button>
-            <span className="text-xs text-muted-foreground">El formulario ya está vacío. Este producto sigue en proceso y lo ves en Productos o Marketplaces.</span>
+            <span className="text-xs text-muted-foreground">El producto queda en Productos.</span>
           </div>
 
-          <Separator className="my-6 md:my-8" />
-
-          <ExportActions
-            visible={hasGeneratedContent}
-            selectedMarketplaces={selectedMarketplaces}
-            onExport={handleExport}
-            onPublish={handlePublish}
-          />
         </Card>
       )}
     </div>

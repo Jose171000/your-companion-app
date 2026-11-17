@@ -21,7 +21,8 @@ import { MAX_REGENERACION, RegeneracionMasivaDialog } from "./RegeneracionMasiva
 import { PublicacionMasivaDialog } from "./PublicacionMasivaDialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ImagePlus, Loader2, Rocket, Sparkles, X } from "lucide-react";
+import { ImagePlus, Loader2, Rocket, Sparkles, Trash2, X } from "lucide-react";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
 
 const TAMANOS_DE_PAGINA = [10, 25, 50, 100];
@@ -67,6 +68,7 @@ export function ProductsModule() {
   const [seleccionados, setSeleccionados] = useState<Map<string, Product>>(new Map());
   const [regenOpen, setRegenOpen] = useState(false);
   const [publicarOpen, setPublicarOpen] = useState(false);
+  const [eliminarVariosOpen, setEliminarVariosOpen] = useState(false);
   const [loteActivo, setLoteActivo] = useState<string | null>(null);
   // Qué le falta a la selección en cada cuenta conectada: decide si «Publicar en canales» se habilita.
   const idsSeleccionados = [...seleccionados.keys()];
@@ -165,6 +167,31 @@ export function ProductsModule() {
       setDeleteTarget(null);
     },
     onError: (error: Error) => toast.error(error.message || "Error al eliminar el producto"),
+  });
+
+  // ── Eliminar varios (los seleccionados; un grupo se elimina con todas sus variantes) ──
+  const idsAEliminar = [...new Set([...seleccionados.values()].flatMap((p) => (p.alGrupo ? (p.groupSummary?.variantIds ?? [p.id]) : [p.id])))];
+  const eliminarVarios = useMutation({
+    mutationFn: async () => {
+      // El servidor acepta hasta 200 por petición: una selección con grupos grandes se manda en tandas.
+      const total = { eliminados: 0, omitidos: [] as { id: string; motivo: string }[] };
+      for (let i = 0; i < idsAEliminar.length; i += 200) {
+        const res = await productsApi.removeMany(idsAEliminar.slice(i, i + 200));
+        if (res.error || !res.data) throw new Error(res.error ?? "No se pudieron eliminar los productos");
+        total.eliminados += res.data.eliminados;
+        total.omitidos.push(...res.data.omitidos);
+      }
+      return total;
+    },
+    onSuccess: (r) => {
+      if (r.eliminados) toast.success(`${r.eliminados} producto(s) eliminados`);
+      if (r.omitidos.length) toast.error(`${r.omitidos.length} no se pudieron eliminar: ${r.omitidos[0].motivo}`);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["products-overview"] });
+      setSeleccionados(new Map());
+      setEliminarVariosOpen(false);
+    },
+    onError: (error: Error) => toast.error(error.message),
   });
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -282,6 +309,11 @@ export function ProductsModule() {
                   {vistaPublicar.isLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Rocket className="w-3.5 h-3.5 mr-1.5" />} Publicar en canales ({seleccionados.size})
                 </Button>
               )}
+              {seleccionados.size > 0 && can("productos.eliminar") && (
+                <Button size="sm" variant="outline" className="text-destructive hover:text-destructive border-destructive/40" onClick={() => setEliminarVariosOpen(true)}>
+                  <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Eliminar ({seleccionados.size})
+                </Button>
+              )}
               {seleccionados.size > 0 && (
                 <Button size="sm" variant="ghost" onClick={() => setSeleccionados(new Map())}><X className="w-3.5 h-3.5 mr-1" /> Quitar selección</Button>
               )}
@@ -322,8 +354,28 @@ export function ProductsModule() {
 
       <NewProductDialog open={newOpen} onClose={() => setNewOpen(false)} />
 
-      <PublicacionMasivaDialog
-        open={publicarOpen}
+      <AlertDialog open={eliminarVariosOpen} onOpenChange={(o) => !eliminarVarios.isPending && setEliminarVariosOpen(o)}>
+        <AlertDialogContent className="glass">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center"><Trash2 className="w-5 h-5 text-destructive" /></div>
+              <AlertDialogTitle>¿Eliminar {seleccionados.size} producto(s)?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-sm leading-relaxed">
+              Se eliminarán de Synkro <span className="font-semibold text-foreground">{idsAEliminar.length} producto(s)</span>{idsAEliminar.length > seleccionados.size ? " (los grupos con todas sus variantes)" : ""} y sus fotos. Las fotos de productos que siguen publicados en algún canal se conservan.
+              <br /><span className="text-destructive/80 font-medium">Esta acción no se puede deshacer.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={eliminarVarios.isPending}>Cancelar</AlertDialogCancel>
+            <Button variant="destructive" disabled={eliminarVarios.isPending || idsAEliminar.length === 0} onClick={() => eliminarVarios.mutate()}>
+              {eliminarVarios.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />} Eliminar
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <PublicacionMasivaDialog        open={publicarOpen}
         onOpenChange={setPublicarOpen}
         productIds={idsSeleccionados}
         vista={vistaPublicar.data ?? null}
