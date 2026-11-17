@@ -121,9 +121,28 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
   const publicados = new Set(
     PUBLISHABLE.map((p) => p.id).filter((mp) => (cuentasDelCanal[mp] ?? []).length > 0 && cuentasDelCanal[mp].every((c) => estaEn(mp, c.id, "published"))),
   );
+  // Ripley pide su propia categoría y sus datos: el producto tiene que estar preparado (ficha → Ripley → Preparar) antes de publicar.
+  const ripleyPreparado = !!String((product?.marketplaceIds as Record<string, unknown> | null | undefined)?.ripley_category_id ?? "").trim();
+  // Ripley recibe un envío de catálogo y lo aprueba después: ya enviado, queda «pendiente de aprobación» y no se vuelve a enviar (crearía un duplicado).
+  const ripleyEnviadoLocal = !!(product?.aiAttributes as Record<string, unknown> | null | undefined)?.ripley_envio;
+  // Lo que se enviaría (categoría, avisos y errores) o, si ya se envió, en qué quedó. Solo lee: no envía nada a Ripley.
+  const ripleyVista = useQuery({
+    queryKey: ["ripley-publish-preview-dialogo", product?.id, !!product?.alGrupo],
+    queryFn: async () => {
+      const res = await syncApi.ripleyPublishPreview(product!.id, !!product?.alGrupo);
+      if (res.error || !res.data) throw new Error(res.error ?? "No se pudo revisar el envío a Ripley");
+      return res.data;
+    },
+    enabled: open && !!product && ripleyPreparado && isConnected("ripley") && !publicados.has("ripley") && (selected.includes("ripley") || ripleyEnviadoLocal),
+    staleTime: 30_000,
+    retry: false,
+  });
+  const ripleyYaEnviado = ripleyEnviadoLocal || !!ripleyVista.data?.bloqueo;
+  const ripleyElegido = selected.includes("ripley") && !publicados.has("ripley") && !ripleyYaEnviado;
+
   // Qué se va a enviar: cada canal marcado, en las cuentas elegidas (o en la única que hay) que todavía no lo tienen.
   const objetivos = selected
-    .filter((mp) => !publicados.has(mp))
+    .filter((mp) => !publicados.has(mp) && !(mp === "ripley" && ripleyYaEnviado))
     .flatMap((mp) => {
       const activas = cuentasDelCanal[mp] ?? [];
       const ids = activas.length > 1 ? (cuentas[mp] ?? []) : activas.map((c) => c.id);
@@ -135,15 +154,16 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
 
   // Al publicarse un canal sale de la selección.
   useEffect(() => {
-    setSelected((prev) => (prev.some((id) => publicados.has(id)) ? prev.filter((id) => !publicados.has(id)) : prev));
+    const fuera = (id: string) => publicados.has(id) || (id === "ripley" && ripleyYaEnviado);
+    setSelected((prev) => (prev.some(fuera) ? prev.filter((id) => !fuera(id)) : prev));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [listings]);
+  }, [listings, ripleyYaEnviado]);
 
   // Al abrir (o cargar las conexiones) se marca el primer canal conectado que aún no está publicado.
   useEffect(() => {
     setSelected((prev) => {
       const validos = prev.filter((id) => visibles.some((v) => v.id === id));
-      return validos.length ? validos : visibles.filter((v) => !publicados.has(v.id)).slice(0, 1).map((v) => v.id);
+      return validos.length ? validos : visibles.filter((v) => !publicados.has(v.id) && !(v.id === "ripley" && ripleyYaEnviado)).slice(0, 1).map((v) => v.id);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id, connections.length]);
@@ -218,22 +238,6 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
   const wooActivas = cuentasDelCanal.woocommerce ?? [];
   const wooCuenta = wooActivas.length > 1 ? cuentas.woocommerce?.[0] : wooActivas[0]?.id;
 
-  // Ripley pide su propia categoría y sus datos: el producto tiene que estar preparado (ficha → Ripley → Preparar) antes de publicar.
-  const ripleyPreparado = !!String((product?.marketplaceIds as Record<string, unknown> | null | undefined)?.ripley_category_id ?? "").trim();
-
-  // Ripley: lo que se enviaría (categoría, avisos y errores). Solo lee: no envía nada a Ripley.
-  const ripleyElegido = selected.includes("ripley") && !publicados.has("ripley");
-  const ripleyVista = useQuery({
-    queryKey: ["ripley-publish-preview-dialogo", product?.id, !!product?.alGrupo],
-    queryFn: async () => {
-      const res = await syncApi.ripleyPublishPreview(product!.id, !!product?.alGrupo);
-      if (res.error || !res.data) throw new Error(res.error ?? "No se pudo revisar el envío a Ripley");
-      return res.data;
-    },
-    enabled: open && !!product && ripleyElegido && ripleyPreparado,
-    staleTime: 30_000,
-    retry: false,
-  });
 
   const falabellaElegido = selected.includes("falabella");
   const falabellaPublicado = listings.find((l) => l.marketplace === "falabella")?.syncStatus === "published";
@@ -273,6 +277,7 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
             const connected = isConnected(mp.id);
             const isSelected = selected.includes(mp.id);
             const isPublished = publicados.has(mp.id);
+            const isEnviado = mp.id === "ripley" && ripleyYaEnviado && !isPublished;
 
             return (
               <div
@@ -281,11 +286,13 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
                   "flex items-center justify-between gap-3 p-3 rounded-xl border-2 transition-all min-w-0",
                   isPublished
                     ? "border-green-500/40 bg-green-500/5"
-                    : isSelected
+                    : isEnviado
+                      ? "border-amber-500/40 bg-amber-500/5"
+                      : isSelected
                       ? "border-primary bg-primary/10 cursor-pointer"
                       : "border-border bg-card hover:border-primary/50 cursor-pointer"
                 )}
-                onClick={() => !isPublished && toggle(mp.id)}
+                onClick={() => !isPublished && !isEnviado && toggle(mp.id)}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="w-16 h-10 rounded-[8px] flex items-center justify-center bg-transparent dark:bg-[#EAEAEA] px-2 py-1 shrink-0 overflow-hidden">
@@ -306,6 +313,11 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
                     ) : !connected ? (
                       <p className="text-xs text-yellow-400 flex items-center gap-1">
                         <AlertCircle className="w-3 h-3" /> Conecta tu cuenta en Marketplaces
+                      </p>
+                    ) : isEnviado ? (
+                      <p className="text-xs text-amber-500 flex items-start gap-1 break-words">
+                        <Loader2 className="w-3 h-3 animate-spin mt-0.5 shrink-0" />
+                        <span>{ripleyVista.data?.bloqueo?.situacion === "procesado" ? "Enviado a Ripley. Ripley ya procesó el envío." : "Enviado a Ripley: pendiente de aprobación en el canal."}</span>
                       </p>
                     ) : listing?.syncStatus === "error" ? (
                       <p className="text-xs text-red-400 break-words line-clamp-3" title={listing.lastError}>
@@ -338,6 +350,8 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
                   <Badge className="bg-green-500/10 text-green-400 border-green-500/30 text-[10px]">
                     Publicado
                   </Badge>
+                ) : isEnviado ? (
+                  <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30 text-[10px] shrink-0">{ripleyVista.data?.bloqueo?.situacion === "procesado" ? "Enviado" : "Pendiente"}</Badge>
                 ) : (
                   isSelected && (
                     <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center shrink-0">

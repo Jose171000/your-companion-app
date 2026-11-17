@@ -35,6 +35,7 @@ function estadoDeCanal(estado: string, pausedByUser: boolean | undefined, stock:
 const ESTADO: Record<string, { texto: string; clase: string }> = {
   published: { texto: "Publicado", clase: "bg-green-500/10 text-green-500" },
   unpublished: { texto: "Sin publicar", clase: "bg-secondary text-muted-foreground" },
+  enviado: { texto: "Pendiente de aprobación", clase: "bg-amber-500/10 text-amber-500" },
   pending: { texto: "Enviando", clase: "bg-amber-500/10 text-amber-500" },
   error: { texto: "Con error", clase: "bg-red-500/10 text-red-500" },
   paused: { texto: "Pausado", clase: "bg-secondary text-muted-foreground" },
@@ -284,7 +285,7 @@ function CanalesDelProducto({ hoja, acciones, onVer, modoGrupo, variantes = 1, n
               {ficha && c.marketplace !== "woocommerce" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => onVer(c.marketplace)}>Ver ficha</Button>}
               {puede && c.marketplace === "falabella" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={acciones.onPrepararFalabella}>Preparar</Button>}
               {puede && c.marketplace === "ripley" && <Button size="sm" variant="outline" className="h-8 text-xs" onClick={acciones.onPrepararRipley}>{publicado ? "Revisar" : "Preparar"}</Button>}
-              {puede && !publicado && <Button size="sm" className="h-8 text-xs" onClick={acciones.onPublicar}><Rocket className="w-3.5 h-3.5 mr-1" />{borradorWoo ? "Reenviar" : "Publicar"}</Button>}
+              {puede && !publicado && ficha?.status !== "enviado" && <Button size="sm" className="h-8 text-xs" onClick={acciones.onPublicar}><Rocket className="w-3.5 h-3.5 mr-1" />{borradorWoo ? "Reenviar" : "Publicar"}</Button>}
               {puede && ficha?.linkId && (() => {
                 const puedePausar = ficha.status === "published" && !ficha.pausedByUser;
                 const puedeReanudar = ficha.status === "paused" && !!ficha.pausedByUser;
