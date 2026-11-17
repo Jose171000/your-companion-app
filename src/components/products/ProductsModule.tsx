@@ -18,9 +18,10 @@ import { PrepareFalabellaDialog } from "./PrepareFalabellaDialog";
 import { PrepareRipleyDialog } from "./PrepareRipleyDialog";
 import { DescuentoGeneralDialog } from "@/components/marketplaces/DescuentoGeneralDialog";
 import { MAX_REGENERACION, RegeneracionMasivaDialog } from "./RegeneracionMasivaDialog";
+import { PublicacionMasivaDialog } from "./PublicacionMasivaDialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ImagePlus, Loader2, Sparkles, X } from "lucide-react";
+import { ImagePlus, Loader2, Rocket, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 
 const TAMANOS_DE_PAGINA = [10, 25, 50, 100];
@@ -65,7 +66,22 @@ export function ProductsModule() {
   // Selección para acciones en lote: por id de la fila (un grupo de variantes cuenta como una fila). Se conserva al cambiar de página.
   const [seleccionados, setSeleccionados] = useState<Map<string, Product>>(new Map());
   const [regenOpen, setRegenOpen] = useState(false);
+  const [publicarOpen, setPublicarOpen] = useState(false);
   const [loteActivo, setLoteActivo] = useState<string | null>(null);
+  // Qué le falta a la selección en cada cuenta conectada: decide si «Publicar en canales» se habilita.
+  const idsSeleccionados = [...seleccionados.keys()];
+  const vistaPublicar = useQuery({
+    queryKey: ["publicacion-masiva-vista", storeId, [...idsSeleccionados].sort().join(",")],
+    queryFn: async () => {
+      const res = await syncApi.bulkPublishPreview(idsSeleccionados);
+      if (res.error || !res.data) throw new Error(res.error ?? "No se pudo revisar la selección");
+      return res.data;
+    },
+    enabled: !!storeId && idsSeleccionados.length > 0 && can("canales.publicar"),
+    staleTime: 15_000,
+    retry: false,
+  });
+  const faltaPublicar = (vistaPublicar.data?.cuentas ?? []).some((c) => c.soportada && c.faltan > 0);
   const alternarSeleccion = (p: Product) =>
     setSeleccionados((prev) => {
       const n = new Map(prev);
@@ -255,6 +271,17 @@ export function ProductsModule() {
               <Button size="sm" className="gradient-primary" onClick={() => setRegenOpen(true)}>
                 <Sparkles className="w-3.5 h-3.5 mr-1.5" /> {loteActivo ? "Ver avance de la IA" : `Generar con IA (${seleccionados.size})`}
               </Button>
+              {seleccionados.size > 0 && can("canales.publicar") && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!faltaPublicar}
+                  onClick={() => setPublicarOpen(true)}
+                  title={vistaPublicar.isLoading ? "Revisando en qué canales falta publicar…" : faltaPublicar ? "Publica en los canales conectados donde aún no están" : "Los productos seleccionados ya están publicados en todos los canales conectados"}
+                >
+                  {vistaPublicar.isLoading ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Rocket className="w-3.5 h-3.5 mr-1.5" />} Publicar en canales ({seleccionados.size})
+                </Button>
+              )}
               {seleccionados.size > 0 && (
                 <Button size="sm" variant="ghost" onClick={() => setSeleccionados(new Map())}><X className="w-3.5 h-3.5 mr-1" /> Quitar selección</Button>
               )}
@@ -294,6 +321,15 @@ export function ProductsModule() {
       )}
 
       <NewProductDialog open={newOpen} onClose={() => setNewOpen(false)} />
+
+      <PublicacionMasivaDialog
+        open={publicarOpen}
+        onOpenChange={setPublicarOpen}
+        productIds={idsSeleccionados}
+        vista={vistaPublicar.data ?? null}
+        cargando={vistaPublicar.isLoading}
+        error={vistaPublicar.isError}
+      />
 
       <RegeneracionMasivaDialog
         open={regenOpen}

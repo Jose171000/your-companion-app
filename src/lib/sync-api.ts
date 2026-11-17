@@ -225,6 +225,22 @@ export interface ChangeRequest {
   product: { id: string; name: string; sku: string; group?: { id: string; name: string } | null };
 }
 
+/** Publicar de forma masiva: lo que falta por cuenta de canal y qué productos no están listos. */
+export interface VistaPublicacionMasiva {
+  cuentas: { id: string; marketplace: string; canal: string; cuenta: string; soportada: boolean; motivoNoDisponible: string | null; faltan: number; listos: number }[];
+  productos: {
+    clave: string; productId: string; etiqueta: string; variantes: number;
+    cuentas: Record<string, { estado: 'nada' | 'listo' | 'incompleto'; publicadas: number; enProceso: number; porPublicar: number; incompletas: { sku: string; motivos: string[] }[] }>;
+  }[];
+  total: number;
+  maximo: number;
+}
+export interface ResultadoPublicacionMasiva {
+  encoladas: { producto: string; cuenta: string; variantes: number }[];
+  omitidas: { producto: string; cuenta: string; motivo: string }[];
+  message: string;
+}
+
 /** Los precios de un grupo de variantes, para editarlos todos a la vez. */
 export interface GroupPrices {
   groupId: string;
@@ -937,6 +953,14 @@ export const syncApi = {
       method: 'POST',
       body: JSON.stringify({ ids, reason }),
     }),
+
+  /** Qué le falta a cada producto seleccionado en cada cuenta conectada (no envía nada) */
+  bulkPublishPreview: (productIds: string[]) =>
+    apiRequest<VistaPublicacionMasiva>('/sync/bulk-publish/preview', { method: 'POST', body: JSON.stringify({ productIds }) }),
+
+  /** Publica los productos seleccionados en las cuentas elegidas (escribe en canales reales; exige confirmar) */
+  bulkPublish: (productIds: string[], connectionIds: string[]) =>
+    apiRequest<ResultadoPublicacionMasiva>('/sync/bulk-publish', { method: 'POST', body: JSON.stringify({ productIds, connectionIds, confirmar: true }) }),
 
   /** Precios de un grupo de variantes: el del producto y el propio de cada canal (para editarlos todos a la vez) */
   getGroupPrices: (groupId: string) => apiRequest<GroupPrices>(`/sync/groups/${groupId}/prices`),
