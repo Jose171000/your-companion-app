@@ -29,6 +29,7 @@ const PUBLISHABLE = [
   { id: "mercadolibre", name: "MercadoLibre", logo: "/mercadolibre.png" },
   { id: "falabella",    name: "Falabella",    logo: "/Falabella.png" },
   { id: "woocommerce",  name: "WooCommerce",  logo: "/woocomerce.png" },
+  { id: "ripley",       name: "Ripley",       logo: "/Logo_Ripley_com.png" },
 ];
 
 interface PublishProductDialogProps {
@@ -226,12 +227,16 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, falabellaElegido, falabellaPublicado, product?.id, version, connections.length]);
 
+  // Ripley pide su propia categoría y sus datos: el producto tiene que estar preparado (ficha → Ripley → Preparar) antes de publicar.
+  const ripleyPreparado = !!String((product?.marketplaceIds as Record<string, unknown> | null | undefined)?.ripley_category_id ?? "").trim();
+
   const canPublish =
     objetivos.length > 0 &&
     !enviando &&
     !missingPrice &&
     porPublicar.every((mp) => isConnected(mp)) &&
     (!porPublicar.includes("falabella") || !!prep?.listo) &&
+    (!porPublicar.includes("ripley") || ripleyPreparado) &&
     !(porPublicar.includes("mercadolibre") && meliOpciones && !meliElegida) &&
     !publishMutation.isPending;
 
@@ -305,6 +310,10 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Loader2 className="w-3 h-3 animate-spin" /> Publicando…
                       </p>
+                    ) : mp.id === "ripley" && !ripleyPreparado ? (
+                      <p className="text-xs text-amber-500 break-words">Primero prepáralo para Ripley: abre la ficha → Ripley → Preparar (elige su categoría y datos).</p>
+                    ) : mp.id === "ripley" ? (
+                      <p className="text-xs text-muted-foreground break-words">Listo para enviar. Ripley lo revisa y lo aprueba antes de mostrarlo.</p>
                     ) : (
                       <p className="text-xs text-muted-foreground">Listo para publicar</p>
                     )}
