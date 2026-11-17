@@ -20,6 +20,10 @@ import type { ResultadoDelRecorrido } from "./VariantsWizard";
 import { toast } from "sonner";
 import { useFormDraft } from "@/contexts/FormDraftContext";
 
+/** Canales que Synkro publica por sí mismo desde aquí; el resto se avisa en la revisión en vez de omitirse en silencio. */
+const CANALES_LANZABLES = ["mercadolibre", "falabella", "woocommerce", "ripley"];
+const NOMBRE_DE_CANAL: Record<string, string> = { mercadolibre: "Mercado Libre", falabella: "Falabella", woocommerce: "WooCommerce", ripley: "Ripley", amazon: "Amazon", shopify: "Shopify", juntoz: "Juntoz", yape: "Yape" };
+
 interface AIProductsModuleProps {
   /** Dentro de una ventana: sin la tarjeta de bienvenida. */
   compact?: boolean;
@@ -59,7 +63,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
   }, [selectedMarketplaces, selectedCategory, setDirty, compact]);
   /** Prepara cada canal (categoría, marca, medidas, atributos, descripción HTML) y publica el producto. */
   const lanzar = async (productId: string, opciones: { grupo?: boolean; meliCategoryId?: string; soloPreparar?: boolean } = {}) => {
-    const canales = selectedMarketplaces.filter((m) => ["mercadolibre", "falabella", "woocommerce", "ripley"].includes(m));
+    const canales = selectedMarketplaces.filter((m) => CANALES_LANZABLES.includes(m));
     if (!canales.length) {
       toast.info("Shopify y otros canales todavía no se publican automáticamente.");
       return;
@@ -274,6 +278,9 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
                 {c.status === "encolado" ? "✓" : c.status === "preparado" ? "◦" : c.status === "omitido" ? "•" : "✗"} {c.message}
               </p>
             ))}
+            {selectedMarketplaces.filter((m) => !CANALES_LANZABLES.includes(m)).map((m) => (
+              <p key={m} className="text-sm break-words text-amber-500">• {NOMBRE_DE_CANAL[m] ?? m}: todavía no se publica automáticamente desde aquí; el contenido queda generado en Synkro.</p>
+            ))}
             {launch.meliCategory?.id && (
               <p className="text-xs text-muted-foreground break-words">Mercado Libre: categoría {launch.meliCategory.path ?? launch.meliCategory.id}</p>
             )}
@@ -285,9 +292,15 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
               </p>
             )}
             {launch.ripley && (
-              <p className={`text-xs break-words ${launch.ripley.category ? "text-muted-foreground" : "text-amber-500"}`}>
+              <p className="text-xs text-muted-foreground break-words">
                 Ripley: {launch.ripley.category ? launch.ripley.category.path : "sin categoría"}
+                {launch.ripley.brand ? ` · marca ${launch.ripley.brand}` : ""}
+                {launch.ripley.attributes ? ` · atributos ${launch.ripley.attributes.filled} de ${launch.ripley.attributes.total}` : ""}
+                {launch.ripley.listo ? "" : ` · todavía ${launch.ripley.motivo}`}
               </p>
+            )}
+            {launch.ripley && launch.ripley.avisos.length > 0 && (
+              <p className="text-xs text-amber-500 break-words">Ripley: {launch.ripley.avisos.slice(0, 3).join(" · ")}</p>
             )}
             {launch.falabella?.categoryNote && (
               <p className="text-xs text-amber-500 break-words">
