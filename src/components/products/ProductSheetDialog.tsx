@@ -34,7 +34,7 @@ function estadoDeCanal(estado: string, pausedByUser: boolean | undefined, stock:
 
 const ESTADO: Record<string, { texto: string; clase: string }> = {
   published: { texto: "Publicado", clase: "bg-green-500/10 text-green-500" },
-  unpublished: { texto: "Preparado, sin publicar", clase: "bg-blue-500/10 text-blue-400" },
+  unpublished: { texto: "Sin publicar", clase: "bg-secondary text-muted-foreground" },
   pending: { texto: "Enviando", clase: "bg-amber-500/10 text-amber-500" },
   error: { texto: "Con error", clase: "bg-red-500/10 text-red-500" },
   paused: { texto: "Pausado", clase: "bg-secondary text-muted-foreground" },

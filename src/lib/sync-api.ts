@@ -353,6 +353,8 @@ export interface FalabellaField {
 export interface LaunchReport {
   channels: { marketplace: string; accounts: number; status: 'encolado' | 'preparado' | 'omitido' | 'error'; message: string }[];
   falabella?: FalabellaPrepReport;
+  /** Ripley: la categoría con la que saldría y si el producto está listo para enviarse. */
+  ripley?: { category: { id: string; path: string } | null; listo: boolean; motivo?: string };
   /** Las variantes (o el producto) tal como saldrían, con su título en cada canal: para revisarlo antes de confirmar. */
   variants?: { id: string; sku: string; etiqueta: string | null; price: number | null; stock: number | null; titulos: { mercadolibre?: string; falabella?: string } }[];
   estimatedMeli: string[];

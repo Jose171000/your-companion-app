@@ -218,6 +218,23 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
   const wooActivas = cuentasDelCanal.woocommerce ?? [];
   const wooCuenta = wooActivas.length > 1 ? cuentas.woocommerce?.[0] : wooActivas[0]?.id;
 
+  // Ripley pide su propia categoría y sus datos: el producto tiene que estar preparado (ficha → Ripley → Preparar) antes de publicar.
+  const ripleyPreparado = !!String((product?.marketplaceIds as Record<string, unknown> | null | undefined)?.ripley_category_id ?? "").trim();
+
+  // Ripley: lo que se enviaría (categoría, avisos y errores). Solo lee: no envía nada a Ripley.
+  const ripleyElegido = selected.includes("ripley") && !publicados.has("ripley");
+  const ripleyVista = useQuery({
+    queryKey: ["ripley-publish-preview-dialogo", product?.id, !!product?.alGrupo],
+    queryFn: async () => {
+      const res = await syncApi.ripleyPublishPreview(product!.id, !!product?.alGrupo);
+      if (res.error || !res.data) throw new Error(res.error ?? "No se pudo revisar el envío a Ripley");
+      return res.data;
+    },
+    enabled: open && !!product && ripleyElegido && ripleyPreparado,
+    staleTime: 30_000,
+    retry: false,
+  });
+
   const falabellaElegido = selected.includes("falabella");
   const falabellaPublicado = listings.find((l) => l.marketplace === "falabella")?.syncStatus === "published";
 
@@ -226,9 +243,6 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
     if (open && falabellaElegido && !falabellaPublicado && isConnected("falabella") && product) preparar.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, falabellaElegido, falabellaPublicado, product?.id, version, connections.length]);
-
-  // Ripley pide su propia categoría y sus datos: el producto tiene que estar preparado (ficha → Ripley → Preparar) antes de publicar.
-  const ripleyPreparado = !!String((product?.marketplaceIds as Record<string, unknown> | null | undefined)?.ripley_category_id ?? "").trim();
 
   const canPublish =
     objetivos.length > 0 &&
@@ -390,6 +404,25 @@ export function PublishProductDialog({ product, onClose, desdeFicha }: PublishPr
           )}
 
           {/* Al cerrar, `product` pasa a null un render antes de que se limpie `prep`: sin esta guarda la pantalla quedaba en negro. */}
+          {product && ripleyElegido && isConnected("ripley") && ripleyPreparado && (
+            <div className="rounded-xl border border-border p-3 space-y-2 min-w-0">
+              <p className="text-sm font-medium flex items-center gap-2"><Sparkles className="w-4 h-4 text-primary" /> Datos para Ripley</p>
+              {ripleyVista.isLoading && <p className="text-xs text-muted-foreground flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Revisando lo que se enviaría…</p>}
+              {ripleyVista.isError && <p className="text-xs text-amber-500 break-words">No se pudo revisar el envío a Ripley ahora. Puedes intentarlo igual o abrir la ficha → Ripley → Preparar.</p>}
+              {ripleyVista.data && (
+                <>
+                  <p className="text-xs text-muted-foreground break-words">Categoría: <span className="text-foreground">{ripleyVista.data.categoria?.ruta ?? "sin categoría"}</span></p>
+                  {ripleyVista.data.errores.map((e) => <p key={e} className="text-xs text-red-400 break-words">• {e}</p>)}
+                  {ripleyVista.data.productos.flatMap((p) => p.errores.map((e) => `${p.sku}: ${e}`)).slice(0, 5).map((e) => <p key={e} className="text-xs text-red-400 break-words">• {e}</p>)}
+                  {ripleyVista.data.yaEnRipley && ripleyVista.data.yaEnRipley.length > 0 && <p className="text-xs text-amber-500 break-words">Estos SKU ya existen en Ripley: {ripleyVista.data.yaEnRipley.map((x) => x.sku).join(", ")}.</p>}
+                  {ripleyVista.data.bloqueo && <p className="text-xs text-amber-500 break-words">{ripleyVista.data.bloqueo.motivo}</p>}
+                  {ripleyVista.data.puedeEnviar && !ripleyVista.data.bloqueo ? <p className="text-xs text-green-500">Listo para enviar. Ripley lo revisa y lo aprueba antes de mostrarlo.</p> : !ripleyVista.data.bloqueo && ripleyVista.data.errores.length === 0 && <p className="text-xs text-amber-500">Hay datos por corregir antes de enviar: ábrelo en la ficha → Ripley → Preparar.</p>}
+                  {!ripleyVista.data.envioEncendido && <p className="text-xs text-amber-500">El envío a Ripley está apagado en el servidor.</p>}
+                </>
+              )}
+            </div>
+          )}
+
           {product && falabellaElegido && !falabellaPublicado && isConnected("falabella") && (
             <div className="rounded-xl border border-border p-3 space-y-3 min-w-0">
               <p className="text-sm font-medium flex items-center gap-1.5">

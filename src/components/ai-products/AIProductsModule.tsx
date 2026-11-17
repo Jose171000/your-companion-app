@@ -59,7 +59,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
   }, [selectedMarketplaces, selectedCategory, setDirty, compact]);
   /** Prepara cada canal (categoría, marca, medidas, atributos, descripción HTML) y publica el producto. */
   const lanzar = async (productId: string, opciones: { grupo?: boolean; meliCategoryId?: string; soloPreparar?: boolean } = {}) => {
-    const canales = selectedMarketplaces.filter((m) => ["mercadolibre", "falabella", "woocommerce"].includes(m));
+    const canales = selectedMarketplaces.filter((m) => ["mercadolibre", "falabella", "woocommerce", "ripley"].includes(m));
     if (!canales.length) {
       toast.info("Shopify y otros canales todavía no se publican automáticamente.");
       return;
@@ -282,6 +282,11 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
                 Falabella: {launch.falabella.category ? launch.falabella.category.path : "sin categoría"} · marca {launch.falabella.brand.value}
                 {launch.falabella.attributes ? ` · atributos ${launch.falabella.attributes.filled} de ${launch.falabella.attributes.total}` : ""}
                 {launch.falabella.listo ? "" : ` · todavía ${launch.falabella.motivo}`}
+              </p>
+            )}
+            {launch.ripley && (
+              <p className={`text-xs break-words ${launch.ripley.category ? "text-muted-foreground" : "text-amber-500"}`}>
+                Ripley: {launch.ripley.category ? launch.ripley.category.path : "sin categoría"}
               </p>
             )}
             {launch.falabella?.categoryNote && (
