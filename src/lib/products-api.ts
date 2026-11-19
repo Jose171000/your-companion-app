@@ -360,6 +360,9 @@ export const productsApi = {
     apiRequest<{ aplicados: number; variantes: number }>(`/products/groups/${groupId}/channel-values/apply`, { method: 'POST', body: JSON.stringify({ marketplace, cambios }) }),
 
   /** Cambia el NOMBRE de un eje de variación del grupo («Talla» → «Tamaño cama») en el grupo y en todas sus variantes; los valores no se tocan. */
+  changeGroupCode: (groupId: string, codigo?: string) =>
+    apiRequest<{ anterior: string; nuevo: string; variantes: number; canales: string[] }>(`/products/groups/${groupId}/change-code`, { method: 'POST', body: JSON.stringify(codigo ? { codigo } : {}) }),
+
   renameGroupAxis: (groupId: string, from: string, to: string) =>
     apiRequest<{ eje: string; variantes: number }>(`/products/groups/${groupId}/axes`, { method: 'PATCH', body: JSON.stringify({ from, to }) }),
 

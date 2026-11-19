@@ -16,6 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CorregirValorDeVariante } from "./CorregirValorDeVariante";
 import { CategoriaDelGrupo } from "./CategoriaDelGrupo";
+import { CodigoDelGrupo } from "./CodigoDelGrupo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -615,6 +616,7 @@ function FichaDeProducto({
 
             {/* ── General ── */}
             <TabsContent value="general" className="pt-4 space-y-4">
+              {modoGrupo && product?.group?.id && <CodigoDelGrupo groupId={product.group.id} codigo={product.group.parentSku} />}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1 sm:col-span-2">
                   <Label className="text-xs">{modoGrupo ? "Título común del grupo (sin color ni talla)" : "Título que se envía a los canales"}{!modoGrupo && <EtiquetaDeOrigen origen={hoja.product.origin?.aiTitle} />}</Label>
