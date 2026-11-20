@@ -271,8 +271,19 @@ export const productsApi = {
   summary: () => apiRequest<ProductsSummary>('/products/summary', { method: 'GET' }),
 
   /** Categoría real, estado en cada canal y qué falta, de los productos indicados */
-  overview: (ids: string[]) =>
-    apiRequest<Record<string, ProductOverview>>(`/products/overview?ids=${ids.join(',')}`, { method: 'GET' }),
+  // Los ids van en la dirección y el servidor acepta un máximo por consulta: con muchas filas (o grupos con muchas
+  // variantes) una sola consulta fallaba y las columnas «Canales» y «Datos» quedaban vacías. Se piden en tandas.
+  overview: async (ids: string[]): Promise<{ data?: Record<string, ProductOverview>; error?: string }> => {
+    const TANDA = 100;
+    const tandas: string[][] = [];
+    for (let i = 0; i < ids.length; i += TANDA) tandas.push(ids.slice(i, i + TANDA));
+    const respuestas = await Promise.all(
+      tandas.map((t) => apiRequest<Record<string, ProductOverview>>(`/products/overview?ids=${t.join(',')}`, { method: 'GET' })),
+    );
+    const falla = respuestas.find((r) => r.error);
+    if (falla && respuestas.every((r) => r.error)) return { error: falla.error };
+    return { data: Object.assign({}, ...respuestas.map((r) => r.data ?? {})) };
+  },
 
   /** Obtener un producto por ID */
   findOne: (id: string) =>
