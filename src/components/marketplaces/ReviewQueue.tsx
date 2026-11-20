@@ -170,6 +170,7 @@ function HistorialDeSolicitudes({ canManage }: { canManage: boolean }) {
     placeholderData: keepPreviousData,
     staleTime: 15_000,
   });
+  const errorDelServidor = data?.error;
   const filas = data?.data?.data ?? [];
   const total = data?.data?.total ?? 0;
   const totalPaginas = data?.data?.totalPages ?? 1;
@@ -211,6 +212,11 @@ function HistorialDeSolicitudes({ canManage }: { canManage: boolean }) {
       </Filtros>
       {isLoading ? (
         <div className="glass rounded-2xl p-4 space-y-3"><Skeleton className="h-4 w-56" /><Skeleton className="h-3 w-40" /></div>
+      ) : errorDelServidor ? (
+        <div className="glass rounded-2xl py-8 px-4 text-center space-y-2">
+          <p className="text-sm text-red-400">No se pudo cargar el historial: {errorDelServidor}</p>
+          <Button variant="outline" size="sm" onClick={() => queryClient.invalidateQueries({ queryKey: ["sync-change-requests-history"] })}>Reintentar</Button>
+        </div>
       ) : !filas.length ? (
         <div className="glass rounded-2xl py-10 text-center text-sm text-muted-foreground">
           {qFinal || estado || campo ? "Ningún envío coincide con la búsqueda o el filtro." : "Todavía no hay envíos en el historial."}
