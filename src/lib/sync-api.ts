@@ -950,6 +950,10 @@ export const syncApi = {
       body: JSON.stringify({ ids }),
     }),
 
+  /** Reenvía por lotes a Falabella las solicitudes que rechazó por pedir esperar (429 Too many attempts) */
+  retryRateLimitedChanges: () =>
+    apiRequest<{ reintentadas: number }>('/sync/change-requests/retry-rate-limited', { method: 'POST' }),
+
   rejectManyChanges: (ids: string[], reason?: string) =>
     apiRequest<{ rechazadas: number; omitidas: { id: string; motivo: string }[] }>('/sync/change-requests/reject-many', {
       method: 'POST',

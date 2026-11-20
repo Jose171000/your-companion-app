@@ -192,6 +192,18 @@ export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading,
     onError: () => toast.error("Error al conectar con el servidor"),
   });
 
+  // Las que Falabella rechazó por pedir esperar (429): se reenvían por lotes, espaciados, sin volver a aprobarlas.
+  const reintentarLimitadas = useMutation({
+    mutationFn: () => syncApi.retryRateLimitedChanges(),
+    onSuccess: (res) => {
+      if (res.error || !res.data) toast.error(res.error ?? "No se pudieron reenviar");
+      else if (!res.data.reintentadas) toast.info("No hay solicitudes rechazadas por el límite de Falabella.");
+      else toast.success(`${res.data.reintentadas} solicitud(es) se reenvían a Falabella por lotes; puede tardar unos minutos.`);
+      refresh();
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
+
   const toggle = useMutation({
     mutationFn: (enabled: boolean) => syncApi.setReviewMode(enabled),
     onSuccess: (res) => {
@@ -210,6 +222,7 @@ export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading,
   const pending = requests.filter((r) => r.status === "pending");
   const history = requests.filter((r) => r.status !== "pending");
   const lotes = agrupar(pending);
+  const limitadasPorFalabella = history.filter((r) => r.status === "error" && r.marketplace === "falabella" && /429|too many attempts/i.test(r.resultMessage ?? "")).length;
 
   // Dentro del Tablero no se muestra nada hasta que haya algo por aprobar.
   if (compacto && !isLoading && !pending.length) return null;
@@ -312,7 +325,15 @@ export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading,
 
       {!compacto && history.length > 0 && (
         <section className="space-y-3">
-          <h3 className="font-semibold text-base">Historial</h3>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h3 className="font-semibold text-base">Historial</h3>
+            {canManage && limitadasPorFalabella > 0 && (
+              <Button variant="outline" size="sm" disabled={reintentarLimitadas.isPending} onClick={() => reintentarLimitadas.mutate()}
+                title="Falabella pidió esperar y no las recibió. Se reenvían por lotes, espaciadas.">
+                Reenviar las rechazadas por el límite de Falabella
+              </Button>
+            )}
+          </div>
           <div className="glass rounded-2xl overflow-hidden divide-y divide-border/50">
             {history.map((r) => {
               const style = RESOLVED_STYLES[r.status] ?? RESOLVED_STYLES.rejected;
