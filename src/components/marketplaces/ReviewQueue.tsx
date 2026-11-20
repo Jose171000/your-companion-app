@@ -164,9 +164,26 @@ export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading,
     onError: () => toast.error("Error al conectar con el servidor"),
   });
 
-  // Varias a la vez: un lote de variantes o todas las pendientes (el servidor admite hasta 200).
+  // Varias a la vez: un lote de variantes o todas las pendientes. Se aprueban en tandas de 100, una tras otra (no todas en una sola
+  // petición); el espaciado hacia cada canal lo controla el servidor (Falabella: lotes con espera entre uno y otro).
   const aprobarVarias = useMutation({
-    mutationFn: (ids: string[]) => syncApi.approveManyChanges(ids.slice(0, 200)),
+    mutationFn: async (ids: string[]) => {
+      const TANDA = 100;
+      let aprobadas = 0;
+      const omitidas: { id: string; motivo: string }[] = [];
+      for (let i = 0; i < ids.length; i += TANDA) {
+        if (ids.length > TANDA) toast.loading(`Aprobando ${Math.min(i + TANDA, ids.length)} de ${ids.length}…`, { id: "aprobando-todas" });
+        const res = await syncApi.approveManyChanges(ids.slice(i, i + TANDA));
+        if (res.error || !res.data) {
+          toast.dismiss("aprobando-todas");
+          return { error: `${res.error ?? "No se pudieron aprobar"}${aprobadas ? ` (ya se aprobaron ${aprobadas}; las demás siguen pendientes)` : ""}`, data: undefined as undefined | { aprobadas: number; omitidas: { id: string; motivo: string }[] } };
+        }
+        aprobadas += res.data.aprobadas;
+        omitidas.push(...res.data.omitidas);
+      }
+      toast.dismiss("aprobando-todas");
+      return { error: undefined as string | undefined, data: { aprobadas, omitidas } };
+    },
     onMutate: () => setBusyId("__varias__"),
     onSettled: () => { setBusyId(null); setConfirmarTodas(false); },
     onSuccess: (res) => {
@@ -255,7 +272,7 @@ export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading,
           {canManage && pending.length > 1 && (
             confirmarTodas ? (
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-muted-foreground">¿Aprobar las {Math.min(pending.length, 200)} pendientes y enviarlas a los canales?</span>
+                <span className="text-muted-foreground">¿Aprobar las {pending.length} pendientes y enviarlas a los canales? Se aprueban por tandas y el envío a cada canal va espaciado, así que puede tardar unos minutos en reflejarse.</span>
                 <Button variant="outline" size="sm" onClick={() => setConfirmarTodas(false)} disabled={busyId === "__varias__"}>No</Button>
                 <Button size="sm" className="gap-1.5 gradient-primary" disabled={busyId === "__varias__"} onClick={() => aprobarVarias.mutate(pending.map((r) => r.id))}>
                   <Check className="w-3.5 h-3.5" /> Sí, aprobar
