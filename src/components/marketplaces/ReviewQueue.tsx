@@ -1,10 +1,11 @@
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowRight, Check, X } from "lucide-react";
+import { ArrowRight, Check, Search, X } from "lucide-react";
 import { ChangeRequest, syncApi } from "@/lib/sync-api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -126,6 +127,127 @@ function LoteDeSolicitudes({
   );
 }
 
+const CAMPOS = [
+  { valor: "", etiqueta: "Todo (precio, descuento, stock)" },
+  { valor: "price", etiqueta: "Precio" },
+  { valor: "promo", etiqueta: "Descuento" },
+  { valor: "stock", etiqueta: "Stock" },
+];
+const clasesDeFiltro = "h-9 rounded-md border border-border bg-background px-2 text-sm";
+
+/** Buscador por SKU o nombre y filtro por tipo de cambio, comunes a Pendientes e Historial. */
+function Filtros({ q, onQ, campo, onCampo, children }: { q: string; onQ: (v: string) => void; campo: string; onCampo: (v: string) => void; children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input value={q} onChange={(e) => onQ(e.target.value)} placeholder="Buscar por SKU o nombre…" className="pl-8 h-9" />
+      </div>
+      <select value={campo} onChange={(e) => onCampo(e.target.value)} className={clasesDeFiltro} aria-label="Filtrar por tipo de cambio">
+        {CAMPOS.map((c) => <option key={c.valor} value={c.valor}>{c.etiqueta}</option>)}
+      </select>
+      {children}
+    </div>
+  );
+}
+
+/** Todo lo ya resuelto, con páginas, búsqueda y filtro por estado: el estado real de cada envío. */
+function HistorialDeSolicitudes({ canManage }: { canManage: boolean }) {
+  const queryClient = useQueryClient();
+  const [pagina, setPagina] = useState(1);
+  const [q, setQ] = useState("");
+  const [qFinal, setQFinal] = useState("");
+  const [estado, setEstado] = useState("");
+  const [campo, setCampo] = useState("");
+  const TAMANO = 50;
+
+  // La búsqueda espera a que termines de escribir; cualquier filtro nuevo vuelve a la primera página.
+  useEffect(() => { const t = setTimeout(() => { setQFinal(q.trim()); setPagina(1); }, 400); return () => clearTimeout(t); }, [q]);
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["sync-change-requests-history", pagina, estado, campo, qFinal],
+    queryFn: () => syncApi.changeRequestsHistory({ page: pagina, limit: TAMANO, status: estado, field: campo, q: qFinal }),
+    placeholderData: keepPreviousData,
+    staleTime: 15_000,
+  });
+  const filas = data?.data?.data ?? [];
+  const total = data?.data?.total ?? 0;
+  const totalPaginas = data?.data?.totalPages ?? 1;
+  const desde = total ? (pagina - 1) * TAMANO + 1 : 0;
+  const hasta = Math.min(pagina * TAMANO, total);
+  const hayLimitadas = filas.some((r) => r.status === "error" && r.marketplace === "falabella" && /429|too many attempts/i.test(r.resultMessage ?? ""));
+
+  const reintentar = useMutation({
+    mutationFn: () => syncApi.retryRateLimitedChanges(),
+    onSuccess: (res) => {
+      if (res.error || !res.data) toast.error(res.error ?? "No se pudieron reenviar");
+      else if (!res.data.reintentadas) toast.info("No hay solicitudes rechazadas por el límite de Falabella.");
+      else toast.success(`${res.data.reintentadas} solicitud(es) se reenvían a Falabella por lotes; puede tardar unos minutos.`);
+      queryClient.invalidateQueries({ queryKey: ["sync-change-requests"] });
+      queryClient.invalidateQueries({ queryKey: ["sync-change-requests-history"] });
+    },
+    onError: () => toast.error("Error al conectar con el servidor"),
+  });
+
+  const cambiaEstado = (v: string) => { setEstado(v); setPagina(1); };
+  const cambiaCampo = (v: string) => { setCampo(v); setPagina(1); };
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="font-semibold text-base">Historial{total ? ` (${total})` : ""}</h3>
+        {canManage && (hayLimitadas || estado === "error") && (
+          <Button variant="outline" size="sm" disabled={reintentar.isPending} onClick={() => reintentar.mutate()}
+            title="Falabella pidió esperar y no las recibió. Se reenvían por lotes, espaciadas.">
+            Reenviar las rechazadas por el límite de Falabella
+          </Button>
+        )}
+      </div>
+      <Filtros q={q} onQ={setQ} campo={campo} onCampo={cambiaCampo}>
+        <select value={estado} onChange={(e) => cambiaEstado(e.target.value)} className={clasesDeFiltro} aria-label="Filtrar por estado">
+          <option value="">Todos los estados</option>
+          {Object.entries(RESOLVED_STYLES).map(([valor, s]) => <option key={valor} value={valor}>{s.label}</option>)}
+        </select>
+      </Filtros>
+      {isLoading ? (
+        <div className="glass rounded-2xl p-4 space-y-3"><Skeleton className="h-4 w-56" /><Skeleton className="h-3 w-40" /></div>
+      ) : !filas.length ? (
+        <div className="glass rounded-2xl py-10 text-center text-sm text-muted-foreground">
+          {qFinal || estado || campo ? "Ningún envío coincide con la búsqueda o el filtro." : "Todavía no hay envíos en el historial."}
+        </div>
+      ) : (
+        <div className={cn("glass rounded-2xl overflow-hidden divide-y divide-border/50", isFetching && "opacity-70")}>
+          {filas.map((r) => {
+            const style = RESOLVED_STYLES[r.status] ?? RESOLVED_STYLES.rejected;
+            return (
+              <div key={r.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
+                <div className="min-w-0 space-y-1">
+                  <ChangeLine r={r} />
+                  {r.resultMessage && <p className="text-xs text-muted-foreground">{r.resultMessage}</p>}
+                </div>
+                <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
+                  {r.resolvedAt && <span>{new Date(r.resolvedAt).toLocaleString()}</span>}
+                  <Badge className={cn("text-[10px]", style.className)}>{style.label}</Badge>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {total > 0 && (
+        <div className="flex items-center justify-between gap-3 flex-wrap text-xs text-muted-foreground">
+          <span>Mostrando {desde}–{hasta} de {total}</span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={pagina <= 1} onClick={() => setPagina((p) => Math.max(1, p - 1))}>Anterior</Button>
+            <span>Página {pagina} de {totalPaginas}</span>
+            <Button variant="outline" size="sm" disabled={pagina >= totalPaginas} onClick={() => setPagina((p) => p + 1)}>Siguiente</Button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** Cola de aprobación: cambios de precio y stock que esperan luz verde. */
 export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading, campos, compacto, titulo }: Props) {
   const requests = campos ? todas.filter((r) => campos.includes(r.field)) : todas;
@@ -133,10 +255,13 @@ export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading,
   const [busyId, setBusyId] = useState<string | null>(null);
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const [confirmarTodas, setConfirmarTodas] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [campoFiltro, setCampoFiltro] = useState("");
   const alternar = (clave: string) => setAbiertos((prev) => { const n = new Set(prev); if (n.has(clave)) n.delete(clave); else n.add(clave); return n; });
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["sync-change-requests"] });
+    queryClient.invalidateQueries({ queryKey: ["sync-change-requests-history"] });
     queryClient.invalidateQueries({ queryKey: ["sync-listings"] });
   };
 
@@ -209,18 +334,6 @@ export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading,
     onError: () => toast.error("Error al conectar con el servidor"),
   });
 
-  // Las que Falabella rechazó por pedir esperar (429): se reenvían por lotes, espaciados, sin volver a aprobarlas.
-  const reintentarLimitadas = useMutation({
-    mutationFn: () => syncApi.retryRateLimitedChanges(),
-    onSuccess: (res) => {
-      if (res.error || !res.data) toast.error(res.error ?? "No se pudieron reenviar");
-      else if (!res.data.reintentadas) toast.info("No hay solicitudes rechazadas por el límite de Falabella.");
-      else toast.success(`${res.data.reintentadas} solicitud(es) se reenvían a Falabella por lotes; puede tardar unos minutos.`);
-      refresh();
-    },
-    onError: () => toast.error("Error al conectar con el servidor"),
-  });
-
   const toggle = useMutation({
     mutationFn: (enabled: boolean) => syncApi.setReviewMode(enabled),
     onSuccess: (res) => {
@@ -237,9 +350,12 @@ export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading,
   });
 
   const pending = requests.filter((r) => r.status === "pending");
-  const history = requests.filter((r) => r.status !== "pending");
-  const lotes = agrupar(pending);
-  const limitadasPorFalabella = history.filter((r) => r.status === "error" && r.marketplace === "falabella" && /429|too many attempts/i.test(r.resultMessage ?? "")).length;
+  const texto = busca.trim().toLowerCase();
+  const visibles = pending.filter((r) =>
+    (!campoFiltro || r.field === campoFiltro) &&
+    (!texto || r.product.sku.toLowerCase().includes(texto) || r.product.name.toLowerCase().includes(texto)));
+  const filtrado = visibles.length !== pending.length;
+  const lotes = agrupar(visibles);
 
   // Dentro del Tablero no se muestra nada hasta que haya algo por aprobar.
   if (compacto && !isLoading && !pending.length) return null;
@@ -268,28 +384,33 @@ export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading,
 
       <section className="space-y-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <h3 className="font-semibold text-base">{titulo ?? "Pendientes"} ({pending.length})</h3>
-          {canManage && pending.length > 1 && (
+          <h3 className="font-semibold text-base">{titulo ?? "Pendientes"} ({filtrado ? `${visibles.length} de ${pending.length}` : pending.length})</h3>
+          {canManage && visibles.length > 1 && (
             confirmarTodas ? (
               <div className="flex items-center gap-2 text-xs">
-                <span className="text-muted-foreground">¿Aprobar las {pending.length} pendientes y enviarlas a los canales? Se aprueban por tandas y el envío a cada canal va espaciado, así que puede tardar unos minutos en reflejarse.</span>
+                <span className="text-muted-foreground">¿Aprobar {filtrado ? `las ${visibles.length} pendientes que ves (según tu búsqueda o filtro)` : `las ${visibles.length} pendientes`} y enviarlas a los canales? Se aprueban por tandas y el envío a cada canal va espaciado, así que puede tardar unos minutos en reflejarse.</span>
                 <Button variant="outline" size="sm" onClick={() => setConfirmarTodas(false)} disabled={busyId === "__varias__"}>No</Button>
-                <Button size="sm" className="gap-1.5 gradient-primary" disabled={busyId === "__varias__"} onClick={() => aprobarVarias.mutate(pending.map((r) => r.id))}>
+                <Button size="sm" className="gap-1.5 gradient-primary" disabled={busyId === "__varias__"} onClick={() => aprobarVarias.mutate(visibles.map((r) => r.id))}>
                   <Check className="w-3.5 h-3.5" /> Sí, aprobar
                 </Button>
               </div>
             ) : (
               <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setConfirmarTodas(true)}>
-                <Check className="w-3.5 h-3.5" /> Aprobar todas ({pending.length})
+                <Check className="w-3.5 h-3.5" /> {filtrado ? `Aprobar las ${visibles.length} que ves` : `Aprobar todas (${visibles.length})`}
               </Button>
             )
           )}
         </div>
+        {!compacto && pending.length > 0 && (
+          <Filtros q={busca} onQ={(v) => { setBusca(v); setConfirmarTodas(false); }} campo={campoFiltro} onCampo={(v) => { setCampoFiltro(v); setConfirmarTodas(false); }} />
+        )}
         {isLoading ? (
           <div className="glass rounded-2xl p-4 space-y-3">
             <Skeleton className="h-4 w-56" />
             <Skeleton className="h-3 w-40" />
           </div>
+        ) : pending.length > 0 && !visibles.length ? (
+          <div className="glass rounded-2xl py-10 text-center text-sm text-muted-foreground">Ninguna pendiente coincide con la búsqueda o el filtro.</div>
         ) : !pending.length ? (
           <div className="glass rounded-2xl py-12 text-center">
             <p className="text-sm font-medium">No hay cambios por revisar</p>
@@ -340,36 +461,7 @@ export function ReviewQueue({ requests: todas, reviewMode, canManage, isLoading,
         )}
       </section>
 
-      {!compacto && history.length > 0 && (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h3 className="font-semibold text-base">Historial</h3>
-            {canManage && limitadasPorFalabella > 0 && (
-              <Button variant="outline" size="sm" disabled={reintentarLimitadas.isPending} onClick={() => reintentarLimitadas.mutate()}
-                title="Falabella pidió esperar y no las recibió. Se reenvían por lotes, espaciadas.">
-                Reenviar las rechazadas por el límite de Falabella
-              </Button>
-            )}
-          </div>
-          <div className="glass rounded-2xl overflow-hidden divide-y divide-border/50">
-            {history.map((r) => {
-              const style = RESOLVED_STYLES[r.status] ?? RESOLVED_STYLES.rejected;
-              return (
-                <div key={r.id} className="p-4 flex flex-col sm:flex-row sm:items-center gap-2 justify-between">
-                  <div className="min-w-0 space-y-1">
-                    <ChangeLine r={r} />
-                    {r.resultMessage && <p className="text-xs text-muted-foreground">{r.resultMessage}</p>}
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
-                    {r.resolvedAt && <span>{new Date(r.resolvedAt).toLocaleString()}</span>}
-                    <Badge className={cn("text-[10px]", style.className)}>{style.label}</Badge>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+      {!compacto && <HistorialDeSolicitudes canManage={canManage} />}
     </div>
   );
 }

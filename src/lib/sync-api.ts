@@ -950,6 +950,13 @@ export const syncApi = {
       body: JSON.stringify({ ids }),
     }),
 
+  /** Historial (lo ya resuelto) con páginas, filtro por estado o campo y búsqueda por SKU o nombre */
+  changeRequestsHistory: (p: { page?: number; limit?: number; status?: string; field?: string; q?: string }) => {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(p)) if (v !== undefined && v !== '') qs.set(k, String(v));
+    return apiRequest<{ data: ChangeRequest[]; total: number; page: number; limit: number; totalPages: number }>(`/sync/change-requests/history?${qs.toString()}`, { method: 'GET' });
+  },
+
   /** Reenvía por lotes a Falabella las solicitudes que rechazó por pedir esperar (429 Too many attempts) */
   retryRateLimitedChanges: () =>
     apiRequest<{ reintentadas: number }>('/sync/change-requests/retry-rate-limited', { method: 'POST' }),
