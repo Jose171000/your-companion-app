@@ -40,6 +40,8 @@ interface Props {
   /** Los mismos filtros del reporte, para que el gráfico y la comparación no cuenten otra cosa. */
   estados: string;
   incluirEnvio: boolean;
+  /** Canal elegido (vacío = todos) */
+  canal?: string;
 }
 
 /**
@@ -47,13 +49,13 @@ interface Props {
  * duración (30 días → los 30 anteriores; un mes completo → el mes anterior) para ver si se está creciendo. La línea punteada es el
  * periodo anterior, alineado por posición.
  */
-export function EvolucionDeVentas({ dias, from, to, storeId, estados, incluirEnvio }: Props) {
+export function EvolucionDeVentas({ dias, from, to, storeId, estados, incluirEnvio, canal }: Props) {
   const [modo, setModo] = useState<Agrupacion>("dia");
   const anterior = useMemo(() => periodoAnterior(from, to), [from, to]);
 
   const { data: previo, isFetching: cargandoPrevio } = useQuery({
-    queryKey: ["sales-previous", storeId, anterior?.from, anterior?.to, estados, incluirEnvio],
-    queryFn: () => reportsApi.getSales(anterior!.from, anterior!.to, estados || undefined, incluirEnvio),
+    queryKey: ["sales-previous", storeId, anterior?.from, anterior?.to, estados, incluirEnvio, canal ?? ""],
+    queryFn: () => reportsApi.getSales(anterior!.from, anterior!.to, estados || undefined, incluirEnvio, canal || undefined),
     enabled: !!storeId && !!anterior,
     placeholderData: keepPreviousData,
     staleTime: 5 * 60_000,

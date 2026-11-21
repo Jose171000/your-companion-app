@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useStores } from "@/contexts/StoreContext";
@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MapaDeCalor } from "./MapaDeCalor";
 import { EvolucionDeVentas } from "./EvolucionDeVentas";
 import { EnviosYCupones } from "./EnviosYCupones";
@@ -40,6 +41,7 @@ const CHANNEL_NAMES: Record<string, string> = {
   amazon: "Amazon",
   woocommerce: "WooCommerce",
   falabella: "Falabella",
+  yavendio: "Yavendió",
   ripley: "Ripley",
   juntoz: "Juntoz",
   tiendanube: "Tiendanube",
@@ -126,6 +128,11 @@ export function AnalyticsModule() {
 
   const { from, to } = rango;
   const [estados, setEstados] = useState<SaleState[]>([]);
+  // Un canal (conectado o personalizado) para analizar y descargar solo sus ventas; «all» = todos.
+  const [canal, setCanal] = useState<string>("all");
+  useEffect(() => setCanal("all"), [storeId]);
+  const canalElegido = canal === "all" ? undefined : canal;
+  const nombreCanal = canalElegido ? channelLabel(canalElegido) : null;
   // Por defecto las ventas son todo lo que pagó el cliente: productos y envío.
   const [incluirEnvio, setIncluirEnvio] = useState(true);
   // Cómo se ordenan los productos ganadores (también lo usa el reporte descargable).
@@ -136,8 +143,8 @@ export function AnalyticsModule() {
   const descargarVentas = async () => {
     setDescargandoVentas(true);
     try {
-      await syncApi.downloadSales({ from, to, status: estados.join(",") || undefined });
-      toast.success("Ventas desglosadas descargadas");
+      await syncApi.downloadSales({ from, to, status: estados.join(",") || undefined, marketplace: canalElegido });
+      toast.success(nombreCanal ? `Ventas desglosadas descargadas (solo ${nombreCanal})` : "Ventas desglosadas descargadas");
     } catch (error) {
       toast.error(error instanceof Error && error.message ? error.message : "No se pudieron descargar las ventas");
     } finally {
@@ -149,8 +156,9 @@ export function AnalyticsModule() {
   const descargar = async (formato: "xlsx" | "pdf") => {
     setDescargando(formato);
     try {
-      await reportsApi.downloadReport(formato, { from, to, status: estados.join(",") || undefined, includeShipping: incluirEnvio, sort: ordenGanadores });
-      toast.success(formato === "pdf" ? "Reporte en PDF descargado" : "Reporte en Excel descargado");
+      await reportsApi.downloadReport(formato, { from, to, status: estados.join(",") || undefined, includeShipping: incluirEnvio, sort: ordenGanadores, canal: canalElegido });
+      const hecho = formato === "pdf" ? "Reporte en PDF descargado" : "Reporte en Excel descargado";
+      toast.success(nombreCanal ? `${hecho}: incluye solo los datos de ${nombreCanal}` : hecho);
     } catch (error) {
       toast.error(error instanceof Error && error.message ? error.message : "No se pudo descargar el reporte");
     } finally {
@@ -159,8 +167,8 @@ export function AnalyticsModule() {
   };
 
   const { data: result, isLoading, isError } = useQuery({
-    queryKey: ["sales-report", storeId, from, to, estados.join(","), incluirEnvio],
-    queryFn: () => reportsApi.getSales(from, to, estados.join(",") || undefined, incluirEnvio),
+    queryKey: ["sales-report", storeId, from, to, estados.join(","), incluirEnvio, canal],
+    queryFn: () => reportsApi.getSales(from, to, estados.join(",") || undefined, incluirEnvio, canalElegido),
     // Al cambiar el filtro se siguen viendo los números anteriores hasta que lleguen los nuevos.
     placeholderData: keepPreviousData,
     enabled: !!storeId,
@@ -211,7 +219,7 @@ export function AnalyticsModule() {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" className="gap-1.5" disabled={descargando !== null}>
                 {descargando ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                Descargar reporte
+                Descargar reporte{nombreCanal ? ` · solo ${nombreCanal}` : ""}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -241,6 +249,31 @@ export function AnalyticsModule() {
       {/* Selector de rango */}
       <div className="flex flex-col gap-3">
         <DateRangeFilter value={rango} onChange={setRango} />
+        {/* Canal: los conectados y también los que el cliente agregó a mano. Salen de las ventas reales. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">Canal de venta</span>
+          <Select value={canal} onValueChange={setCanal}>
+            <SelectTrigger className="w-[230px]" aria-label="Filtrar por canal de venta">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los canales</SelectItem>
+              {[...new Set([...(report.availableChannels ?? []), ...(canalElegido ? [canalElegido] : [])])]
+                .sort((a, b) => channelLabel(a).localeCompare(channelLabel(b)))
+                .map((c) => (
+                  <SelectItem key={c} value={c}>{channelLabel(c)}</SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {nombreCanal && (
+          <div className="flex items-start gap-2 rounded-xl border border-[#FCCB34]/40 bg-[#FCCB34]/10 px-3 py-2 text-xs">
+            <AlertCircle className="w-4 h-4 text-[#FCCB34] shrink-0 mt-0.5" />
+            <p>
+              Estás viendo solo <strong>{nombreCanal}</strong>. Lo que descargues (el reporte en Excel o PDF y las ventas desglosadas) incluirá únicamente los datos de este canal, no los de toda la tienda.
+            </p>
+          </div>
+        )}
         {/* Solo pedidos en ciertos estados: entregados, enviados, cancelados o devueltos (igual que en cada canal) */}
         <SaleStatusFilter
           value={estados}
@@ -289,6 +322,7 @@ export function AnalyticsModule() {
         storeId={storeId}
         estados={estados.join(",")}
         incluirEnvio={incluirEnvio}
+        canal={canalElegido}
       />
 
       {/* Lo más vendido, con su stock y en cuánto se agota */}
@@ -297,6 +331,7 @@ export function AnalyticsModule() {
         from={from}
         to={to}
         status={estados.join(",") || undefined}
+        canal={canalElegido}
         orden={ordenGanadores}
         onOrdenChange={setOrdenGanadores}
       />
@@ -312,7 +347,7 @@ export function AnalyticsModule() {
               <h3 className="font-semibold">Ventas desglosadas</h3>
               <p className="text-xs text-muted-foreground mt-1 max-w-xl">
                 Cada venta con su cliente, producto, SKU, canal, estado y envío, del {report.range.from} al {report.range.to}
-                {estados.length > 0 ? " (con los estados elegidos)" : ""}: {report.totals.orders} {report.totals.orders === 1 ? "pedido" : "pedidos"}.
+                {estados.length > 0 ? " (con los estados elegidos)" : ""}{nombreCanal ? `, solo de ${nombreCanal}` : ""}: {report.totals.orders} {report.totals.orders === 1 ? "pedido" : "pedidos"}.
               </p>
             </div>
           </div>
@@ -320,7 +355,7 @@ export function AnalyticsModule() {
             {can("ventas.descargar") && (
               <Button variant="outline" size="sm" className="gap-1.5" disabled={descargandoVentas} onClick={descargarVentas}>
                 {descargandoVentas ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileSpreadsheet className="w-3.5 h-3.5" />}
-                Descargar ventas desglosadas (Excel)
+                Descargar ventas desglosadas (Excel){nombreCanal ? ` · solo ${nombreCanal}` : ""}
               </Button>
             )}
             {can("ventas.ver") && (

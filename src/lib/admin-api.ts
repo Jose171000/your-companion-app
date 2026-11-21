@@ -259,6 +259,9 @@ export interface SalesReport {
   byStatus?: { status: string; orders: number; sales: number }[];
   /** Estados que se están filtrando (vacío = todos) */
   statusFilter?: string[];
+  /** Canal que se está filtrando (null = todos) y todos los canales con ventas en el rango, también los personalizados */
+  channelFilter?: string | null;
+  availableChannels?: string[];
   /** Cuándo entró la última venta de la tienda */
   lastOrderAt?: string | null;
   sources: { marketplaces: boolean; sheets: boolean; sheetError: string | null };
@@ -308,30 +311,33 @@ export interface ProductosGanadoresInforme {
 
 export const reportsApi = {
   /** Productos más vendidos del periodo, con su stock y en cuánto tiempo se agotaría */
-  getTopProducts: (from?: string, to?: string, status?: string) => {
+  getTopProducts: (from?: string, to?: string, status?: string, canal?: string) => {
     const params = new URLSearchParams({ limit: '200' });
     if (from) params.set('from', from);
     if (to) params.set('to', to);
     if (status) params.set('status', status);
+    if (canal) params.set('canal', canal);
     return apiRequest<ProductosGanadoresInforme>(`/reports/top-products?${params}`, { method: 'GET' });
   },
 
   /** Descarga el reporte de analíticas (ventas del periodo y productos ganadores) en Excel o PDF */
-  downloadReport: (format: 'xlsx' | 'pdf', opts: { from?: string; to?: string; status?: string; includeShipping?: boolean; sort?: OrdenDeGanadores }) => {
+  downloadReport: (format: 'xlsx' | 'pdf', opts: { from?: string; to?: string; status?: string; includeShipping?: boolean; sort?: OrdenDeGanadores; canal?: string }) => {
     const params = new URLSearchParams({ format });
     if (opts.from) params.set('from', opts.from);
     if (opts.to) params.set('to', opts.to);
     if (opts.status) params.set('status', opts.status);
     if (opts.includeShipping === false) params.set('includeShipping', 'false');
     if (opts.sort) params.set('sort', opts.sort);
-    return apiDownload(`/reports/export?${params}`, `analiticas_${opts.from ?? ''}_${opts.to ?? ''}.${format}`);
+    if (opts.canal) params.set('canal', opts.canal);
+    return apiDownload(`/reports/export?${params}`, `analiticas${opts.canal ? `_${opts.canal}` : ''}_${opts.from ?? ''}_${opts.to ?? ''}.${format}`);
   },
 
   /** Reporte externo que el admin configuró para este usuario */
   getConfig: () => apiRequest<ReportConfig>('/reports/config', { method: 'GET' }),
 
-  getSales: (from?: string, to?: string, status?: string, includeShipping = true) => {
+  getSales: (from?: string, to?: string, status?: string, includeShipping = true, canal?: string) => {
     const params = new URLSearchParams();
+    if (canal) params.set('canal', canal);
     if (!includeShipping) params.set('includeShipping', 'false');
     if (from) params.set('from', from);
     if (to) params.set('to', to);

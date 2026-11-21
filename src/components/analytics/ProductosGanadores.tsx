@@ -15,6 +15,8 @@ interface Props {
   to?: string;
   /** Estados de venta elegidos en el filtro de Analíticas (separados por coma); vacío = ventas concretadas */
   status?: string;
+  /** Canal elegido en Analíticas (vacío = todos) */
+  canal?: string;
   /** El orden elegido se comparte con la descarga del reporte */
   orden: OrdenDeGanadores;
   onOrdenChange: (o: OrdenDeGanadores) => void;
@@ -111,11 +113,11 @@ function Fila({ g, puesto }: { g: ProductoGanador; puesto: number }) {
 }
 
 /** Lo que más se vende, cuánto dinero representa y cuánto tardaría en agotarse el stock según el historial de ventas. */
-export function ProductosGanadores({ storeId, from, to, status, orden, onOrdenChange }: Props) {
+export function ProductosGanadores({ storeId, from, to, status, canal, orden, onOrdenChange }: Props) {
   const [verTodos, setVerTodos] = useState(false);
   const { data: res, isLoading, isError } = useQuery({
-    queryKey: ["top-products", storeId, from, to, status ?? ""],
-    queryFn: () => reportsApi.getTopProducts(from, to, status || undefined),
+    queryKey: ["top-products", storeId, from, to, status ?? "", canal ?? ""],
+    queryFn: () => reportsApi.getTopProducts(from, to, status || undefined, canal || undefined),
     enabled: !!storeId,
     placeholderData: keepPreviousData,
     staleTime: 60_000,
