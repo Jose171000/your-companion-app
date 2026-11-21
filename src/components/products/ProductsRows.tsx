@@ -131,7 +131,7 @@ export function GroupRows({ product, overview, overviewLoading, seleccion, ...ha
       <tr className="hover:bg-secondary/20 transition-colors group cursor-pointer" onClick={() => setAbierto((a) => !a)}>
         <td className="px-4 py-3">
           <div className="flex items-center gap-3">
-            <Casilla product={product} seleccion={seleccion} />
+            <Casilla product={{ ...product, alGrupo: true }} seleccion={seleccion} />
             <button type="button" className="text-muted-foreground hover:text-foreground" aria-label={abierto ? "Ocultar variantes" : "Ver variantes"} aria-expanded={abierto}>
               {abierto ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </button>
@@ -175,7 +175,7 @@ export function GroupCard({ product, overview, overviewLoading, seleccion, ...ha
   return (
     <div>
       <button type="button" onClick={() => setAbierto((a) => !a)} className="w-full p-4 flex gap-3 text-left hover:bg-secondary/20" aria-expanded={abierto}>
-        <Casilla product={product} seleccion={seleccion} />
+        <Casilla product={{ ...product, alGrupo: true }} seleccion={seleccion} />
         <Thumb product={product} />
         <div className="flex-1 min-w-0 space-y-1.5">
           <div className="flex items-center gap-1">
