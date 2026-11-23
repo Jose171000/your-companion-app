@@ -5,6 +5,7 @@ import { Copy, Link2, Mail, RefreshCw, Trash2 } from "lucide-react";
 import { nombreDeRol, ROLE_LABELS, storesApi, StoreSummary } from "@/lib/stores-api";
 import { asignacionDeValor, RolePicker, ValorDeRol, valorDeRol } from "./RolePicker";
 import { RolesTab } from "./RolesTab";
+import { ClavesMcpTab } from "./ClavesMcpTab";
 import { useStores } from "@/contexts/StoreContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
@@ -166,6 +167,7 @@ export function ManageStoreDialog({ store, onClose }: Props) {
               <TabsTrigger value="miembros">Equipo</TabsTrigger>
               {isOwner && <TabsTrigger value="invitar">Invitar</TabsTrigger>}
               {isOwner && <TabsTrigger value="roles">Roles</TabsTrigger>}
+              {isOwner && <TabsTrigger value="mcp">Conexión MCP</TabsTrigger>}
               {isOwner && <TabsTrigger value="enlace">Enlace público</TabsTrigger>}
             </TabsList>
 
@@ -265,6 +267,12 @@ export function ManageStoreDialog({ store, onClose }: Props) {
             {isOwner && (
               <TabsContent value="roles" className="pt-4">
                 <RolesTab storeId={id} />
+              </TabsContent>
+            )}
+
+            {isOwner && (
+              <TabsContent value="mcp" className="pt-4">
+                <ClavesMcpTab storeId={id} />
               </TabsContent>
             )}
 
