@@ -194,6 +194,7 @@ export function PrepareRipleyDialog({ product, open, onClose, desdeFicha }: Prop
       if (res.error) return toast.error(res.error);
       toast.success("Guardado para Ripley. No se envió nada a Ripley todavía.");
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["variant-compat"] });
       onClose();
     },
     onError: () => toast.error("Error al guardar los datos de Ripley"),

@@ -193,6 +193,8 @@ export function PrepareFalabellaDialog({ product, open, onClose, desdeFicha }: P
       if (res.data?.listo) toast.success(res.data.message);
       else toast.warning(res.data?.message ?? "Guardado");
       queryClient.invalidateQueries({ queryKey: ["products"] });
+      // La revisión de variantes (¿se publican juntas o separadas?) depende de la categoría: hay que recalcularla con la nueva.
+      queryClient.invalidateQueries({ queryKey: ["variant-compat"] });
       onClose();
     },
     onError: () => toast.error("Error al guardar los datos de Falabella"),
