@@ -10,6 +10,7 @@ import { CrmModule } from "@/components/crm/CrmModule";
 import { BillingModule } from "./BillingModule";
 import { SignupRequests } from "./SignupRequests";
 import { ActividadModule } from "./activity/ActividadModule";
+import { ClavesMcpAdmin } from "./ClavesMcpAdmin";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -82,6 +83,7 @@ export function AdminModule() {
           )}
           {!isAccountant && <TabsTrigger value="crm">CRM</TabsTrigger>}
           {isSuperadmin && <TabsTrigger value="actividad">Actividad</TabsTrigger>}
+          {isSuperadmin && <TabsTrigger value="claves-mcp">Claves MCP</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="facturacion" className="pt-6">
@@ -133,6 +135,11 @@ export function AdminModule() {
         {isSuperadmin && (
           <TabsContent value="actividad" className="pt-6">
             <ActividadModule />
+          </TabsContent>
+        )}
+        {isSuperadmin && (
+          <TabsContent value="claves-mcp" className="pt-6">
+            <ClavesMcpAdmin />
           </TabsContent>
         )}
       </Tabs>

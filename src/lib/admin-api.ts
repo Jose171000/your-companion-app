@@ -230,7 +230,49 @@ export const adminApi = {
       frameAncestors: string | null;
       reason: string | null;
     }>(`/admin/embed-check?url=${encodeURIComponent(url)}`, { method: 'GET' }),
+
+  // ── Claves del MCP (todas, de tiendas y de plataforma) ──
+
+  /** TODAS las claves del MCP, con su tienda y su creador. Nunca el valor de la clave. */
+  mcpKeys: (filtro: { kind?: string; estado?: string; storeId?: string } = {}) => {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(filtro)) if (v) q.set(k, v);
+    const s = q.toString();
+    return apiRequest<ClaveMcpAdmin[]>(`/admin/api-keys${s ? `?${s}` : ''}`, { method: 'GET' });
+  },
+
+  mcpPlatformPermissions: () => apiRequest<PermisosDePlataforma>('/admin/api-keys/permissions', { method: 'GET' }),
+
+  /** Crea una clave de plataforma. Caduca obligatoriamente. La clave completa viene UNA sola vez, en `key`. */
+  createPlatformKey: (cuerpo: { name: string; permissions: string[]; expiresInDays: number }) =>
+    apiRequest<ClaveMcpAdmin & { key: string }>('/admin/api-keys', { method: 'POST', body: JSON.stringify(cuerpo) }),
+
+  /** Revoca cualquier clave del MCP. */
+  revokeMcpKey: (id: string) => apiRequest<{ id: string; revoked: boolean }>(`/admin/api-keys/${id}`, { method: 'DELETE' }),
 };
+
+/** Una clave del MCP vista por un superadmin. */
+export interface ClaveMcpAdmin {
+  id: string;
+  kind: 'store' | 'platform';
+  name: string;
+  prefix: string;
+  permissions: string[];
+  estado: 'activa' | 'revocada' | 'caducada';
+  expiresAt: string | null;
+  revokedAt: string | null;
+  lastUsedAt: string | null;
+  createdAt: string;
+  store: { id: string; name: string } | null;
+  createdBy: { id: string; email: string; name: string } | null;
+}
+
+export interface PermisosDePlataforma {
+  permissions: { clave: string; titulo: string; ayuda: string; sensible: boolean }[];
+  defaults: string[];
+  maxDays: number;
+  maxActive: number;
+}
 
 // ─────────────────────────────────────────────
 // Reports API (cliente ve sus propias ventas)
