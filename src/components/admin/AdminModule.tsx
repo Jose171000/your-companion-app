@@ -67,7 +67,7 @@ export function AdminModule() {
     : clients;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 max-w-full">
       <Tabs defaultValue={isAccountant ? "facturacion" : "finanzas"}>
         <TabsList>
           <TabsTrigger value="finanzas">Finanzas</TabsTrigger>
