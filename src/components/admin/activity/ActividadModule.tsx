@@ -138,7 +138,7 @@ export function ActividadModule() {
             </div>
           ) : (
             <>
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <Ranking titulo="Secciones más usadas" ayuda="Pantallas que más se abren" puestos={r.secciones} nombre={nombreDePantalla} promedio={r.filtro.promedio} />
                 <Ranking titulo="Funciones más usadas" ayuda="Acciones que cambian datos (registrar, editar, subir…)" puestos={r.funciones} nombre={nombreDeElemento} promedio={r.filtro.promedio} vacio="Todavía no hay acciones registradas." />
               </div>
@@ -224,7 +224,7 @@ function Ranking({ titulo, ayuda, puestos, nombre, promedio, vacio }: {
   titulo: string; ayuda: string; puestos: PuestoDeRanking[]; nombre: (t: string) => string; promedio: boolean; vacio?: string;
 }) {
   return (
-    <div className="glass rounded-2xl border border-border dark:border-white/10 p-5 md:p-6">
+    <div className="glass rounded-2xl border border-border dark:border-white/10 p-5 md:p-6 min-w-0">
       <h3 className="font-semibold">{titulo}</h3>
       <p className="text-xs text-muted-foreground mb-4">{ayuda}{promedio ? " · % = parte del uso de cada persona, en promedio" : ""}</p>
       {puestos.length === 0 ? (
