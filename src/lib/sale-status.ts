@@ -1,7 +1,9 @@
 /** Estado de una venta, igual para todos los canales (el servidor traduce lo que dice cada uno). */
-export type SaleState = "pendiente" | "enviado" | "entregado" | "cancelado" | "devuelto";
+export type SaleState = "sin_pagar" | "pendiente" | "enviado" | "entregado" | "cancelado" | "devuelto";
 
 export const SALE_STATES: { value: SaleState; singular: string; label: string; clase: string }[] = [
+  // Pedido de una tienda propia sin pago confirmado: se ve, pero no es venta ni mueve stock.
+  { value: "sin_pagar", singular: "Sin pagar", label: "Sin pagar", clase: "bg-orange-500/10 text-orange-400 border-orange-500/30" },
   { value: "pendiente", singular: "Pendiente", label: "Pendientes", clase: "bg-amber-500/10 text-amber-500 border-amber-500/30" },
   { value: "enviado", singular: "Enviado", label: "Enviados", clase: "bg-blue-500/10 text-blue-400 border-blue-500/30" },
   { value: "entregado", singular: "Entregado", label: "Entregados", clase: "bg-green-500/10 text-green-500 border-green-500/30" },

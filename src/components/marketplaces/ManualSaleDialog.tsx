@@ -182,7 +182,7 @@ export function ManualSaleDialog({ open, onOpenChange, editar, onGuardada }: {
                 <Select value={estado} onValueChange={setEstado}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {SALE_STATES.map((e) => <SelectItem key={e.value} value={e.value}>{e.singular}</SelectItem>)}
+                    {SALE_STATES.filter((e) => e.value !== "sin_pagar").map((e) => <SelectItem key={e.value} value={e.value}>{e.singular}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

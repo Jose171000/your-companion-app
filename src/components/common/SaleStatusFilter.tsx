@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { SALE_STATES, SaleState } from "@/lib/sale-status";
 
 /**
- * Filtro por estado de la venta (pendiente, enviado, entregado, cancelado, devuelto). Se pueden marcar varios;
+ * Filtro por estado de la venta (sin pagar, pendiente, enviado, entregado, cancelado, devuelto). Se pueden marcar varios;
  * sin ninguno marcado se muestran todas. Cada opción muestra cuántas ventas hay en ese estado.
  */
 export function SaleStatusFilter({ value, onChange, counts }: {
