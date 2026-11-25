@@ -70,7 +70,6 @@ export function RegeneracionMasivaDialog({ open, onOpenChange, productIds, onFin
     if (data?.terminado && avisado.current !== data.id) {
       avisado.current = data.id;
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["products-overview"] });
       queryClient.invalidateQueries({ queryKey: ["product-sheet"] });
       const errores = data.items.filter((i) => i.estado === "error").length;
       toast[errores ? "warning" : "success"](errores ? `Regeneración terminada con ${errores} error(es)` : "Regeneración con IA terminada");

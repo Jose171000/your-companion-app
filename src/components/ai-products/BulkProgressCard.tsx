@@ -36,7 +36,6 @@ export function BulkProgressCard({ lote, onClose, onNuevoLote }: { lote: LoteEnC
   useEffect(() => {
     if (p?.terminado) {
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["products-summary"] });
     }
   }, [p?.terminado, queryClient]);
 

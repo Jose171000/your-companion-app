@@ -128,13 +128,14 @@ export function ProductsModule() {
     ? `${seleccionados.size} producto(s) seleccionado(s)${idsDelDescuento.length !== seleccionados.size ? ` (${idsDelDescuento.length} con sus variantes)` : ""}`
     : `Ningún producto seleccionado: se aplicará a los ${products.length} de esta página${idsDelDescuento.length !== products.length ? ` (${idsDelDescuento.length} con sus variantes)` : ""}${search ? ` · búsqueda «${search}»` : ""}`;
   const { data: overviewResult, isLoading: overviewLoading } = useQuery({
-    queryKey: ["products-overview", storeId, ids],
+    // Bajo «products»: todo lo que refresca la lista (eliminar, crear, editar, publicar, importar…) refresca también esto.
+    queryKey: ["products", "overview", storeId, ids],
     queryFn: () => productsApi.overview(ids),
     enabled: ids.length > 0,
     staleTime: 30_000,
   });
   const { data: summaryResult } = useQuery({
-    queryKey: ["products-summary", storeId],
+    queryKey: ["products", "summary", storeId],
     queryFn: () => productsApi.summary(),
     staleTime: 30_000,
   });
@@ -187,7 +188,6 @@ export function ProductsModule() {
       if (r.eliminados) toast.success(`${r.eliminados} producto(s) eliminados`);
       if (r.omitidos.length) toast.error(`${r.omitidos.length} no se pudieron eliminar: ${r.omitidos[0].motivo}`);
       queryClient.invalidateQueries({ queryKey: ["products"] });
-      queryClient.invalidateQueries({ queryKey: ["products-overview"] });
       setSeleccionados(new Map());
       setEliminarVariosOpen(false);
     },

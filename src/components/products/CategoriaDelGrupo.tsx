@@ -41,7 +41,7 @@ export function CategoriaDelGrupo({ groupId }: { groupId: string }) {
       if (res.error || !res.data) return toast.error(res.error ?? "No se pudo asignar la categoría");
       const n = res.data.asignadas + res.data.igualadas;
       toast.success(`Categoría unificada en ${n} variante(s).${res.data.distintasPublicadas ? ` ${res.data.distintasPublicadas} ya publicada(s) con otra conservan la de su ficha en Falabella.` : ""} No se envió nada a Falabella.`);
-      for (const k of ["falabella-group-category", "products", "product-sheet", "sync-status", "products-overview", "variant-compat"]) queryClient.invalidateQueries({ queryKey: [k] });
+      for (const k of ["falabella-group-category", "products", "product-sheet", "sync-status", "variant-compat"]) queryClient.invalidateQueries({ queryKey: [k] });
     },
     onError: () => toast.error("Error al conectar con el servidor"),
   });

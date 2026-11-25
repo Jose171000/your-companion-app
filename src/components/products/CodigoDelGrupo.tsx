@@ -24,7 +24,7 @@ export function CodigoDelGrupo({ groupId, codigo }: { groupId: string; codigo: s
       toast.success(`Código del grupo: ${res.data.anterior} → ${res.data.nuevo}. No se envió nada a los canales${res.data.canales.length ? `; para que ${res.data.canales.join(", ")} lo reciba hay que reenviar el grupo` : ""}.`);
       setEditando(false);
       setNuevo("");
-      for (const k of ["products", "product-sheet", "sync-status", "products-overview"]) queryClient.invalidateQueries({ queryKey: [k] });
+      for (const k of ["products", "product-sheet", "sync-status"]) queryClient.invalidateQueries({ queryKey: [k] });
     },
     onError: () => toast.error("Error al conectar con el servidor"),
   });
