@@ -27,6 +27,7 @@ const ESCRIBE: Permiso = "productos.editar";
 const AYUDA_DE_ESCRITURA = "Crea productos y variantes, y edita o completa con IA los que no están en ningún canal. No publica ni cambia precio o stock de lo que ya existe.";
 
 const ACCIONES: Record<string, string> = {
+  crear_enlace_para_fotos: "Creó un enlace para subir fotos",
   crear_producto: "Creó un producto",
   crear_producto_con_variantes: "Creó un producto con variantes",
   agregar_variantes: "Agregó variantes",
@@ -192,7 +193,7 @@ export function ClavesMcpTab({ storeId }: { storeId: string }) {
             {permisos.has(ESCRIBE) && (
               <p className="flex items-start gap-1.5 rounded-lg bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                Esta clave podrá cambiar tu catálogo. Para fotos, el asistente necesita enlaces https directos a archivos JPG.
+                Esta clave podrá cambiar tu catálogo. Para las fotos, el asistente puede darte un enlace para subirlas desde tu celular o tu PC.
               </p>
             )}
             {sensiblesMarcados.length > 0 && (
