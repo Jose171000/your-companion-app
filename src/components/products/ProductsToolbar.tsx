@@ -18,6 +18,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -41,9 +43,19 @@ interface ProductsToolbarProps {
   onInStockChange: (v: boolean) => void;
   onNewProduct: () => void;
   onExport: (format: "csv" | "xlsx" | "json") => void;
+  /** Excel con los atributos de cada categoría; sin canal salen todos */
+  onExportFichas: (canal?: string) => void;
   /** Abre el descuento general para los productos que se ven en la lista */
   onDescuento?: () => void;
 }
+
+/** Canales que tienen ficha que exportar. */
+const CANALES_CON_FICHA = [
+  { id: "falabella", name: "Falabella" },
+  { id: "mercadolibre", name: "Mercado Libre" },
+  { id: "ripley", name: "Ripley" },
+  { id: "woocommerce", name: "WooCommerce" },
+];
 
 /** Canales que tiene la tienda conectados o con publicaciones, más el que está elegido (para poder quitarlo). */
 function useCanalesDeLaTienda(elegido: string) {
@@ -64,6 +76,7 @@ export function ProductsToolbar({
   onInStockChange,
   onNewProduct,
   onExport,
+  onExportFichas,
   onDescuento,
 }: ProductsToolbarProps) {
   const [localSearch, setLocalSearch] = useState(search);
@@ -148,6 +161,14 @@ export function ProductsToolbar({
               <DropdownMenuItem onClick={() => onExport("csv")}>Exportar como CSV</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport("xlsx")}>Exportar como Excel</DropdownMenuItem>
               <DropdownMenuItem onClick={() => onExport("json")}>Exportar como JSON</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="max-w-64 text-xs font-normal text-muted-foreground">
+                Fichas por canal (Excel): una hoja por categoría, con sus atributos
+              </DropdownMenuLabel>
+              <DropdownMenuItem onClick={() => onExportFichas()}>Todos los canales</DropdownMenuItem>
+              {CANALES_CON_FICHA.filter((c) => canales.some((x) => x.id === c.id)).map((c) => (
+                <DropdownMenuItem key={c.id} onClick={() => onExportFichas(c.id)}>Solo {c.name}</DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

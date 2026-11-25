@@ -246,6 +246,16 @@ export function ProductsModule() {
     }
   };
 
+  const handleExportFichas = async (canal?: string) => {
+    try {
+      toast.loading("Preparando las fichas por canal… puede tardar si hay muchas categorías.", { id: "export-toast" });
+      await productsApi.exportChannelSheets(canal, filters);
+      toast.success("Exportación completada", { id: "export-toast" });
+    } catch (error: any) {
+      toast.error(error.message || "Error al exportar las fichas", { id: "export-toast" });
+    }
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -259,6 +269,7 @@ export function ProductsModule() {
         onInStockChange={handleInStockChange}
         onNewProduct={openCreate}
         onExport={handleExport}
+        onExportFichas={handleExportFichas}
         onDescuento={products.length > 0 ? () => setDescuentoOpen(true) : undefined}
       />
 

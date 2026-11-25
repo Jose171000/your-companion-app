@@ -405,6 +405,14 @@ export const productsApi = {
     return apiDownload(`/export/products/${format}${buildQueryString(exportParams)}`, `productos.${format}`);
   },
 
+  /** Excel con una hoja por canal y categoría, con los atributos propios de cada una (mismos filtros que la lista) */
+  exportChannelSheets: (canal: string | undefined, params: ProductsQueryParams = {}) => {
+    const { page, limit, sortBy, order, ...exportParams } = params;
+    const filtros = buildQueryString(exportParams);
+    const query = canal ? `${filtros}${filtros ? '&' : '?'}canal=${canal}` : filtros;
+    return apiDownload(`/export/channel-sheets${query}`, `fichas-${canal ?? 'por-canal'}.xlsx`);
+  },
+
   /** Exportar contenido generado por IA */
   exportAiContent: (format: 'json' | 'csv' | 'xlsx', params: ProductsQueryParams = {}) => {
     const { page, limit, sortBy, order, ...exportParams } = params;
