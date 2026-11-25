@@ -68,6 +68,18 @@ export const ROLE_LABELS: Record<StoreRole, string> = {
 /** A qué rol pasa una persona: uno de fábrica o un rol personalizado de la tienda (exactamente uno). */
 export type AsignacionDeRol = { role: 'editor' | 'viewer' } | { customRoleId: string };
 
+/** Un cambio hecho por un asistente a través del MCP. */
+export interface CambioMcp {
+  id: string;
+  keyId: string;
+  keyName: string;
+  tool: string;
+  resumen: { name?: string; sku?: string; parentSku?: string; id?: string; variantes?: number; campos?: string[] };
+  estado: 'pendiente' | 'hecho' | 'error';
+  mensaje: string | null;
+  createdAt: string;
+}
+
 /** Una clave de acceso al MCP de la tienda. Nunca trae la clave completa (solo al crearla). */
 export interface ClaveMcp {
   id: string;
@@ -170,10 +182,13 @@ export const storesApi = {
   deleteRole: (storeId: string, roleId: string) =>
     apiRequest<{ removed: boolean }>(`/stores/${storeId}/roles/${roleId}`, { method: 'DELETE' }),
 
-  /** Permisos que puede llevar una clave del MCP (solo lectura). */
+  /** Permisos que puede llevar una clave del MCP. */
   mcpPermissions: () => apiRequest<{ permissions: Permiso[] }>('/stores/mcp/permissions', { method: 'GET' }),
 
   apiKeys: (storeId: string) => apiRequest<ClaveMcp[]>(`/stores/${storeId}/api-keys`, { method: 'GET' }),
+
+  /** Los últimos cambios hechos por asistentes en la tienda (solo el dueño). */
+  mcpChanges: (storeId: string) => apiRequest<CambioMcp[]>(`/stores/${storeId}/mcp-changes`, { method: 'GET' }),
 
   /** La clave completa viene UNA sola vez, en `key`. */
   createApiKey: (storeId: string, cuerpo: { name: string; permissions: Permiso[]; expiresInDays?: number }) =>

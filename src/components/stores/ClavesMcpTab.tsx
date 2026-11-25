@@ -19,9 +19,20 @@ const MCP_URL = `${API_BASE_URL}/api/v1/mcp`;
 /** Lo que lleva una clave si no se cambia nada: sin datos de contacto de clientes ni costos. */
 const POR_DEFECTO: Permiso[] = ["productos.ver", "canales.ver", "ventas.ver", "analiticas.ver"];
 /** Lo que cada permiso necesita para tener sentido (el servidor también lo completa). */
-const REQUIERE: Partial<Record<Permiso, Permiso[]>> = { "ventas.contacto": ["ventas.ver"] };
+const REQUIERE: Partial<Record<Permiso, Permiso[]>> = { "ventas.contacto": ["ventas.ver"], "productos.editar": ["productos.ver"] };
 /** Permisos que no conviene dar sin pensarlo: salen en un aviso. */
 const SENSIBLES: Permiso[] = ["ventas.contacto", "costos.ver"];
+/** El único permiso que cambia datos. Desde el MCP hace menos que el mismo permiso en la app, y se dice así. */
+const ESCRIBE: Permiso = "productos.editar";
+const AYUDA_DE_ESCRITURA = "Crea productos y variantes, y edita o completa con IA los que no están en ningún canal. No publica ni cambia precio o stock de lo que ya existe.";
+
+const ACCIONES: Record<string, string> = {
+  crear_producto: "Creó un producto",
+  crear_producto_con_variantes: "Creó un producto con variantes",
+  agregar_variantes: "Agregó variantes",
+  editar_producto: "Editó un producto",
+  generar_contenido_ia: "Completó con IA",
+};
 
 const CADUCIDADES = [
   { valor: "ninguna", etiqueta: "Sin caducidad" },
@@ -46,7 +57,7 @@ const copiar = (texto: string, aviso: string) =>
 
 /**
  * La pestaña «Conexión MCP» de la gestión de la tienda: claves para que un asistente (Claude, Cursor…) consulte la tienda.
- * Solo el dueño. Las claves son de solo lectura; la clave completa se ve una sola vez, al crearla.
+ * Solo el dueño. Por defecto son de solo lectura; la clave completa se ve una sola vez, al crearla.
  */
 export function ClavesMcpTab({ storeId }: { storeId: string }) {
   const queryClient = useQueryClient();
@@ -59,12 +70,13 @@ export function ClavesMcpTab({ storeId }: { storeId: string }) {
 
   const clavesQuery = useQuery({ queryKey: ["store-api-keys", storeId], queryFn: () => storesApi.apiKeys(storeId), enabled: !!storeId });
   const permisosQuery = useQuery({ queryKey: ["mcp-permissions"], queryFn: () => storesApi.mcpPermissions(), staleTime: Infinity });
+  const cambiosQuery = useQuery({ queryKey: ["store-mcp-changes", storeId], queryFn: () => storesApi.mcpChanges(storeId), enabled: !!storeId });
   // Los títulos y ayudas son los mismos del catálogo de roles.
   const catalogoQuery = useQuery({ queryKey: ["permissions-catalog"], queryFn: () => storesApi.catalog(), staleTime: Infinity });
 
   const refrescar = () => queryClient.invalidateQueries({ queryKey: ["store-api-keys", storeId] });
   const titulo = (clave: Permiso) => catalogoQuery.data?.data?.permisos.find((p) => p.clave === clave)?.titulo ?? clave;
-  const ayuda = (clave: Permiso) => catalogoQuery.data?.data?.permisos.find((p) => p.clave === clave)?.ayuda ?? "";
+  const ayuda = (clave: Permiso) => (clave === ESCRIBE ? AYUDA_DE_ESCRITURA : catalogoQuery.data?.data?.permisos.find((p) => p.clave === clave)?.ayuda ?? "");
 
   const reiniciar = () => {
     setCreando(false);
@@ -119,6 +131,7 @@ export function ClavesMcpTab({ storeId }: { storeId: string }) {
   const disponibles = permisosQuery.data?.data?.permissions ?? [];
   const claves = clavesQuery.data?.data;
   const sensiblesMarcados = SENSIBLES.filter((p) => permisos.has(p));
+  const cambios = cambiosQuery.data?.data ?? [];
   const nombreValido = nombre.trim().length >= 2;
   const comando = nueva ? `claude mcp add --transport http synkro ${MCP_URL} --header "Authorization: Bearer ${nueva.clave}"` : "";
 
@@ -129,7 +142,7 @@ export function ClavesMcpTab({ storeId }: { storeId: string }) {
     <div className="space-y-5">
       <p className="text-xs text-muted-foreground">
         Con una clave, un asistente como Claude puede <strong>consultar</strong> esta tienda: productos, ventas, reportes y cambios pendientes.
-        Solo lectura: no puede editar, publicar ni aprobar nada. Lo que ve depende de los permisos de la clave y de los tuyos.
+        Si le das el permiso de productos, también puede crearlos. Nunca publica ni aprueba nada. Lo que puede hacer depende de la clave y de tus permisos.
       </p>
 
       {nueva && (
@@ -166,7 +179,7 @@ export function ClavesMcpTab({ storeId }: { storeId: string }) {
           </div>
 
           <div className="space-y-2">
-            <Label>Qué puede ver</Label>
+            <Label>Qué puede hacer</Label>
             {disponibles.map((p) => (
               <label key={p} className="flex cursor-pointer items-start gap-2.5 rounded-lg p-1.5 hover:bg-secondary/40">
                 <Checkbox className="mt-0.5" checked={permisos.has(p)} onCheckedChange={(v) => alternar(p, v === true)} />
@@ -176,6 +189,12 @@ export function ClavesMcpTab({ storeId }: { storeId: string }) {
                 </span>
               </label>
             ))}
+            {permisos.has(ESCRIBE) && (
+              <p className="flex items-start gap-1.5 rounded-lg bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                Esta clave podrá cambiar tu catálogo. Para fotos, el asistente necesita enlaces https directos a archivos JPG.
+              </p>
+            )}
             {sensiblesMarcados.length > 0 && (
               <p className="flex items-start gap-1.5 rounded-lg bg-amber-500/10 p-2 text-xs text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -251,6 +270,27 @@ export function ClavesMcpTab({ storeId }: { storeId: string }) {
           Hasta 10 claves activas por tienda. Una clave revocada deja de funcionar al instante. Si alguien sale del equipo, sus claves pierden los permisos que tenía.
         </p>
       </section>
+
+      {cambios.length > 0 && (
+        <section className="space-y-2">
+          <p className="text-sm font-semibold">Cambios hechos por asistentes</p>
+          <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+            {cambios.map((c) => (
+              <li key={c.id} className="rounded-lg border border-border p-2 text-xs">
+                <p className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-medium">{ACCIONES[c.tool] ?? c.tool}</span>
+                  <span className="min-w-0 truncate">{c.resumen.name ?? c.resumen.sku ?? ""}</span>
+                  {c.estado !== "hecho" && (
+                    <Badge variant="outline" className="text-[10px] font-normal">{c.estado === "error" ? "No se hizo" : "Sin confirmar"}</Badge>
+                  )}
+                </p>
+                <p className="text-muted-foreground">{c.keyName} · {new Date(c.createdAt).toLocaleString()}</p>
+                {c.mensaje && <p className="break-words text-destructive">{c.mensaje}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
