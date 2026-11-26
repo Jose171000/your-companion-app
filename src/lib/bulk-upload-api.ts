@@ -52,6 +52,32 @@ export interface BulkRetryResponse {
   falabellaReenviados: number;
 }
 
+export interface CargaMasiva {
+  id: string;
+  /** Nombre del Excel (las cargas antiguas no lo tienen) */
+  archivo: string | null;
+  creada: string;
+  terminadaEl: string | null;
+  estado: 'en_cola' | 'procesando' | 'terminada' | 'detenida';
+  total: number;
+  creados: number;
+  fallidos: number;
+  reintentados: number;
+  /** Filas del Excel que no entraron, con su motivo */
+  rechazadas: string[];
+  falabella: { pendientes: number; enviados: number; rechazados: number };
+  sePuedeReintentar: boolean;
+}
+
+export interface ProductoDeCarga {
+  sku: string;
+  estado: 'pendiente' | 'listo' | 'fallido' | 'reintentado';
+  error: string | null;
+  productId: string | null;
+  falabella: string | null;
+  falabellaError: string | null;
+}
+
 export interface BulkUploadStatus {
   status: string;
   total?: number;
@@ -99,6 +125,13 @@ export const bulkUploadApi = {
   /** Avance de una carga masiva: cuántos productos van listos y cuántos fallaron. */
   getProductsProgress: (batchId: string) =>
     apiRequest<BulkProgress>(`/bulk-upload/products/progress/${batchId}`, { method: 'GET' }),
+
+  /** Las cargas masivas que subiste en la tienda activa, la más nueva primero. */
+  getBatches: () => apiRequest<{ cargas: CargaMasiva[] }>('/bulk-upload/products/batches', { method: 'GET' }),
+
+  /** Los productos de una carga, uno por uno. */
+  getBatchProducts: (batchId: string) =>
+    apiRequest<{ productos: ProductoDeCarga[] }>(`/bulk-upload/products/batches/${batchId}`, { method: 'GET' }),
 
   /** Vuelve a mandar los productos fallidos de una carga terminada y reenvía a Falabella los que quedaron sin enviar. */
   retryProducts: (batchId: string) =>

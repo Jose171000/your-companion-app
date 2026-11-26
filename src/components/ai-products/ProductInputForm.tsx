@@ -1,3 +1,4 @@
+import { AvisoDeCanales } from "./AvisoDeCanales";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -352,6 +353,7 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
                   baseStock={stock}
                   deteccion={sugerencia}
                   busy={isProcessing}
+                  faltanCanales={!isFormReady}
                   onSubmit={(wizard) => onSubmitVariants?.({ sku: sku.trim(), content: singleProduct, images, wizard })}
                 />
               )}
@@ -429,6 +431,8 @@ export function ProductInputForm({ onSubmit, onSubmitVariants, isProcessing, isF
           </div>
         </TabsContent>
       </Tabs>
+
+      {mode === "single" && tiene !== "si" && !isFormReady && <AvisoDeCanales />}
 
       {!(mode === "single" && tiene === "si") && (
       <Button

@@ -1,5 +1,6 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { AccountChooser, CuentasPorCanal } from "@/components/marketplaces/AccountChooser";
-import { BulkProgressCard, LoteEnCurso } from "./BulkProgressCard";
+import { CargasMasivas } from "./CargasMasivas";
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { MarketplaceSelector } from "./MarketplaceSelector";
@@ -39,9 +40,9 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
   const [launching, setLaunching] = useState(false);
   // El último paso solo preparó los canales: la persona revisa y confirma antes de que se publique nada.
   const [enRevision, setEnRevision] = useState(false);
-  // Cuentas elegidas por canal (si la tienda tiene varias) y la carga masiva que está en proceso.
+  // Cuentas elegidas por canal (si la tienda tiene varias).
   const [cuentas, setCuentas] = useState<CuentasPorCanal>({});
-  const [lote, setLote] = useState<LoteEnCurso | null>(null);
+  const queryClient = useQueryClient();
   // En carga masiva los canales van en la columna `canales` del Excel; sin ella se usan todos los conectados.
   const [modoCarga, setModoCarga] = useState<"single" | "bulk">("single");
   const esMasivo = modoCarga === "bulk";
@@ -133,7 +134,7 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
           // El formulario se limpia: así no se puede enviar el mismo archivo otra vez por error mientras se procesa.
           setFormKey((k) => k + 1);
           setDirty("ai-products", false);
-          if (response.data?.batchId) setLote({ batchId: response.data.batchId, total: response.data.totalQueued ?? 0, rechazos: rechazos });
+          queryClient.invalidateQueries({ queryKey: ["bulk-batches"] });
         }
       } else {
         // ── Producto individual: genera contenido con IA ──
@@ -453,8 +454,8 @@ export function AIProductsModule({ compact = false, onCreated }: AIProductsModul
         />
       </Card>
 
-      {/* Carga masiva en proceso: avance en vivo */}
-      {lote && <BulkProgressCard lote={lote} onClose={() => setLote(null)} onNuevoLote={setLote} />}
+      {/* Cargas masivas en curso e historial (en la ventana «Nuevo producto», solo al elegir carga masiva) */}
+      {(!compact || esMasivo) && <CargasMasivas />}
 
       {/* Resultado de un producto con variantes */}
       {grupoCreado && (

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { DeteccionDeVariantes, EjeDeVariacion } from "@/lib/variants-api";
+import { AvisoDeCanales } from "./AvisoDeCanales";
 import {
   MAX_FOTOS_POR_VARIANTE,
   MAX_VARIANTES,
@@ -35,6 +36,8 @@ interface Props {
   /** Lo que la IA detectó antes de entrar: ejes, valores y a qué valor corresponde cada foto. */
   deteccion: DeteccionDeVariantes | null;
   busy: boolean;
+  /** No hay ningún canal elegido: no se puede generar todavía. */
+  faltanCanales?: boolean;
   onSubmit: (r: ResultadoDelRecorrido) => void;
 }
 
@@ -105,7 +108,7 @@ function CampoConCheck({ placeholder, onAdd, ancho = "w-44" }: { placeholder: st
   );
 }
 
-export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, baseStock, deteccion, busy, onSubmit }: Props) {
+export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, baseStock, deteccion, busy, faltanCanales, onSubmit }: Props) {
   const [axes, setAxes] = useState<string[]>(() => deteccion?.ejes.map((e) => e.name) ?? []);
   const [vals, setVals] = useState<Record<string, string[]>>(() => Object.fromEntries((deteccion?.ejes ?? []).map((e) => [e.name, e.values])));
   const [fotosModo, setFotosModo] = useState<"mismas" | "cambian" | null>(null);
@@ -189,7 +192,7 @@ export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, b
   })();
 
   const sinFotos = modoFotos === "cambian" ? variantes.filter((v) => !fotosDe(claveDe(v, ejes)).length) : [];
-  const listoParaCrear = variantes.length > 0 && variantes.length <= MAX_VARIANTES && sinFotos.length === 0 && skusRepetidos.size === 0 && !busy;
+  const listoParaCrear = variantes.length > 0 && variantes.length <= MAX_VARIANTES && sinFotos.length === 0 && skusRepetidos.size === 0 && !busy && !faltanCanales;
 
   const crear = () => {
     onSubmit({
@@ -463,6 +466,7 @@ export function VariantsWizard({ photos, parentSku, codigoSugerido, basePrice, b
           {excluidas.length > 0 && (
             <button type="button" className="text-[11px] text-muted-foreground underline mt-2" onClick={() => setExcluidas([])}>Volver a incluir las {excluidas.length} variantes quitadas</button>
           )}
+          {faltanCanales && <div className="mt-3"><AvisoDeCanales /></div>}
           <Button type="button" disabled={!listoParaCrear} onClick={crear} className="w-full h-11 mt-3 rounded-[12px] font-semibold bg-[#111111] dark:bg-[#FCCB34] text-white dark:text-[#111111] hover:bg-[#222222] dark:hover:bg-[#E6B620]">
             {busy ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Creando variantes…</> : <><Sparkles className="w-4 h-4 mr-2 text-[#FCCB34] dark:text-[#111111]" />Generar con IA</>}
           </Button>
