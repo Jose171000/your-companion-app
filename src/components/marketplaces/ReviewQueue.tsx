@@ -176,14 +176,27 @@ function HistorialDeSolicitudes({ canManage }: { canManage: boolean }) {
   const totalPaginas = data?.data?.totalPages ?? 1;
   const desde = total ? (pagina - 1) * TAMANO + 1 : 0;
   const hasta = Math.min(pagina * TAMANO, total);
-  const hayLimitadas = filas.some((r) => r.status === "error" && r.marketplace === "falabella" && /429|too many attempts/i.test(r.resultMessage ?? ""));
+  const hayErrores = estado === "error" || filas.some((r) => r.status === "error");
+  const [confirmando, setConfirmando] = useState(false);
 
-  const reintentar = useMutation({
-    mutationFn: () => syncApi.retryRateLimitedChanges(),
+  const reenviar = useMutation({
+    mutationFn: (filtro: { ids?: string[]; field?: string; q?: string }) => syncApi.retryFailedChanges(filtro),
     onSuccess: (res) => {
-      if (res.error || !res.data) toast.error(res.error ?? "No se pudieron reenviar");
-      else if (!res.data.reintentadas) toast.info("No hay solicitudes rechazadas por el límite de Falabella.");
-      else toast.success(`${res.data.reintentadas} solicitud(es) se reenvían a Falabella por lotes; puede tardar unos minutos.`);
+      setConfirmando(false);
+      if (res.error || !res.data) {
+        toast.error(res.error ?? "No se pudieron reenviar");
+      } else {
+        const { reenviadas, enRevision, omitidas, restantes } = res.data;
+        const motivos = [...new Set(omitidas.map((o) => o.motivo))].slice(0, 3).join(" ");
+        const partes = [
+          reenviadas
+            ? `${reenviadas} ${reenviadas === 1 ? "envío" : "envíos"} ${enRevision ? "quedan pendientes de aprobar (arriba)" : "se están reenviando"}.`
+            : "No había nada que reenviar.",
+          omitidas.length ? `${omitidas.length} omitido(s): ${motivos}` : "",
+          restantes ? `Quedan ${restantes}: vuelve a pulsar para seguir.` : "",
+        ].filter(Boolean).join(" ");
+        (reenviadas ? toast.success : toast.info)(partes, { duration: 12000 });
+      }
       queryClient.invalidateQueries({ queryKey: ["sync-change-requests"] });
       queryClient.invalidateQueries({ queryKey: ["sync-change-requests-history"] });
     },
@@ -197,11 +210,18 @@ function HistorialDeSolicitudes({ canManage }: { canManage: boolean }) {
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="font-semibold text-base">Historial{total ? ` (${total})` : ""}</h3>
-        {canManage && (hayLimitadas || estado === "error") && (
-          <Button variant="outline" size="sm" disabled={reintentar.isPending} onClick={() => reintentar.mutate()}
-            title="Falabella pidió esperar y no las recibió. Se reenvían por lotes, espaciadas.">
-            Reenviar las rechazadas por el límite de Falabella
-          </Button>
+        {canManage && hayErrores && (!estado || estado === "error") && (
+          confirmando ? (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-muted-foreground">Se envía el valor actual de Synkro{campo || qFinal ? " (solo lo que coincide con tu filtro)" : ""}.</span>
+              <Button size="sm" disabled={reenviar.isPending} onClick={() => reenviar.mutate({ field: campo || undefined, q: qFinal || undefined })}>
+                {reenviar.isPending ? "Reenviando…" : "Sí, reenviar"}
+              </Button>
+              <Button variant="ghost" size="sm" disabled={reenviar.isPending} onClick={() => setConfirmando(false)}>Cancelar</Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setConfirmando(true)}>Reenviar todos los errores</Button>
+          )
         )}
       </div>
       <Filtros q={q} onQ={setQ} campo={campo} onCampo={cambiaCampo}>
@@ -234,6 +254,11 @@ function HistorialDeSolicitudes({ canManage }: { canManage: boolean }) {
                 <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
                   {r.resolvedAt && <span>{new Date(r.resolvedAt).toLocaleString()}</span>}
                   <Badge className={cn("text-[10px]", style.className)}>{style.label}</Badge>
+                  {canManage && r.status === "error" && (
+                    <Button variant="outline" size="sm" disabled={reenviar.isPending} onClick={() => reenviar.mutate({ ids: [r.id] })} title="Envía el valor que Synkro tiene ahora">
+                      Reenviar
+                    </Button>
+                  )}
                 </div>
               </div>
             );

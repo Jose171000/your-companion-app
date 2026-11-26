@@ -961,6 +961,13 @@ export const syncApi = {
   retryRateLimitedChanges: () =>
     apiRequest<{ reintentadas: number }>('/sync/change-requests/retry-rate-limited', { method: 'POST' }),
 
+  /** Reenvía los envíos con error con el valor actual de Synkro: una fila (ids) o todos los que coinciden con los filtros */
+  retryFailedChanges: (filtro: { ids?: string[]; field?: string; q?: string }) =>
+    apiRequest<{ reenviadas: number; enRevision: boolean; omitidas: { sku: string; motivo: string }[]; restantes: number }>('/sync/change-requests/retry-errors', {
+      method: 'POST',
+      body: JSON.stringify(filtro),
+    }),
+
   rejectManyChanges: (ids: string[], reason?: string) =>
     apiRequest<{ rechazadas: number; omitidas: { id: string; motivo: string }[] }>('/sync/change-requests/reject-many', {
       method: 'POST',
