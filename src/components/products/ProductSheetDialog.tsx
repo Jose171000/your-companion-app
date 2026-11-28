@@ -796,12 +796,12 @@ function FichaDeProducto({
                 <EstadoDelCanal canal={ripley} stock={hoja.product.stock} />
                 {ripley.lastError && <p className="text-xs text-red-400 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{ripley.lastError}</p>}
                 {ripley.listo ? (
-                  <p className="text-xs text-green-500 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> Esto es lo que Synkro preparó y envió a Ripley.</p>
+                  <p className="text-xs text-green-500 flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5" /> {ripley.sent.sentAt ? "Esto es lo que Synkro preparó y envió a Ripley." : ripley.sent.offerId ? "Datos de Ripley guardados en Synkro. Synkro no ha enviado esta ficha." : "Preparado en Synkro, todavía sin enviar."}</p>
                 ) : (
                   <p className="text-xs text-amber-500 break-words flex gap-1.5"><AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />{ripley.motivo ?? "Todavía falta preparar este producto para Ripley."}</p>
                 )}
                 <div className="rounded-lg border border-border p-3 space-y-1 text-sm break-words">
-                  <p><span className="text-muted-foreground">Nombre que se envió:</span> {ripley.sent.name ?? "—"}</p>
+                  <p><span className="text-muted-foreground">{ripley.sent.sentAt ? "Nombre que se envió:" : ripley.sent.offerId ? "Nombre en Ripley:" : "Nombre preparado:"}</span> {ripley.sent.name ?? "—"}</p>
                   {ripley.sent.shortDescription && <p><span className="text-muted-foreground">Descripción corta:</span> {ripley.sent.shortDescription}</p>}
                   <p><span className="text-muted-foreground">Categoría:</span> {ripley.sent.categoryPath ?? ripley.sent.categoryId ?? "sin asignar"}</p>
                   <p><span className="text-muted-foreground">Marca:</span> {ripley.sent.brand ?? "—"}</p>
@@ -810,7 +810,7 @@ function FichaDeProducto({
                 </div>
                 {(ripley.sent.attributes as any[]).length > 0 && (
                   <div className="space-y-2">
-                    <Label className="text-xs">Atributos de la categoría que se enviaron ({(ripley.sent.attributes as any[]).length})</Label>
+                    <Label className="text-xs">Atributos de la categoría {ripley.sent.sentAt ? "que se enviaron" : "guardados en Synkro"} ({(ripley.sent.attributes as any[]).length})</Label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {(ripley.sent.attributes as any[]).map((a) => (
                         <div key={a.name} className="rounded-lg border border-border px-3 py-2 text-sm break-words">
@@ -820,6 +820,11 @@ function FichaDeProducto({
                       ))}
                     </div>
                   </div>
+                )}
+                {ripley.sent.offerId && (ripley.sent.attributes as any[]).length === 0 && (
+                  <p className="text-xs text-muted-foreground rounded-lg border border-dashed border-border p-3">
+                    Ripley no entrega los atributos al importar. Puedes rellenarlos en Publicar → Preparar para Ripley y pulsar solo «Guardar».
+                  </p>
                 )}
                 <p className="text-xs text-muted-foreground">
                   Por ahora esta pestaña es solo de lectura. Para cambiar la categoría, los atributos o la marca usa Publicar → Preparar para Ripley. El stock y el precio de Ripley se sincronizan solos.
